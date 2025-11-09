@@ -127,8 +127,11 @@ module suirify::protocol {
 
         // Reset daily counters if needed and enforce global per-day limit
         reset_daily_mint_if_needed(config, now);
-        assert!(config.mints_today < config.global_mint_limit_per_day, EUNAUTHORIZED);
-        config.mints_today = config.mints_today + 1;
+
+        // ensure there's room for this mint (use +1 to avoid ordering ambiguity)
+        let next_mint_count = config.mints_today + 1;
+        assert!(next_mint_count <= config.global_mint_limit_per_day, EUNAUTHORIZED);
+        config.mints_today = next_mint_count;
 
         let attestation = Suirify_Attestation {
             id: object::new(ctx),
@@ -278,7 +281,7 @@ module suirify::protocol {
             config.last_mint_reset_timestamp = now_ms;
         };
     }
-    
+
     // Getter for tests: expose mints_today for verification
     public fun get_mints_today(config: &ProtocolConfig): u64 {
         config.mints_today
