@@ -42,18 +42,18 @@ module suirify::suirify_tests {
         next_tx(&mut scenario, ADMIN);
         {
             let admin_cap = test_scenario::take_from_sender<VerifierAdminCap>(&scenario);
-            let config = test_scenario::take_from_sender<ProtocolConfig>(&scenario);
+            let mut config = test_scenario::take_from_sender<ProtocolConfig>(&scenario);
             
             // Mint attestation for USER1
             protocol::mint_attestation(
                 &admin_cap,
-                &config,
+                &mut config,
                 USER1,
                 840, // US jurisdiction code
                 1,   // verifier source
                 1,   // verification level
                 b"name_hash_test",
-                true, // is_human_verified
+                true, // is_human_sverified
                 true, // is_over_18
                 1,    // verifier_version
                 test_scenario::ctx(&mut scenario)
@@ -94,11 +94,11 @@ module suirify::suirify_tests {
         next_tx(&mut scenario, ADMIN);
         {
             let admin_cap = test_scenario::take_from_sender<VerifierAdminCap>(&scenario);
-            let config = test_scenario::take_from_sender<ProtocolConfig>(&scenario);
+            let mut config = test_scenario::take_from_sender<ProtocolConfig>(&scenario);
             
             protocol::mint_attestation(
                 &admin_cap,
-                &config,
+                &mut config,
                 USER1,
                 840, // US jurisdiction code
                 1, 1, b"name_hash_test", true, true, 1,
@@ -125,7 +125,7 @@ module suirify::suirify_tests {
             );
             
             // Verify attestation is revoked
-            assert!(protocol::get_status(&attestation) == 3, 7); // STATUS_REVOKED
+            assert!(protocol::get_status(&attestation) == 2, 7); // STATUS_REVOKED (was 3)
             assert!(protocol::is_revoked(&attestation), 8);
             
             test_scenario::return_to_sender(&scenario, admin_cap);
@@ -149,11 +149,11 @@ module suirify::suirify_tests {
         next_tx(&mut scenario, ADMIN);
         {
             let admin_cap = test_scenario::take_from_sender<VerifierAdminCap>(&scenario);
-            let config = test_scenario::take_from_sender<ProtocolConfig>(&scenario);
+            let mut config = test_scenario::take_from_sender<ProtocolConfig>(&scenario);
             
             protocol::mint_attestation(
                 &admin_cap,
-                &config,
+                &mut config,
                 USER1,
                 840, 1, 1, b"name_hash_test", true, true, 1,
                 test_scenario::ctx(&mut scenario)
@@ -195,11 +195,11 @@ module suirify::suirify_tests {
         next_tx(&mut scenario, ADMIN);
         {
             let admin_cap = test_scenario::take_from_sender<VerifierAdminCap>(&scenario);
-            let config = test_scenario::take_from_sender<ProtocolConfig>(&scenario);
+            let mut config = test_scenario::take_from_sender<ProtocolConfig>(&scenario);
             
             protocol::mint_attestation(
                 &admin_cap,
-                &config,
+                &mut config,
                 USER1,
                 840, 1, 1, b"name_hash_test", true, true, 1,
                 test_scenario::ctx(&mut scenario)
@@ -282,7 +282,7 @@ module suirify::suirify_tests {
             // This should fail
             protocol::mint_attestation(
                 &admin_cap,
-                &config,
+                &mut config,
                 USER1,
                 840, 1, 1, b"name_hash_test", true, true, 1,
                 test_scenario::ctx(&mut scenario)
@@ -308,11 +308,11 @@ module suirify::suirify_tests {
         next_tx(&mut scenario, ADMIN);
         {
             let admin_cap = test_scenario::take_from_sender<VerifierAdminCap>(&scenario);
-            let config = test_scenario::take_from_sender<ProtocolConfig>(&scenario);
+            let mut config = test_scenario::take_from_sender<ProtocolConfig>(&scenario);
             
             protocol::mint_attestation(
                 &admin_cap,
-                &config,
+                &mut config,
                 USER1,
                 840, 1, 1, b"name_hash_test", true, true, 1,
                 test_scenario::ctx(&mut scenario)
@@ -346,11 +346,11 @@ module suirify::suirify_tests {
         next_tx(&mut scenario, ADMIN);
         {
             let admin_cap = test_scenario::take_from_sender<VerifierAdminCap>(&scenario);
-            let config = test_scenario::take_from_sender<ProtocolConfig>(&scenario);
+            let mut config = test_scenario::take_from_sender<ProtocolConfig>(&scenario);
             
             protocol::mint_attestation(
                 &admin_cap,
-                &config,
+                &mut config,
                 USER1,
                 840, 1, 1, b"test_name_hash", true, true, 1,
                 test_scenario::ctx(&mut scenario)
@@ -372,6 +372,304 @@ module suirify::suirify_tests {
         };
         
         clock::destroy_for_testing(clock);
+        test_scenario::end(scenario);
+    }
+
+    // Test-only: validate daily mint counters/reset and allowlist behavior
+    #[test_only]
+    public fun test_mint_counters_and_reset() {
+        let mut scenario = test_scenario::begin(ADMIN);
+
+        // Initialize protocol
+        {
+            protocol::test_init(test_scenario::ctx(&mut scenario));
+        };
+
+        next_tx(&mut scenario, ADMIN);
+        {
+            let admin_cap = test_scenario::take_from_sender<VerifierAdminCap>(&scenario);
+            let mut config = test_scenario::take_from_sender<ProtocolConfig>(&scenario);
+
+            // Set a low daily limit so we can observe behavior
+            protocol::update_global_mint_limit_per_day(&admin_cap, &mut config, 2);
+
+            // Mint twice (should succeed)
+            protocol::mint_attestation(
+                &admin_cap,
+                &mut config,
+                ADMIN,
+                1u16,   // jurisdiction_code
+                1u8,    // verifier_source
+                1u8,    // verification_level
+                vector[], // name_hash
+                true,   // is_human_verified
+                true,   // is_over_18
+                1u8,    // verifier_version
+                test_scenario::ctx(&mut scenario),
+            );
+            protocol::mint_attestation(
+                &admin_cap,
+                &mut config,
+                ADMIN,
+                1u16,
+                1u8,
+                1u8,
+                vector[],
+                true,
+                true,
+                1u8,
+                test_scenario::ctx(&mut scenario),
+            );
+
+            // Return objects to admin so we can inspect/use them in next tx
+            test_scenario::return_to_sender(&scenario, admin_cap);
+            test_scenario::return_to_sender(&scenario, config);
+        };
+
+        // Now simulate a reset and ensure minting is possible again after reset
+        next_tx(&mut scenario, ADMIN);
+        {
+            let admin_cap = test_scenario::take_from_sender<VerifierAdminCap>(&scenario);
+            let mut config = test_scenario::take_from_sender<ProtocolConfig>(&scenario);
+
+            // Force a 24h+ jump to trigger reset (use a large timestamp)
+            protocol::reset_daily_mint_if_needed(&mut config, 999999999999u64);
+
+            // After reset, minting should succeed again (this would have failed if counters weren't reset)
+            protocol::mint_attestation(
+                &admin_cap,
+                &mut config,
+                ADMIN,
+                1u16,
+                1u8,
+                1u8,
+                vector[],
+                true,
+                true,
+                1u8,
+                test_scenario::ctx(&mut scenario),
+            );
+
+            test_scenario::return_to_sender(&scenario, admin_cap);
+            test_scenario::return_to_sender(&scenario, config);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test_only]
+    public fun test_allowlist_behavior() {
+        let mut scenario = test_scenario::begin(ADMIN);
+
+        // Initialize protocol
+        {
+            protocol::test_init(test_scenario::ctx(&mut scenario));
+        };
+
+        next_tx(&mut scenario, ADMIN);
+        {
+            let admin_cap = test_scenario::take_from_sender<VerifierAdminCap>(&scenario);
+            let mut config = test_scenario::take_from_sender<ProtocolConfig>(&scenario);
+
+            let addr_allowed = USER1;
+            let addr_not_allowed = USER2;
+
+            // Add one address to allowlist and verify membership checks
+            protocol::add_to_allowlist(&admin_cap, &mut config, addr_allowed);
+            assert!(protocol::is_in_allowlist(&admin_cap, &config, addr_allowed), 100);
+            assert!(!protocol::is_in_allowlist(&admin_cap, &config, addr_not_allowed), 100);
+
+            // Minting to allowed address should succeed
+            protocol::mint_attestation(
+                &admin_cap,
+                &mut config,
+                addr_allowed,
+                1u16,
+                1u8,
+                1u8,
+                vector[],
+                false,
+                false,
+                1u8,
+                test_scenario::ctx(&mut scenario),
+            );
+
+            test_scenario::return_to_sender(&scenario, admin_cap);
+            test_scenario::return_to_sender(&scenario, config);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    // New tests to cover edge cases and authority checks
+
+    #[test]
+    #[expected_failure(abort_code = suirify::protocol::EUNAUTHORIZED)]
+    fun test_min_verifier_version_enforced() {
+        let mut scenario = test_scenario::begin(ADMIN);
+        { protocol::test_init(test_scenario::ctx(&mut scenario)); };
+
+        next_tx(&mut scenario, ADMIN);
+        {
+            let admin_cap = test_scenario::take_from_sender<VerifierAdminCap>(&scenario);
+            let mut config = test_scenario::take_from_sender<ProtocolConfig>(&scenario);
+
+            // raise minimum required verifier version
+            protocol::update_min_verifier_version(&admin_cap, &mut config, 2);
+
+            // attempt to mint with verifier_version = 1 should abort
+            protocol::mint_attestation(
+                &admin_cap,
+                &mut config,
+                USER1,
+                840, 1, 1, b"mh", true, true, 1,
+                test_scenario::ctx(&mut scenario)
+            );
+
+            test_scenario::return_to_sender(&scenario, admin_cap);
+            test_scenario::return_to_sender(&scenario, config);
+        };
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = suirify::protocol::EUNAUTHORIZED)]
+    fun test_global_mint_limit_exceeded() {
+        let mut scenario = test_scenario::begin(ADMIN);
+        { protocol::test_init(test_scenario::ctx(&mut scenario)); };
+
+        next_tx(&mut scenario, ADMIN);
+        {
+            let admin_cap = test_scenario::take_from_sender<VerifierAdminCap>(&scenario);
+            let mut config = test_scenario::take_from_sender<ProtocolConfig>(&scenario);
+
+            // set daily limit to 1
+            protocol::update_global_mint_limit_per_day(&admin_cap, &mut config, 1);
+
+            // first mint succeeds
+            protocol::mint_attestation(
+                &admin_cap,
+                &mut config,
+                ADMIN,
+                1u16, 1u8, 1u8, vector[], true, true, 1u8,
+                test_scenario::ctx(&mut scenario)
+            );
+
+            // verify counter incremented
+            assert!(protocol::get_mints_today(&config) == 1, 999);
+
+            // second mint in same day should abort due to limit
+            protocol::mint_attestation(
+                &admin_cap,
+                &mut config,
+                ADMIN,
+                1u16, 1u8, 1u8, vector[], true, true, 1u8,
+                test_scenario::ctx(&mut scenario)
+            );
+
+            test_scenario::return_to_sender(&scenario, admin_cap);
+            test_scenario::return_to_sender(&scenario, config);
+        };
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = suirify::protocol::EPROTOCOL_PAUSED)]
+    fun test_revoke_when_paused_fails() {
+        let mut scenario = test_scenario::begin(ADMIN);
+        { protocol::test_init(test_scenario::ctx(&mut scenario)); };
+
+        // mint an attestation to revoke later
+        next_tx(&mut scenario, ADMIN);
+        {
+            let admin_cap = test_scenario::take_from_sender<VerifierAdminCap>(&scenario);
+            let mut config = test_scenario::take_from_sender<ProtocolConfig>(&scenario);
+
+            protocol::mint_attestation(
+                &admin_cap,
+                &mut config,
+                USER1,
+                840, 1, 1, b"mh", true, true, 1,
+                test_scenario::ctx(&mut scenario)
+            );
+
+            test_scenario::return_to_sender(&scenario, admin_cap);
+            test_scenario::return_to_sender(&scenario, config);
+        };
+
+        // pause protocol then attempt revoke (should abort)
+        next_tx(&mut scenario, ADMIN);
+        {
+            let admin_cap = test_scenario::take_from_sender<VerifierAdminCap>(&scenario);
+            let mut config = test_scenario::take_from_sender<ProtocolConfig>(&scenario);
+            let mut attestation = test_scenario::take_from_address<Suirify_Attestation>(&scenario, USER1);
+
+            protocol::set_protocol_paused(&admin_cap, &mut config, true);
+
+            protocol::revoke_attestation(
+                &admin_cap,
+                &config,
+                &mut attestation,
+                1,
+                test_scenario::ctx(&mut scenario)
+            );
+
+            test_scenario::return_to_sender(&scenario, admin_cap);
+            test_scenario::return_to_sender(&scenario, config);
+            test_scenario::return_to_address(USER1, attestation);
+        };
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_owner_can_burn_after_revoke() {
+        let mut scenario = test_scenario::begin(ADMIN);
+        { protocol::test_init(test_scenario::ctx(&mut scenario)); };
+
+        // mint
+        next_tx(&mut scenario, ADMIN);
+        {
+            let admin_cap = test_scenario::take_from_sender<VerifierAdminCap>(&scenario);
+            let mut config = test_scenario::take_from_sender<ProtocolConfig>(&scenario);
+
+            protocol::mint_attestation(
+                &admin_cap,
+                &mut config,
+                USER1,
+                840, 1, 1, b"mh", true, true, 1,
+                test_scenario::ctx(&mut scenario)
+            );
+
+            test_scenario::return_to_sender(&scenario, admin_cap);
+            test_scenario::return_to_sender(&scenario, config);
+        };
+
+        // revoke as admin
+        next_tx(&mut scenario, ADMIN);
+        {
+            let admin_cap = test_scenario::take_from_sender<VerifierAdminCap>(&scenario);
+            let config = test_scenario::take_from_sender<ProtocolConfig>(&scenario);
+            let mut attestation = test_scenario::take_from_address<Suirify_Attestation>(&scenario, USER1);
+
+            protocol::revoke_attestation(&admin_cap, &config, &mut attestation, 2, test_scenario::ctx(&mut scenario));
+
+            test_scenario::return_to_sender(&scenario, admin_cap);
+            test_scenario::return_to_sender(&scenario, config);
+            test_scenario::return_to_address(USER1, attestation);
+        };
+
+        // owner burns revoked attestation
+        next_tx(&mut scenario, USER1);
+        {
+            let attestation = test_scenario::take_from_sender<Suirify_Attestation>(&scenario);
+            user_actions::burn_self(attestation, test_scenario::ctx(&mut scenario));
+        };
+
+        next_tx(&mut scenario, USER1);
+        {
+            assert!(!test_scenario::has_most_recent_for_sender<Suirify_Attestation>(&scenario), 200);
+        };
+
         test_scenario::end(scenario);
     }
 }

@@ -73,6 +73,8 @@ module suirify::protocol {
     // Functions
     /// Initializes the entire protocol.
     fun init(ctx: &mut TxContext) {
+        let now = tx_context::epoch_timestamp_ms(ctx);
+
         let verifier_admin_cap = VerifierAdminCap {
             id: object::new(ctx),
         };
@@ -88,7 +90,7 @@ module suirify::protocol {
             treasury_address: tx_context::sender(ctx),
             global_mint_limit_per_day: 1000,
             mints_today: 0,
-            last_mint_reset_timestamp: 0,
+            last_mint_reset_timestamp: now,
             min_verifier_version: 1,
             contract_version: 1,
         };
@@ -101,7 +103,7 @@ module suirify::protocol {
     /// to the recipient.
     public fun mint_attestation(
         _cap: &VerifierAdminCap,
-        config: &ProtocolConfig,
+        config: &mut ProtocolConfig,
         recipient: address,
         jurisdiction_code: u16,
         verifier_source: u8,
@@ -112,8 +114,21 @@ module suirify::protocol {
         verifier_version: u8,
         ctx: &mut TxContext,
     ) {
+        let now = tx_context::epoch_timestamp_ms(ctx);
+
         assert!(!config.paused, EPROTOCOL_PAUSED);
         assert!(verifier_version >= config.min_verifier_version, EUNAUTHORIZED);
+
+        // If an allowlist is configured (non-empty), enforce membership
+        if (vector::length(&config.allowlists) > 0) {
+            // abort if recipient not present in allowlist
+            assert!(vector::contains(&config.allowlists, &recipient), EUNAUTHORIZED);
+        };
+
+        // Reset daily counters if needed and enforce global per-day limit
+        reset_daily_mint_if_needed(config, now);
+        assert!(config.mints_today < config.global_mint_limit_per_day, EUNAUTHORIZED);
+        config.mints_today = config.mints_today + 1;
 
         let attestation = Suirify_Attestation {
             id: object::new(ctx),
@@ -122,8 +137,8 @@ module suirify::protocol {
             verification_level,
             verifier_source,
             verifier_version,
-            issue_time_ms: tx_context::epoch_timestamp_ms(ctx),
-            expiry_time_ms: tx_context::epoch_timestamp_ms(ctx) + config.default_expiry_duration_ms,
+            issue_time_ms: now,
+            expiry_time_ms: now + config.default_expiry_duration_ms,
             status: STATUS_ACTIVE,
             revoked: false,
             revoke_time_ms: 0,
@@ -131,7 +146,7 @@ module suirify::protocol {
             name_hash,
             is_human_verified,
             is_over_18,
-            version: 1,
+            version: config.contract_version,
         };
 
         event::emit(AttestationMinted {
@@ -253,6 +268,20 @@ module suirify::protocol {
         new_global_mint_limit_per_day: u64,
     ) {
         config.global_mint_limit_per_day = new_global_mint_limit_per_day;
+    }
+
+    // Resets the daily mint count if 24 hours have passed since the last reset
+    public fun reset_daily_mint_if_needed(config: &mut ProtocolConfig, now_ms: u64) {
+        // 86_400_000 ms = 24 hours
+        if (config.last_mint_reset_timestamp == 0 || now_ms >= config.last_mint_reset_timestamp + 86400000) {
+            config.mints_today = 0;
+            config.last_mint_reset_timestamp = now_ms;
+        };
+    }
+    
+    // Getter for tests: expose mints_today for verification
+    public fun get_mints_today(config: &ProtocolConfig): u64 {
+        config.mints_today
     }
 
     // Updates the minimum verifier version(
