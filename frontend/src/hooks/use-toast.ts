@@ -2,6 +2,19 @@ import * as React from "react";
 
 import type { ToastActionElement, ToastProps } from "@/components/ui/toast";
 
+/*
+  useToast - lightweight global toast store
+
+  - Keeps a small in-memory list of toasts
+  - Exposes `toast()` to add a toast, `dismiss()` to hide and later remove
+  - `useToast()` subscribes to updates and returns current toasts + helpers
+
+  Notes:
+  - TOAST_REMOVE_DELAY is intentionally long (1,000,000 ms) - adjust if desired
+  - This file uses an event-listener pattern rather than React context to
+    minimize provider wiring for simple apps.
+*/
+
 const TOAST_LIMIT = 1;
 const TOAST_REMOVE_DELAY = 1000000;
 
@@ -68,6 +81,7 @@ const addToRemoveQueue = (toastId: string) => {
   toastTimeouts.set(toastId, timeout);
 };
 
+/* Reducer with minimal side-effects for queuing removals. */
 export const reducer = (state: State, action: Action): State => {
   switch (action.type) {
     case "ADD_TOAST":
@@ -85,8 +99,7 @@ export const reducer = (state: State, action: Action): State => {
     case "DISMISS_TOAST": {
       const { toastId } = action;
 
-      // ! Side effects ! - This could be extracted into a dismissToast() action,
-      // but I'll keep it here for simplicity
+      // Side effect: schedule removal after delay
       if (toastId) {
         addToRemoveQueue(toastId);
       } else {
@@ -134,6 +147,10 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">;
 
+/*
+  toast()
+  Adds a toast to the in-memory store and returns helpers for updating or dismissing it.
+*/
 function toast({ ...props }: Toast) {
   const id = genId();
 
@@ -163,6 +180,10 @@ function toast({ ...props }: Toast) {
   };
 }
 
+/*
+  useToast()
+  Hook that subscribes to the in-memory toast store and returns state + helpers.
+*/
 function useToast() {
   const [state, setState] = React.useState<State>(memoryState);
 

@@ -2,6 +2,12 @@ import { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import React from "react";
 
+/*
+  FeatureCard
+  Reusable presentational card used across the Compliance page to render a small
+  icon + title + description block. Accepts either an image URL, a Lucide icon
+  component, or a generic React node for maximum flexibility.
+*/
 type IconLike = LucideIcon | string | React.ReactNode;
 
 interface FeatureCardProps {
@@ -23,7 +29,7 @@ const FeatureCard = ({ icon, title, description, className }: FeatureCardProps) 
           ) : typeof icon === "function" ? (
             // If a Lucide icon (function component) is provided
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (React.createElement(icon as LucideIcon, { className: "icon-svg", strokeWidth: 1.5 }))
+            React.createElement(icon as LucideIcon, { className: "icon-svg", strokeWidth: 1.5 })
           ) : (
             // Otherwise, render any provided React node
             icon

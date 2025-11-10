@@ -4,13 +4,20 @@ import { Button } from "@/components/ui/button";
 import suiLogo from "@/assets/sui.png";
 import wireframeBg from "@/assets/wireframe-bg.png";
 import sovereignImg from "@/assets/Vector.png";
-import zeroPiiImg    from "@/assets/Icons.png";
+import zeroPiiImg from "@/assets/Icons.png";
 import firstClassImg from "@/assets/first.png";
 import chainsImg from "@/assets/chains.png";
 import groupImg from "@/assets/Group.png";
 import reloadImg from "@/assets/reload.png";
 import shieldImg from "@/assets/shield.png";
+import backImg from "@/assets/back.png";
+import passportImg from "@/assets/passport.png";
 
+/*
+  Compliance
+  Page that showcases SUIrify product features and marketing content.
+  This is a presentational component built from smaller primitives like FeatureCard.
+*/
 const Compliance = () => {
   const features = [
     {
@@ -146,6 +153,76 @@ const Compliance = () => {
             {/* Add your content here */}
           </div>
         </div>
+      </section>
+      {/* Quote / Background Screen (matches provided screenshot) */}
+      <section className="quote-screen">
+        <div
+          className="quote-screen__bg"
+          style={{ backgroundImage: `url(${backImg})` }}
+        />
+
+        <div className="quote-container">
+          <div className="quote-mark">“</div>
+          <div className="quote-text">
+            We Are Not Just Building A Startup—
+            <br />
+            We Are Crafting The <span className="highlight">Future Of Human</span>
+            <br />
+            Identity, Trust, And Economic
+            <br />
+            Participation.
+          </div>
+
+          <div className="quote-attrib">~&nbsp;The SUIrify Team</div>
+        </div>
+      </section>
+
+      {/* Passport / Learn Panel (continuation screen) */}
+      <section className="passport-section">
+        <div className="passport-panel">
+          <div className="passport-content">
+            <h2 className="passport-title">Learn more about<br/>Sovereign Identity & Web3</h2>
+            <p className="passport-desc">Build your knowledge of the new digital economy with SUIrify Learn. Understand everything from the basics of on-chain attestations to the future of compliant finance.</p>
+            <button className="cta-small">Build with suirify</button>
+          </div>
+
+          <div className="passport-art">
+            <img src={passportImg} alt="Passport" />
+          </div>
+        </div>
+      </section>
+
+      {/* Join the Future of Identity - Newsletter / Subscribe Section */}
+      <section className="join-future-section">
+        <div className="container mx-auto px-4">
+          <div className="relative max-w-6xl mx-auto -mt-4">
+            <div className="bg-[#4b4f72] text-white rounded-[36px] p-8 md:p-12 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
+              <div className="md:flex-1">
+                <h3 className="text-4xl md:text-5xl font-semibold suirify-heading">Join the Future of Identity</h3>
+                <p className="mt-4 text-sm md:text-base text-gray-200 max-w-2xl">Keep up with the latest SUIrify news, protocol upgrades, and insights on compliant Web3.</p>
+              </div>
+
+              <div className="md:flex-0 flex items-center justify-end w-full md:w-auto">
+                <input
+                  type="email"
+                  aria-label="Email address"
+                  placeholder="Enter your email address"
+                  className="bg-[#1f2330] placeholder-gray-400 text-white rounded-full px-6 py-3 w-48 md:w-64 shadow-inner focus:outline-none"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Full-width blue hero band that visually continues below the panel */}
+        <section className="start-building bg-[#4aa0f5] mt-6">
+          <div className="container mx-auto px-4">
+            <div className="py-24 text-center">
+              <h2 className="text-4xl md:text-6xl font-bold suirify-heading text-white">Start Building With SUIrify</h2>
+              <p className="mt-6 text-base md:text-lg text-[#071428] max-w-3xl mx-auto">Instant access to the foundational identity layer for compliant finance in Web3.</p>
+            </div>
+          </div>
+        </section>
       </section>
     </div>
   );

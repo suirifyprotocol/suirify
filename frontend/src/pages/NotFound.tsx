@@ -1,6 +1,11 @@
 import { useLocation } from "react-router-dom";
 import { useEffect } from "react";
 
+/*
+  NotFound
+  Simple 404 page with a console warning for visibility. The component uses
+  a side-effect to log the missing route whenever it mounts or the path changes.
+*/
 const NotFound = () => {
   const location = useLocation();
 
