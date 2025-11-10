@@ -3,22 +3,27 @@
 /// This package is responsible for creating, managing, and verifying attestations.
 module suirify::protocol {
     use sui::event;
+    use suirify::auth;
+    use suirify::auth::VerifierAdminCap;
+    use suirify::jurisdictions::{Self, JurisdictionPolicy};
 
     // Custom Errors
     const EUNAUTHORIZED: u64 = 0;
     const EPROTOCOL_PAUSED: u64 = 1;
     const EONLY_OWNER_CAN_BURN: u64 = 2;
+    const EJURISDICTION_MISMATCH: u64 = 3;
+    const EINVALID_VERIFIER_SOURCE: u64 = 4;
 
     // Constants
     const STATUS_ACTIVE: u8 = 1;
     const STATUS_REVOKED: u8 = 2;
 
     // Structs
-    /// A capability object that grants the holder the exclusive authority
-    /// to mint, revoke, and manage the protocol's configuration.
-    public struct VerifierAdminCap has key, store {
-        id: UID,
-    }
+    // A capability object that grants the holder the exclusive authority
+    // to mint, revoke, and manage the protocol's configuration.
+    // public struct VerifierAdminCap has key, store {
+    //     id: UID,
+    // }
 
     /// The primary credential object. It is a Soulbound (non-transferable), user-
     /// owned object representing a successful identity verification.
@@ -75,9 +80,8 @@ module suirify::protocol {
     fun init(ctx: &mut TxContext) {
         let now = tx_context::epoch_timestamp_ms(ctx);
 
-        let verifier_admin_cap = VerifierAdminCap {
-            id: object::new(ctx),
-        };
+        let verifier_admin_cap = auth::create_cap(ctx);
+         transfer::public_transfer(verifier_admin_cap, tx_context::sender(ctx));
 
         let protocol_config = ProtocolConfig {
             id: object::new(ctx),
@@ -95,7 +99,7 @@ module suirify::protocol {
             contract_version: 1,
         };
 
-        transfer::transfer(verifier_admin_cap, tx_context::sender(ctx));
+        // transfer::transfer(verifier_admin_cap, tx_context::sender(ctx));
         transfer::transfer(protocol_config, tx_context::sender(ctx));
     }
 
@@ -104,6 +108,7 @@ module suirify::protocol {
     public fun mint_attestation(
         _cap: &VerifierAdminCap,
         config: &mut ProtocolConfig,
+        policy: &JurisdictionPolicy,
         recipient: address,
         jurisdiction_code: u16,
         verifier_source: u8,
@@ -118,6 +123,12 @@ module suirify::protocol {
 
         assert!(!config.paused, EPROTOCOL_PAUSED);
         assert!(verifier_version >= config.min_verifier_version, EUNAUTHORIZED);
+
+        // assert!(policy.iso_num == jurisdiction_code, EJURISDICTION_MISMATCH);
+        // assert!(vector::contains(&policy.allowed_sources, &verifier_source), EINVALID_VERIFIER_SOURCE);
+        assert!(jurisdictions::get_iso_num(policy) == jurisdiction_code, EJURISDICTION_MISMATCH);
+        assert!(vector::contains(jurisdictions::get_allowed_sources(policy), &verifier_source), EINVALID_VERIFIER_SOURCE);
+
 
         // If an allowlist is configured (non-empty), enforce membership
         if (vector::length(&config.allowlists) > 0) {
@@ -365,7 +376,8 @@ module suirify::user_actions {
 
 /// Defines and manages jurisdiction-specific verification policies.
 module suirify::jurisdictions {
-    use suirify::protocol::VerifierAdminCap;
+    use suirify::auth::VerifierAdminCap;
+    // use suirify::protocol::VerifierAdminCap;
 
     /// Defines jurisdiction-specific verification policies.
     public struct JurisdictionPolicy has key, store {
@@ -411,4 +423,12 @@ module suirify::jurisdictions {
         
         transfer::share_object(policy); // Make policy globally accessible
     }
+
+    public fun get_iso_num(policy: &JurisdictionPolicy): u16 {
+        policy.iso_num
+    }
+    public fun get_allowed_sources(policy: &JurisdictionPolicy): &vector<u8> {
+        &policy.allowed_sources
+    }
+
 }
