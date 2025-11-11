@@ -1,11 +1,15 @@
-// suirify.move
-/// The main module for the SUIrify protocol.
+/// suirify.move
+/// The main module for the Suirify protocol.
 /// This package is responsible for creating, managing, and verifying attestations.
 module suirify::protocol {
     use sui::event;
     use suirify::auth;
     use suirify::auth::VerifierAdminCap;
     use suirify::jurisdictions::{Self, JurisdictionPolicy};
+    use sui::package::{Self};
+    use sui::table::{Self, Table};
+    use sui::display;
+    use std::string;
 
     // Custom Errors
     const EUNAUTHORIZED: u64 = 0;
@@ -13,10 +17,13 @@ module suirify::protocol {
     const EONLY_OWNER_CAN_BURN: u64 = 2;
     const EJURISDICTION_MISMATCH: u64 = 3;
     const EINVALID_VERIFIER_SOURCE: u64 = 4;
+    const EATTESTATION_ALREADY_EXISTS: u64 = 5;
 
     // Constants
     const STATUS_ACTIVE: u8 = 1;
-    const STATUS_REVOKED: u8 = 2;
+    #[allow(unused_const)]
+    const STATUS_EXPIRED: u8 = 2;
+    const STATUS_REVOKED: u8 = 3;
 
     // Structs
     // A capability object that grants the holder the exclusive authority
@@ -64,6 +71,11 @@ module suirify::protocol {
         contract_version: u16,
     }
 
+    public struct AttestationRegistry has key {
+        id: UID,
+        user_attestations: Table<address, ID>,
+    }
+
     // Events
     public struct AttestationMinted has copy, drop {
         objectId: ID,
@@ -75,13 +87,15 @@ module suirify::protocol {
         reason_code: u8,
     }
 
+    public struct PROTOCOL has drop {}
+
     // Functions
     /// Initializes the entire protocol.
-    fun init(ctx: &mut TxContext) {
+    fun init(otw: PROTOCOL, ctx: &mut TxContext) {
         let now = tx_context::epoch_timestamp_ms(ctx);
 
         let verifier_admin_cap = auth::create_cap(ctx);
-         transfer::public_transfer(verifier_admin_cap, tx_context::sender(ctx));
+        transfer::public_transfer(verifier_admin_cap, tx_context::sender(ctx));
 
         let protocol_config = ProtocolConfig {
             id: object::new(ctx),
@@ -101,6 +115,45 @@ module suirify::protocol {
 
         // transfer::transfer(verifier_admin_cap, tx_context::sender(ctx));
         transfer::transfer(protocol_config, tx_context::sender(ctx));
+
+        // Create and share the attestation registry
+        let registry = AttestationRegistry {
+            id: object::new(ctx),
+            user_attestations: table::new(ctx),
+        
+        };
+        transfer::share_object(registry);
+
+        let keys = vector[
+            string::utf8(b"name"),
+            string::utf8(b"description"),
+            string::utf8(b"image_url"),
+            string::utf8(b"creator"),
+            string::utf8(b"project_url"),
+            string::utf8(b"jurisdiction")
+        ];
+
+        let values = vector[
+            string::utf8(b"Suirify Attestation"),
+            string::utf8(b"A soulbound, non-transferable identity attestation for the Sui ecosystem."),
+            string::utf8(b"https://i.ibb.co/NnQJgG9p/suirifyimg.pnge"),
+            string::utf8(b"Suirify Protocol"),
+            string::utf8(b"https://testnet.suirify.test"),
+            string::utf8(b"Jurisdiction Code: {jurisdiction_code}")
+        ];
+
+        let publisher = package::claim(otw, ctx);
+
+        let mut display = display::new_with_fields<Suirify_Attestation>(
+            &publisher, keys, values, ctx
+        );
+
+        display.update_version();
+
+        transfer::public_transfer(publisher, tx_context::sender(ctx));
+        transfer::public_transfer(display, tx_context::sender(ctx));
+
+
     }
 
     /// Creates a new Suirify_Attestation with extended metadata and transfers it
@@ -108,6 +161,7 @@ module suirify::protocol {
     public fun mint_attestation(
         _cap: &VerifierAdminCap,
         config: &mut ProtocolConfig,
+        registry: &mut AttestationRegistry,
         policy: &JurisdictionPolicy,
         recipient: address,
         jurisdiction_code: u16,
@@ -120,6 +174,8 @@ module suirify::protocol {
         ctx: &mut TxContext,
     ) {
         let now = tx_context::epoch_timestamp_ms(ctx);
+
+        assert!(!table::contains(&registry.user_attestations, recipient), EATTESTATION_ALREADY_EXISTS);
 
         assert!(!config.paused, EPROTOCOL_PAUSED);
         assert!(verifier_version >= config.min_verifier_version, EUNAUTHORIZED);
@@ -163,6 +219,10 @@ module suirify::protocol {
             version: config.contract_version,
         };
 
+        let attestation_id = object::id(&attestation);
+        table::add(&mut registry.user_attestations, recipient, attestation_id);
+        
+
         event::emit(AttestationMinted {
             objectId: object::id(&attestation),
             recipient,
@@ -194,8 +254,12 @@ module suirify::protocol {
 
     /// Allows the owner of an attestation to permanently and irrevocably delete it
     /// from the blockchain ("right to be forgotten").
-    public fun burn_self(attestation: Suirify_Attestation, ctx: &mut TxContext) {
-        assert!(attestation.owner == tx_context::sender(ctx), EONLY_OWNER_CAN_BURN);
+    public fun burn_self(attestation: Suirify_Attestation, registry: &mut AttestationRegistry, ctx: &mut TxContext) {
+        let owner = attestation.owner;
+        assert!(owner == tx_context::sender(ctx), EONLY_OWNER_CAN_BURN);
+
+        table::remove(&mut registry.user_attestations, owner);
+
         let Suirify_Attestation { id, owner: _, .. } = attestation;
         object::delete(id);
     }
@@ -340,7 +404,7 @@ module suirify::protocol {
     // Test-only function to initialize the protocol for testing purposes
     #[test_only]
     public fun test_init(ctx: &mut TxContext) {
-        init(ctx);
+        init(PROTOCOL {}, ctx);
     }
 }
 
@@ -365,12 +429,12 @@ module suirify::attestation_utils {
 
 /// Defines actions that can only be initiated by the owner of a Suirify_Attestation.
 module suirify::user_actions {
-    use suirify::protocol::{Self, Suirify_Attestation};
+    use suirify::protocol::{Self, Suirify_Attestation, AttestationRegistry};
 
     /// Allows the owner of an attestation to permanently and irrevocably delete it
     /// from the blockchain ("right to be forgotten").
-    public fun burn_self(attestation: Suirify_Attestation, ctx: &mut TxContext) {
-        protocol::burn_self(attestation, ctx);
+    public fun burn_self(attestation: Suirify_Attestation, registry: &mut AttestationRegistry, ctx: &mut TxContext) {
+        protocol::burn_self(attestation, registry, ctx);
     }
 }
 
