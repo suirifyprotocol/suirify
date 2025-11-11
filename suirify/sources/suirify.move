@@ -100,9 +100,11 @@ module suirify::protocol {
     /// Initializes the entire protocol.
     fun init(otw: PROTOCOL, ctx: &mut TxContext) {
         let now = tx_context::epoch_timestamp_ms(ctx);
+        let sender = tx_context::sender(ctx);
 
-        let verifier_admin_cap = auth::create_cap(ctx);
-        transfer::public_transfer(verifier_admin_cap, tx_context::sender(ctx));
+        //let verifier_admin_cap = auth::create_cap(ctx);
+        //transfer::transfer(verifier_admin_cap, tx_context::sender(ctx));
+        auth::create_and_transfer_cap(sender, ctx);
 
         let protocol_config = ProtocolConfig {
             id: object::new(ctx),
