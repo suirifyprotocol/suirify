@@ -10,6 +10,9 @@ module suirify::protocol {
     use sui::table::{Self, Table};
     use sui::display;
     use std::string;
+    use sui::coin::{Self, Coin};
+    //use sui::balance::{Balance};
+    use sui::sui::SUI;
 
     // Custom Errors
     const EUNAUTHORIZED: u64 = 0;
@@ -18,6 +21,7 @@ module suirify::protocol {
     const EJURISDICTION_MISMATCH: u64 = 3;
     const EINVALID_VERIFIER_SOURCE: u64 = 4;
     const EATTESTATION_ALREADY_EXISTS: u64 = 5;
+    const EINSUFFICIENT_FEE: u64 = 6;
 
     // Constants
     const STATUS_ACTIVE: u8 = 1;
@@ -165,6 +169,7 @@ module suirify::protocol {
     public fun mint_attestation(
         _cap: &VerifierAdminCap,
         config: &mut ProtocolConfig,
+        payment_fee: &mut Coin<SUI>,
         registry: &mut AttestationRegistry,
         policy: &JurisdictionPolicy,
         recipient: address,
@@ -177,6 +182,13 @@ module suirify::protocol {
         verifier_version: u8,
         ctx: &mut TxContext,
     ) {
+
+        assert!(coin::value(payment_fee) >= config.mint_fee, EINSUFFICIENT_FEE);
+        let fee_coin: Coin<SUI> = coin::split(payment_fee, config.mint_fee, ctx);
+
+        transfer::public_transfer(fee_coin, config.treasury_address);
+
+
         let now = tx_context::epoch_timestamp_ms(ctx);
 
         assert!(!table::contains(&registry.user_attestations, recipient), EATTESTATION_ALREADY_EXISTS);

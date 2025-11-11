@@ -4,6 +4,8 @@
 module suirify::suirify_tests {
     use sui::test_scenario::{Self, next_tx, ctx};
     use sui::clock;
+    use sui::coin::{Self, Coin};
+    use sui::sui::SUI;
 
     use suirify::auth::VerifierAdminCap;
     use suirify::protocol::{Self, ProtocolConfig, Suirify_Attestation, AttestationRegistry};
@@ -15,6 +17,7 @@ module suirify::suirify_tests {
     const USER1: address = @0x1234;
     const USER2: address = @0x5678;
     const NGA_ISO_CODE: u16 = 566;
+    const MINT_FEE: u64 = 100_000_000; // 0.1 SUI, matching the protocol config
 
     /// Helper function to set up the initial protocol state for tests.
     fun setup(scenario: &mut test_scenario::Scenario) {
@@ -44,9 +47,11 @@ module suirify::suirify_tests {
         next_tx(scenario, ADMIN);
     }
 
-    // ADDED: Private helper function for minting to avoid code duplication.
     /// Mints a standard attestation for USER1.
-    fun mint_attestation_for_user1(scenario: &mut test_scenario::Scenario) {
+    fun mint_attestation_for_user1(
+        scenario: &mut test_scenario::Scenario,
+        payment_coin: &mut Coin<SUI>
+    ) {
         let admin_cap = test_scenario::take_from_sender<VerifierAdminCap>(scenario);
         let mut config = test_scenario::take_from_sender<ProtocolConfig>(scenario);
         let mut att_registry = test_scenario::take_shared<AttestationRegistry>(scenario);
@@ -55,6 +60,7 @@ module suirify::suirify_tests {
         protocol::mint_attestation(
             &admin_cap,
             &mut config,
+            payment_coin,
             &mut att_registry,
             &policy,
             USER1, NGA_ISO_CODE, 1, 1, b"name_hash_test", true, true, 1,
@@ -68,7 +74,6 @@ module suirify::suirify_tests {
     }
 
     #[test]
-    /// Verifies that the `init` and `setup` functions correctly create all initial objects.
     fun test_init_and_setup() {
         let mut scenario = test_scenario::begin(ADMIN);
         setup(&mut scenario);
@@ -76,8 +81,6 @@ module suirify::suirify_tests {
         assert!(test_scenario::has_most_recent_for_sender<VerifierAdminCap>(&scenario), 0);
         assert!(test_scenario::has_most_recent_for_sender<ProtocolConfig>(&scenario), 1);
 
-        // Correctly check for shared object existence by taking and returning them.
-        // If any of these objects do not exist, the test will abort here.
         let jur_reg = test_scenario::take_shared<JurisdictionRegistry>(&scenario);
         test_scenario::return_shared(jur_reg);
         let att_reg = test_scenario::take_shared<AttestationRegistry>(&scenario);
@@ -89,76 +92,89 @@ module suirify::suirify_tests {
     }
 
     #[test]
-    /// Tests the successful minting of a new attestation.
     fun test_mint_attestation_success() {
         let mut scenario = test_scenario::begin(ADMIN);
         setup(&mut scenario);
 
-        // MODIFIED: Call the private helper function.
-        mint_attestation_for_user1(&mut scenario);
+        next_tx(&mut scenario, USER1);
+        let mut payment_coin = coin::mint_for_testing<SUI>(MINT_FEE, ctx(&mut scenario));
+        next_tx(&mut scenario, ADMIN);
+
+        mint_attestation_for_user1(&mut scenario, &mut payment_coin);
+        
+        assert!(coin::value(&payment_coin) == 0, 2);
+        coin::burn_for_testing(payment_coin);
 
         next_tx(&mut scenario, USER1);
-        {
-            assert!(test_scenario::has_most_recent_for_sender<Suirify_Attestation>(&scenario), 5);
-        };
+        assert!(test_scenario::has_most_recent_for_sender<Suirify_Attestation>(&scenario), 3);
 
         test_scenario::end(scenario);
     }
 
     #[test]
     #[expected_failure(abort_code = suirify::protocol::EATTESTATION_ALREADY_EXISTS)]
-    /// Verifies that the contract prevents minting a second attestation for the same user.
     fun test_mint_duplicate_attestation_fails() {
         let mut scenario = test_scenario::begin(ADMIN);
         setup(&mut scenario);
 
-        // The first mint for USER1 should succeed.
-        mint_attestation_for_user1(&mut scenario);
+        // First mint (succeeds)
+        next_tx(&mut scenario, USER1);
+        let mut payment_coin1 = coin::mint_for_testing<SUI>(MINT_FEE, ctx(&mut scenario));
+        next_tx(&mut scenario, ADMIN);
+        mint_attestation_for_user1(&mut scenario, &mut payment_coin1);
+        coin::burn_for_testing(payment_coin1);
 
-        // The second mint for the SAME user (USER1) should fail.
-        // We re-take the objects because the helper function returned them.
-        mint_attestation_for_user1(&mut scenario);
+        // Second mint attempt (fails)
+        next_tx(&mut scenario, USER1);
+        let mut payment_coin2 = coin::mint_for_testing<SUI>(MINT_FEE, ctx(&mut scenario));
+        next_tx(&mut scenario, ADMIN);
+        mint_attestation_for_user1(&mut scenario, &mut payment_coin2);
+        
+        // CORRECTED: Cleanup code for the non-failing path to satisfy the compiler.
+        coin::burn_for_testing(payment_coin2);
 
         test_scenario::end(scenario);
     }
 
     #[test]
     #[expected_failure(abort_code = suirify::protocol::EONLY_OWNER_CAN_BURN)]
-    /// Verifies that only the owner of an attestation can burn it.
     fun test_burn_by_non_owner_fails() {
         let mut scenario = test_scenario::begin(ADMIN);
         setup(&mut scenario);
 
-        // Mint an attestation for USER1 first.
-        // MODIFIED: Call the helper function.
-        mint_attestation_for_user1(&mut scenario);
+        // Mint an attestation for USER1
+        next_tx(&mut scenario, USER1);
+        let mut payment_coin = coin::mint_for_testing<SUI>(MINT_FEE, ctx(&mut scenario));
+        next_tx(&mut scenario, ADMIN);
+        mint_attestation_for_user1(&mut scenario, &mut payment_coin);
+        coin::burn_for_testing(payment_coin);
 
-        // Switch to USER2 to attempt the burn.
+        // Switch to USER2 to attempt the burn
         next_tx(&mut scenario, USER2);
         {
             let attestation = test_scenario::take_from_address<Suirify_Attestation>(&scenario, USER1);
             let mut att_registry = test_scenario::take_shared<AttestationRegistry>(&scenario);
 
-            // This call will fail because the sender (USER2) is not the owner (USER1).
             user_actions::burn_self(attestation, &mut att_registry, ctx(&mut scenario));
 
             test_scenario::return_shared(att_registry);
         };
-
         test_scenario::end(scenario);
     }
 
     #[test]
-    /// Verifies that an owner can successfully delete their own attestation.
     fun test_burn_by_owner_success() {
         let mut scenario = test_scenario::begin(ADMIN);
         setup(&mut scenario);
 
-        // Mint an attestation for USER1.
-        // MODIFIED: Call the helper function.
-        mint_attestation_for_user1(&mut scenario);
+        // Mint an attestation for USER1
+        next_tx(&mut scenario, USER1);
+        let mut payment_coin = coin::mint_for_testing<SUI>(MINT_FEE, ctx(&mut scenario));
+        next_tx(&mut scenario, ADMIN);
+        mint_attestation_for_user1(&mut scenario, &mut payment_coin);
+        coin::burn_for_testing(payment_coin);
 
-        // Switch to USER1 to burn their attestation.
+        // Switch to USER1 to burn their attestation
         next_tx(&mut scenario, USER1);
         {
             let attestation = test_scenario::take_from_sender<Suirify_Attestation>(&scenario);
@@ -167,15 +183,13 @@ module suirify::suirify_tests {
             user_actions::burn_self(attestation, &mut att_registry, ctx(&mut scenario));
             test_scenario::return_shared(att_registry);
 
-            // Verify the attestation object no longer exists for the user.
-            assert!(!test_scenario::has_most_recent_for_sender<Suirify_Attestation>(&scenario), 6);
+            assert!(!test_scenario::has_most_recent_for_sender<Suirify_Attestation>(&scenario), 4);
         };
-
         test_scenario::end(scenario);
     }
 
     #[test]
-    /// Tests the read-only utility functions in `attestation_utils`.
+    #[allow(unused_mut_ref)]
     fun test_attestation_utils_functions() {
         let mut scenario = test_scenario::begin(ADMIN);
         let mut clock = clock::create_for_testing(ctx(&mut scenario));
@@ -183,22 +197,25 @@ module suirify::suirify_tests {
         
         setup(&mut scenario);
 
-        // Mint an attestation for USER1.
-        // MODIFIED: Call the helper function.
-        mint_attestation_for_user1(&mut scenario);
+        // Mint an attestation for USER1
+        next_tx(&mut scenario, USER1);
+        let mut payment_coin = coin::mint_for_testing<SUI>(MINT_FEE, ctx(&mut scenario));
+        next_tx(&mut scenario, ADMIN);
+        mint_attestation_for_user1(&mut scenario, &mut payment_coin);
+        coin::burn_for_testing(payment_coin);
 
         next_tx(&mut scenario, USER1);
         {
             let attestation = test_scenario::take_from_sender<Suirify_Attestation>(&scenario);
 
-            assert!(attestation_utils::is_valid(&attestation, &clock), 7);
-            assert!(attestation_utils::get_name_hash(&attestation) == b"name_hash_test", 8);
+            assert!(attestation_utils::is_valid(&attestation, &clock), 5);
+            assert!(attestation_utils::get_name_hash(&attestation) == b"name_hash_test", 6);
 
-            clock::increment_for_testing(&mut clock, 31536000000 + 1); // 1 year + 1ms
+            clock::increment_for_testing(&mut clock, 31536000000 + 1); 
 
-            assert!(!attestation_utils::is_valid(&attestation, &clock), 9);
+            assert!(!attestation_utils::is_valid(&attestation, &clock), 7);
 
-            test_scenario::return_to_sender(&scenario, attestation);
+            test_scenario::return_to_sender(&mut scenario, attestation);
         };
 
         clock::destroy_for_testing(clock);
