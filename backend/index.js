@@ -563,12 +563,45 @@ app.post('/face-verify', async (req, res) => {
     // normalize sizes for fair comparison
     const W = 256;
     const H = 256;
-    imgRef.resize(W, H);
-    imgLive.resize(W, H);
+
+    const resizeImage = (image) => {
+      if (!image || typeof image.resize !== 'function') {
+        return image;
+      }
+      const sizeSpec = { w: W, h: H };
+      try {
+        const result = image.resize(sizeSpec);
+        if (result) return result;
+      } catch (errPrimary) {
+        try {
+          const result = image.resize(W, H);
+          if (result) return result;
+        } catch (errLegacy) {
+          console.error('Failed to resize image with Jimp API variants:', errLegacy && errLegacy.message ? errLegacy.message : errLegacy);
+          throw errLegacy;
+        }
+      }
+      return image;
+    };
+
+    resizeImage(imgRef);
+    resizeImage(imgLive);
 
     // perceptual distance 0..1 (lower = more similar), diff.percent 0..1 (lower = more similar)
-    const perceptualDistance = Jimp.distance(imgRef, imgLive); // 0..1
-    const diff = Jimp.diff(imgRef, imgLive); // { percent, image }
+    const hasStaticDistance = Jimp && typeof Jimp.distance === 'function';
+    const hasStaticDiff = Jimp && typeof Jimp.diff === 'function';
+
+    const perceptualDistance = hasStaticDistance
+      ? Jimp.distance(imgRef, imgLive)
+      : (typeof imgRef.distance === 'function' ? imgRef.distance(imgLive) : 1);
+
+    const diffResult = hasStaticDiff
+      ? Jimp.diff(imgRef, imgLive)
+      : (typeof imgRef.diff === 'function' ? imgRef.diff(imgLive) : { percent: 1 });
+
+    const diff = diffResult && typeof diffResult.percent === 'number'
+      ? diffResult
+      : { percent: 1 };
 
     const similarity = Math.max(0, 1 - perceptualDistance); // 0..1, higher=more similar
     const diffPercent = diff && typeof diff.percent === 'number' ? diff.percent : 1;
@@ -595,8 +628,10 @@ app.post('/face-verify', async (req, res) => {
       diffPercent: Number(diffPercent.toFixed(3))
     });
   } catch (e) {
-    console.error('face-verify error:', e);
-    return res.status(500).json({ success: false, error: 'Face verification failed on server' });
+    const message = (e && e.message) ? e.message : 'Unknown face verification error';
+    console.error('face-verify error:', message);
+    if (e && e.stack) console.error(e.stack);
+    return res.status(500).json({ success: false, error: message });
   }
 });
 

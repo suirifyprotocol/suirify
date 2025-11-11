@@ -17,7 +17,7 @@ const govMockDB = {
             issuingAuthority: 'National Identity Management Commission',
             issuanceDate: '2018-06-01',
             expiryDate: null,
-            photoReference: '/photos/ng/sambo.jpg',
+            photoReference: '/reference_photos/NGA-12345678901.jpg',
             biometricHash: 'hash_example_1',
             mrz: null,
             barcodeData: 'barcode_ng_123',
@@ -37,7 +37,7 @@ const govMockDB = {
             issuingAuthority: 'National Identity Management Commission',
             issuanceDate: '2022-01-10',
             expiryDate: null,
-            photoReference: '/photos/ng/isaac.jpg',
+            photoReference: '/reference_photos/NGA-10987654321',
             biometricHash: 'hash_example_2',
             mrz: null,
             barcodeData: 'barcode_ng_109',
@@ -58,7 +58,7 @@ const govMockDB = {
             issuanceDate: '2020-03-05',
             expiryDate: null,
             // Use a hosted avatar as the reference photo so the backend can fetch it
-            photoReference: 'https://ui-avatars.com/api/?name=Bari-Domaka+Pop-Yornwin&background=0D9488&color=ffffff&size=400',
+            photoReference: '/reference_photos/NGA-11223344556.png',
             biometricHash: 'hash_example_3',
             mrz: null,
             barcodeData: 'barcode_ng_112',
@@ -67,10 +67,10 @@ const govMockDB = {
     },
 
     Ghana: {
-        'GHA-A123456789': {
+        'GHA-123456789': {
             country: 'Ghana',
             documentType: 'passport',
-            idNumber: 'GHA-A123456789',
+            idNumber: 'GHA-123456789',
             fullName: 'Kwame Nkrumah',
             givenName: 'Kwame',
             familyName: 'Nkrumah',
@@ -81,7 +81,29 @@ const govMockDB = {
             issuingAuthority: 'Ghana Passport Office',
             issuanceDate: '1957-03-06',
             expiryDate: null,
-            photoReference: '/photos/gh/kwame.jpg',
+            photoReference: '',
+            biometricHash: 'hash_example_gh_1',
+            mrz: 'P<GHA123456789<<<<<<<<<',
+            barcodeData: 'barcode_gh_A123',
+            additionalNotes: 'Historic record (example)'
+        }
+    },
+    Kenya: {
+        '12345678': {
+            country: 'Kenya',
+            documentType: 'Nationl ID',
+            idNumber: '12345678',
+            fullName: 'Jane Zuri',
+            givenName: 'Jane',
+            familyName: 'Zuri',
+            dateOfBirth: '2009-09-21',
+            gender: 'female',
+            nationality: 'Kenyan',
+            address: 'Nairobi, Kenya',
+            issuingAuthority: 'Kenya National ID Authority',
+            issuanceDate: '1957-03-06',
+            expiryDate: null,
+            photoReference: '',
             biometricHash: 'hash_example_gh_1',
             mrz: 'P<GHA123456789<<<<<<<<<',
             barcodeData: 'barcode_gh_A123',
