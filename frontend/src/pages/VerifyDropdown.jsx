@@ -1,6 +1,7 @@
-import React, { useState } from "react";
-import { ConnectButton } from "@mysten/dapp-kit";
+import React, { useEffect, useState } from "react";
+import { ConnectButton, useCurrentAccount } from "@mysten/dapp-kit";
 import "@mysten/dapp-kit/dist/index.css";
+import { useNavigate } from "react-router-dom";
 
 /*
   VerifyDropdown
@@ -9,6 +10,14 @@ import "@mysten/dapp-kit/dist/index.css";
 */
 const VerifyDropdown = () => {
   const [activated, setActivated] = useState(false);
+  const account = useCurrentAccount();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (account?.address) {
+      navigate("/verify");
+    }
+  }, [account?.address, navigate]);
 
   return (
     <div style={{ position: "relative", display: "inline-block", textAlign: "left" }}>

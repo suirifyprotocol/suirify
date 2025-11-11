@@ -390,6 +390,9 @@ main, section { max-width: 100vw; overflow-x: clip; }
 .bg-background{
   background-color: hsla(0, 0%, 0%, 1);
 }
+.compliance-section{
+  padding-bottom: 80px;
+}
 .suirify-heading{
   display: flex;
   justify-content: center;
@@ -714,6 +717,7 @@ main, section { max-width: 100vw; overflow-x: clip; }
   /* Force text to solid black as requested */
   color: hsla(0, 0%, 0%, 1);
 }
+ /* */
 /* responsive columns */
 @media (min-width: 640px) {
   .cards-grid {
@@ -818,4 +822,318 @@ main, section { max-width: 100vw; overflow-x: clip; }
   .built { font-size: 36px; }
   .built-content { font-size: 22px; max-width: 90%; }
   .cards-wrapper-build { padding-top: 32px; font-size: 14px; }
+}
+
+/* Quote screen styles added for compliance page (no Tailwind) */
+.quote-screen {
+  position: relative;
+  /* border removed as requested */
+  min-height: 360px;
+  margin: 48px 20px;
+  overflow: hidden;
+  border-radius: 6px;
+  background-color: rgba(0,0,0,0.35);
+  max-height: 595px;
+}
+
+.quote-screen__bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: brightness(0.35) contrast(1.05);
+  z-index: 1;
+}
+
+.quote-container {
+  position: relative;
+  z-index: 2;
+  max-width: 1200px;
+  height: 100%;
+  margin: 0 auto;
+  padding: 56px 64px;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.quote-mark {
+  font-size: 54px;
+  color: #5fb1ff;
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+
+.quote-text {
+  font-family: Audiowide, 'Inter', sans-serif;
+  font-weight: 400;
+  font-size: 45px;
+  line-height: 1.02;
+  color: hsla(0, 0%, 100%, 1);
+  letter-spacing: 0%;
+}
+.quote-dif{
+  color: hsla(0, 0%, 100%, 0.68);
+}
+.quote-text .highlight {
+  color: #ffffff;
+}
+
+.quote-attrib {
+  font-family: "Poppins";
+  margin-top: 20px;
+  text-align: right;
+  font-size: 25px;
+  color: hsla(0, 0%, 100%, 1);
+}
+
+@media (max-width: 768px) {
+  .quote-container { padding: 28px 18px; }
+  .quote-text { font-size: 26px; }
+  .quote-mark { font-size: 40px; }
+}
+
+/* Passport / Learn panel styles (continuation screen) */
+.passport-section {
+  padding: 48px 20px;
+  background: transparent;
+  max-height: 565px;
+  max-width: 1186px;
+}
+
+.passport-panel {
+  max-width: 1180px;
+  margin: 0 auto;
+  background: hsla(212, 72%, 59%, 1); /* panel blue */
+  border-radius: 28px;
+  padding: 44px;
+  display: flex;
+  gap: 36px;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 8px 30px rgba(22, 30, 37, 0.35);
+}
+
+.passport-content {
+  flex: 1 1 58%;
+  color: #071019;
+}
+
+.passport-title {
+  font-family: 'Audiowide', sans-serif;
+  font-weight: 700;
+  font-size: 44px;
+  margin: 0 0 18px 0;
+  color: #071019;
+}
+
+.passport-desc {
+  color: rgba(7,16,25,0.9);
+  font-size: 14px;
+  line-height: 1.8;
+  max-width: 620px;
+  margin-bottom: 18px;
+  font-family: "Alexandria";
+}
+
+.cta-small {
+  background: rgba(237, 255, 255, 0.92);
+  color: #071019;
+  border: none;
+  padding: 12px 18px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.passport-art {
+  flex: 0 0 34%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.passport-art img {
+  width: 260px;
+  background: hsla(212, 72%, 59%, 1);
+  max-width: 100%;
+  transform: rotate(-8deg) translateY(-6px);
+  border-radius: 8px;
+}
+
+@media (max-width: 960px) {
+  .passport-panel { flex-direction: column-reverse; padding: 28px; border-radius: 20px; }
+  .passport-art { margin-bottom: 12px; }
+  .passport-title { font-size: 32px; }
+  .passport-desc { max-width: 100%; }
+}
+
+/* Join the Future of Identity Section */
+.join-future-section {
+  padding: 0px 0 0 0;
+  background: transparent;
+  position: relative;
+}
+
+.join-future-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 16px;
+  position: relative;
+  z-index: 10;
+}
+
+.join-future-wrapper {
+  position: relative;
+  max-width: 1152px;
+  margin: 0 auto;
+  transform: translateY(50%);
+  z-index: 10;
+}
+
+.join-future-card {
+  background: #535672;
+  color: #ffffff;
+  border-radius: 36px;
+  padding: 48px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.join-future-content {
+  flex: 1;
+}
+
+.join-future-title {
+  font-family: 'Audiowide', sans-serif;
+  font-size: 48px;
+  font-weight: 600;
+  line-height: 1.1;
+  margin: 0 0 16px 0;
+  color: #000000;
+}
+
+.join-future-subtitle {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.85);
+  max-width: 560px;
+}
+
+.join-future-input-wrapper {
+  flex: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.join-future-input {
+  background: #2d3142;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  padding: 14px 24px;
+  width: 320px;
+  font-size: 14px;
+  outline: none;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.join-future-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.join-future-input:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Start Building Section */
+.start-building {
+  background: #4aa0f5;
+  margin-top: 0;
+  padding: 0;
+  position: relative;
+}
+
+.start-building-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.start-building-content {
+  padding: 180px 0 96px 0;
+  text-align: center;
+}
+
+.start-building-title {
+  font-family: 'Audiowide', sans-serif;
+  font-size: 64px;
+  font-weight: 700;
+  line-height: 1;
+  margin: 0 0 24px 0;
+  color: #ffffff;
+}
+
+.start-building-subtitle {
+  margin: 0 auto;
+  font-size: 20px;
+  line-height: 1.4;
+  color: #071428;
+  max-width: 768px;
+}
+
+/* Responsive styles for Join Future section */
+@media (max-width: 768px) {
+  .join-future-section {
+    padding: 40px 0 0 0;
+  }
+
+  .join-future-wrapper {
+    transform: translateY(40%);
+  }
+
+  .join-future-card {
+    flex-direction: column;
+    padding: 32px 24px;
+  }
+
+  .join-future-title {
+    font-size: 32px;
+  }
+
+  .join-future-subtitle {
+    font-size: 14px;
+    max-width: 100%;
+  }
+
+  .join-future-input-wrapper {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .join-future-input {
+    width: 100%;
+    max-width: 400px;
+  }
+
+  .start-building-content {
+    padding: 140px 0 64px 0;
+  }
+
+  .start-building-title {
+    font-size: 36px;
+  }
+
+  .start-building-subtitle {
+    font-size: 16px;
+    padding: 0 16px;
+  }
 }
