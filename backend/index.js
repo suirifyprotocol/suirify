@@ -1,6 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const crypto = require('crypto');
+const os = require('os');
 require('dotenv').config();
 const { govLookup, normalizeCountryKey } = require('./mockDB');
 const { getIsoCode, getCountryList } = require('./countryCodes');
@@ -126,9 +127,36 @@ const ADMIN_CAP_ID = process.env.ADMIN_CAP_ID;
 const PROTOCOL_CONFIG_ID = process.env.PROTOCOL_CONFIG_ID;
 const ATTESTATION_REGISTRY_ID = process.env.ATTESTATION_REGISTRY_ID;
 const JURISDICTION_POLICY_ID = process.env.JURISDICTION_POLICY_ID;
-const SPONSOR_PRIVATE_KEY = process.env.SPONSOR_PRIVATE_KEY;
-const MINT_FEE = BigInt(process.env.MINT_FEE || 100000000);
+const ADMIN_PRIVATE_KEY = process.env.ADMIN_PRIVATE_KEY || process.env.SPONSOR_PRIVATE_KEY || null;
+const STATIC_MINT_FEE = process.env.MINT_FEE || null;
 const BYPASS_FACE_MATCH = process.env.BYPASS_FACE_MATCH !== 'false';
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY || null;
+const HOST = process.env.HOST || '0.0.0.0';
+const MIST_PER_SUI = BigInt(1_000_000_000);
+
+function toBigIntOrNull(value) {
+  if (value === null || value === undefined) return null;
+  try {
+    return BigInt(value);
+  } catch (_err) {
+    return null;
+  }
+}
+
+function formatSuiFromMist(mistValue) {
+  try {
+    const mist = BigInt(mistValue);
+    const whole = mist / MIST_PER_SUI;
+    const remainder = mist % MIST_PER_SUI;
+    if (remainder === BigInt(0)) {
+      return whole.toString();
+    }
+    const remainderStr = remainder.toString().padStart(9, '0').replace(/0+$/, '');
+    return `${whole.toString()}.${remainderStr}`;
+  } catch (_err) {
+    return null;
+  }
+}
 
 if (BYPASS_FACE_MATCH) {
   console.warn('Face verification bypass mode enabled — similarity checks will be skipped.');
@@ -137,11 +165,10 @@ if (BYPASS_FACE_MATCH) {
 console.log(`Sui network configured: ${SUI_NETWORK} (rpc: ${SUI_RPC})`);
 
 let suiClient;
-let sponsorKeypair;
+let adminKeypair;
 
-// REPLACED: instantiate SuiClient when available; load sponsor keypair only if provided.
+// Instantiate Sui client when available; load admin signer only if provided.
 try {
-	// Instantiate Sui client if constructor is available
 	if (typeof SuiClient === 'function') {
 		try {
 			suiClient = new SuiClient({ url: SUI_RPC });
@@ -154,21 +181,17 @@ try {
 		console.warn('Sui client constructor not found in @mysten/sui exports. On-chain features disabled.');
 	}
 
-	// Load sponsor keypair only when provided and supported
-	if (SPONSOR_PRIVATE_KEY) {
+	if (ADMIN_PRIVATE_KEY) {
     if (Ed25519Keypair && typeof Ed25519Keypair.fromSecretKey === 'function') {
       try {
-        const tryLoadSponsorKeypair = (rawValue) => {
-          // First try: assume the value is already in the sui bech32 / encoded format the SDK expects.
+        const tryLoadAdminKeypair = (rawValue) => {
           try {
             return Ed25519Keypair.fromSecretKey(rawValue);
           } catch (err1) {
-            // Fallback: attempt to treat as base64 encoded bytes (possibly prefixed with a scheme byte).
             try {
               const decoded = Buffer.from(rawValue, 'base64');
               let secretBytes;
               if (decoded.length === 33 && decoded[0] === 0) {
-                // some exports prefix with 0 flag + 32 byte seed
                 secretBytes = decoded.slice(1, 33);
               } else if (decoded.length === 64) {
                 secretBytes = decoded.slice(0, 32);
@@ -185,37 +208,204 @@ try {
             }
           }
         };
-        sponsorKeypair = tryLoadSponsorKeypair(SPONSOR_PRIVATE_KEY);
-        console.log(`Sponsor address loaded: ${sponsorKeypair.getPublicKey().toSuiAddress()}`);
+        adminKeypair = tryLoadAdminKeypair(ADMIN_PRIVATE_KEY);
+        console.log(`Admin signer loaded: ${adminKeypair.getPublicKey().toSuiAddress()}`);
       } catch (e) {
-        console.error('Failed to load SPONSOR_PRIVATE_KEY. Provide either a sui encoded secret key (suiprivkey...) or a base64 seed.', e);
-        sponsorKeypair = null;
+        console.error('Failed to load ADMIN_PRIVATE_KEY. Provide either a sui encoded secret key (suiprivkey...) or a base64 seed.', e);
+        adminKeypair = null;
       }
 		} else {
-			console.warn('SPONSOR_PRIVATE_KEY provided but Ed25519Keypair helper not available. Sponsor will not be used.');
+			console.warn('ADMIN_PRIVATE_KEY provided but Ed25519Keypair helper not available. On-chain mint finalization disabled.');
 		}
 	} else {
-		console.info('No SPONSOR_PRIVATE_KEY provided. Transactions will be sponsor-less unless configured.');
+		console.info('No ADMIN_PRIVATE_KEY provided. Transactions will require manual signing.');
 	}
 
-	// Inform about missing important env vars but do not prevent server start
 	if (!PACKAGE_ID) {
 		console.warn('PACKAGE_ID not set. On-chain mint operations will fail until PACKAGE_ID is configured.');
 	}
 	if (!ADMIN_CAP_ID || !PROTOCOL_CONFIG_ID || !ATTESTATION_REGISTRY_ID) {
 		console.warn('One or more protocol env IDs (ADMIN_CAP_ID, PROTOCOL_CONFIG_ID, ATTESTATION_REGISTRY_ID) are not set. Some on-chain calls may fail.');
 	}
+  if (ADMIN_API_KEY) {
+    console.log('Admin API key configured — admin endpoints enabled.');
+  } else {
+    console.warn('ADMIN_API_KEY not set. Admin maintenance endpoints will be disabled.');
+  }
 } catch (outerErr) {
-	console.error('Unexpected error during Sui client / sponsor initialization:', outerErr);
+	console.error('Unexpected error during Sui client / admin initialization:', outerErr);
 	suiClient = null;
-	sponsorKeypair = null;
+	adminKeypair = null;
 }
 
 const verificationSessionStore = new Map();
 const pendingMints = new Map();
-const pendingSponsoredTransactions = new Map();
-let cachedAdminOwnerAddress = null;
-let adminOwnerCheckError = null;
+const consumedMintRequests = new Set();
+
+function summarizeAttestationObject(attestationObject) {
+  if (!attestationObject || attestationObject.error) return null;
+  const data = attestationObject.data || {};
+  const content = data.content || {};
+  const fields = content.fields || null;
+  if (!fields || !data.objectId) return null;
+
+  const toNumberOrNull = (value) => {
+    if (value === null || value === undefined) return null;
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+  };
+
+  const issueDateMs = toNumberOrNull(fields.issue_time_ms);
+  const expiryDateMs = toNumberOrNull(fields.expiry_time_ms);
+  const statusField = fields.status ? String(fields.status).toUpperCase() : null;
+  const revoked = Boolean(fields.revoked);
+  const status = statusField || (revoked ? 'REVOKED' : 'ACTIVE');
+  const statusLabel = status === 'ACTIVE' ? 'Active' : status === 'REVOKED' ? 'Revoked' : status;
+  const isExpired = expiryDateMs !== null && Date.now() > expiryDateMs;
+  const isValid = status === 'ACTIVE' && !isExpired;
+
+  return {
+    objectId: data.objectId,
+    jurisdictionCode: fields?.jurisdiction_code ?? null,
+    verificationLevel: fields?.verification_level ?? null,
+    issueDateMs,
+    expiryDateMs,
+    status,
+    statusLabel,
+    revoked,
+    isValid,
+  };
+}
+
+async function getExistingAttestation(walletAddress) {
+  if (!suiClient || !PACKAGE_ID || !walletAddress) return null;
+  try {
+    const ownedObjects = await suiClient.getOwnedObjects({
+      owner: walletAddress,
+      filter: { StructType: `${PACKAGE_ID}::protocol::Suirify_Attestation` },
+      options: { showContent: true },
+    });
+    const attestationObject = ownedObjects?.data?.find((obj) => obj && !obj.error);
+    const summary = summarizeAttestationObject(attestationObject);
+    if (!summary) return null;
+    return {
+      objectId: summary.objectId,
+      jurisdictionCode: summary.jurisdictionCode,
+      verificationLevel: summary.verificationLevel,
+      issueDateMs: summary.issueDateMs,
+      expiryDateMs: summary.expiryDateMs,
+      status: summary.statusLabel,
+      statusCode: summary.status,
+      isValid: summary.isValid,
+    };
+  } catch (err) {
+    console.error('Failed to load existing attestation for wallet', walletAddress, err);
+    return null;
+  }
+}
+
+async function getLatestPendingMintRequest(walletAddress, limit = 20, preferredRequestId = null) {
+  if (!suiClient || !PACKAGE_ID || !walletAddress) return null;
+  try {
+    const normalizedWallet = typeof walletAddress === 'string' ? walletAddress.trim() : walletAddress;
+    if (!normalizedWallet) {
+      return null;
+    }
+    const filter = { MoveEventType: `${PACKAGE_ID}::protocol::MintRequestCreated` };
+
+    const response = await suiClient.queryEvents({ query: filter, limit });
+    const events = Array.isArray(response?.data) ? response.data.slice() : [];
+    events.sort((a, b) => {
+      const aTs = a?.timestampMs ? Number(a.timestampMs) : 0;
+      const bTs = b?.timestampMs ? Number(b.timestampMs) : 0;
+      return bTs - aTs;
+    });
+
+  let fallbackMatch = null;
+  const preferLower = typeof preferredRequestId === 'string' ? preferredRequestId.toLowerCase() : null;
+
+  for (const event of events) {
+      const parsed = event?.parsedJson || {};
+      const requestId = parsed.request_id || parsed.requestId || null;
+      const requester = parsed.requester || parsed.requester_address || null;
+      if (!requestId || typeof requestId !== 'string' || !requester) continue;
+  if (requester.toLowerCase() !== normalizedWallet.toLowerCase()) continue;
+      if (isRequestConsumed(requestId)) continue;
+
+      const digest = (event?.id && event.id.txDigest) || event?.txDigest || event?.transactionDigest || event?.digest || null;
+      const eventSeq = event?.id && event.id.eventSeq !== undefined ? event.id.eventSeq : null;
+
+      const record = {
+        requestId,
+        requestTxDigest: digest,
+        eventSequence: eventSeq,
+        timestampMs: event?.timestampMs || null,
+        requester,
+      };
+
+      if (preferLower && requestId.toLowerCase() === preferLower) {
+        return record;
+      }
+
+      if (!fallbackMatch) {
+        fallbackMatch = record;
+      }
+    }
+    if (fallbackMatch) {
+      return fallbackMatch;
+    }
+  } catch (error) {
+    console.error('Failed to lookup pending mint request for wallet', walletAddress, error);
+  }
+  return null;
+}
+
+if (typeof db.getAllConsumedMintRequests === 'function') {
+  try {
+    const existingConsumed = db.getAllConsumedMintRequests();
+    existingConsumed.forEach((entry) => {
+      if (entry && entry.requestId) {
+        consumedMintRequests.add(entry.requestId.toLowerCase());
+      }
+    });
+    if (existingConsumed.length) {
+      console.log(`Loaded ${existingConsumed.length} consumed mint request(s) from persistent storage.`);
+    }
+  } catch (err) {
+    console.error('Failed to hydrate consumed mint requests from persistent storage:', err);
+  }
+}
+
+const ADMIN_HEADER_KEY = 'x-admin-key';
+
+function isRequestConsumed(requestId) {
+  if (!requestId || typeof requestId !== 'string') return false;
+  const lower = requestId.toLowerCase();
+  return consumedMintRequests.has(lower) || (typeof db.isMintRequestConsumed === 'function' && db.isMintRequestConsumed(lower));
+}
+
+function markRequestConsumed(requestId, metadata) {
+  if (!requestId || typeof requestId !== 'string') return;
+  const lower = requestId.toLowerCase();
+  consumedMintRequests.add(lower);
+  if (typeof db.markMintRequestConsumed === 'function') {
+    const safeMetadata = Object.assign({}, metadata || {});
+    if (!safeMetadata.eventType) safeMetadata.eventType = 'consumed';
+    db.markMintRequestConsumed(lower, Object.assign({}, safeMetadata, { originalRequestId: requestId }));
+  }
+}
+
+function requireAdmin(req, res, next) {
+  if (!ADMIN_API_KEY) {
+    return res.status(503).json({ error: 'ADMIN_API_KEY not configured on the server.' });
+  }
+  const provided = req.headers[ADMIN_HEADER_KEY] || req.headers['x-admin-token'];
+  const value = Array.isArray(provided) ? provided[0] : provided;
+  if (value !== ADMIN_API_KEY) {
+    return res.status(401).json({ error: 'Unauthorized admin request.' });
+  }
+  return next();
+}
 
 // Replace previous normalizeName and sha256ToU8Array with robust implementations
 const normalizeName = (name) => {
@@ -243,6 +433,52 @@ function buildNameHash(normalizedName, walletAddress, pepper, version = 1) {
   return new Uint8Array(hashBuf);
 }
 
+const hashFullNameForStorage = (fullName) => {
+  if (!fullName || typeof fullName !== 'string') return null;
+  const normalized = normalizeName(fullName);
+  if (!normalized) return null;
+  const payload = `audit-name:v1|${normalized}|${SECRET_PEPPER}`;
+  return crypto.createHash('sha256').update(Buffer.from(payload, 'utf8')).digest('hex');
+};
+
+async function signTransactionWithKeypair(keypair, txBytes) {
+  if (!keypair) {
+    throw new Error('Keypair is not configured.');
+  }
+
+  const bytes = txBytes instanceof Uint8Array ? txBytes : Uint8Array.from(txBytes);
+  const base64 = Buffer.from(bytes).toString('base64');
+  const attempts = [
+    ['signTransactionBlock', bytes],
+    ['signTransaction', bytes],
+    ['signTransaction', base64],
+    ['sign', bytes],
+  ];
+
+  for (const [method, arg] of attempts) {
+    const fn = keypair[method];
+    if (typeof fn !== 'function') continue;
+    try {
+      const maybePromise = fn.call(keypair, arg);
+      const payload = maybePromise && typeof maybePromise.then === 'function' ? await maybePromise : maybePromise;
+      let signature = payload && payload.signature !== undefined ? payload.signature : payload;
+      if (Array.isArray(signature)) {
+        [signature] = signature;
+      }
+      if (signature instanceof Uint8Array) {
+        signature = Buffer.from(signature).toString('base64');
+      }
+      if (typeof signature === 'string') {
+        return signature;
+      }
+    } catch (err) {
+      console.warn(`Admin keypair ${method} failed:`, err && err.message ? err.message : err);
+    }
+  }
+
+  throw new Error('Admin keypair does not support transaction signing with the available methods.');
+}
+
 /**
  * ENDPOINT 1: Check for an existing attestation & get dashboard data.
  */
@@ -256,18 +492,26 @@ app.get('/attestation/:walletAddress', async (req, res) => {
       options: { showContent: true },
     });
     const attestationObject = ownedObjects.data.find((obj) => !obj.error);
-    if (!attestationObject) return res.json({ hasAttestation: false, data: null });
+    const summary = summarizeAttestationObject(attestationObject);
+    if (!summary) return res.json({ hasAttestation: false, isValid: false, data: null });
 
-    const fields = attestationObject.data.content.fields;
-    const dashboardData = {
-      objectId: attestationObject.data.objectId,
-      jurisdictionCode: fields.jurisdiction_code,
-      verificationLevel: fields.verification_level,
-      issueDate: new Date(parseInt(fields.issue_time_ms, 10)).toISOString(),
-      expiryDate: new Date(parseInt(fields.expiry_time_ms, 10)).toISOString(),
-      status: fields.revoked ? 'Revoked' : 'Active',
+    const toIsoOrNull = (ms) => {
+      if (ms === null || ms === undefined) return null;
+      const date = new Date(ms);
+      return Number.isNaN(date.getTime()) ? null : date.toISOString();
     };
-    res.json({ hasAttestation: true, data: dashboardData });
+
+    const dashboardData = {
+      objectId: summary.objectId,
+      jurisdictionCode: summary.jurisdictionCode,
+      verificationLevel: summary.verificationLevel,
+      issueDate: toIsoOrNull(summary.issueDateMs),
+      expiryDate: toIsoOrNull(summary.expiryDateMs),
+      status: summary.statusLabel,
+      statusCode: summary.status,
+      revoked: summary.revoked,
+    };
+    res.json({ hasAttestation: true, isValid: summary.isValid, data: dashboardData });
   } catch (error) {
     console.error(`Error fetching attestation for ${req.params.walletAddress}:`, error);
     res.status(500).json({ error: 'Failed to query the blockchain.' });
@@ -393,226 +637,418 @@ app.post('/complete-verification', async (req, res) => {
 });
 
 /**
- * ENDPOINT 4: Create the sponsored transaction after user consent.
+ * Provide mint configuration so the frontend can construct mint requests client-side.
  */
-app.post('/create-mint-tx', async (req, res) => {
-  const { sessionId } = req.body;
-  if (!sessionId) return res.status(400).json({ error: 'SessionID is required.' });
-
-  // Guard: ensure the Sui client is configured before doing any Sui calls
+app.get('/mint-config', async (_req, res) => {
   if (!suiClient) {
-    console.warn('create-mint-tx called but suiClient is not configured.');
-    return res.status(500).json({ error: 'Sui client is not configured on the server. On-chain features disabled.' });
+    return res.status(500).json({ error: 'Sui client is not configured on the server.' });
+  }
+  if (!PACKAGE_ID || !ATTESTATION_REGISTRY_ID) {
+    return res.status(500).json({ error: 'Protocol package or registry id is not configured.' });
   }
 
-  if (!sponsorKeypair) {
-    console.warn('create-mint-tx called but sponsor keypair is not configured.');
-    return res.status(500).json({ error: 'Sponsor account not configured on the server.' });
+  let mintFeeMist = STATIC_MINT_FEE ? String(STATIC_MINT_FEE) : null;
+  let contractVersion = null;
+  let treasuryAddress = null;
+  let mintFeeSource = mintFeeMist ? 'env' : null;
+  let chainMintFee = null;
+
+  if (PROTOCOL_CONFIG_ID) {
+    try {
+      const configObject = await suiClient.getObject({ id: PROTOCOL_CONFIG_ID, options: { showContent: true } });
+      const fields = configObject?.data?.content?.fields;
+      if (fields) {
+        if (fields.mint_fee !== undefined && fields.mint_fee !== null) {
+          chainMintFee = toBigIntOrNull(fields.mint_fee);
+          if (chainMintFee !== null) {
+            mintFeeMist = chainMintFee.toString();
+            mintFeeSource = 'on-chain';
+          }
+        }
+        if (fields.contract_version !== undefined) {
+          contractVersion = Number(fields.contract_version);
+        }
+        if (fields.treasury_address) {
+          treasuryAddress = fields.treasury_address;
+        }
+      }
+    } catch (err) {
+      console.warn('Unable to fetch ProtocolConfig on-chain:', err && err.message ? err.message : err);
+    }
   }
 
-  const sessionData = verificationSessionStore.get(sessionId);
-  if (!sessionData || !sessionData.preparedData) return res.status(404).json({ error: 'Verification session incomplete.' });
-
-  const { preparedData, country, idNumber, policyId: sessionPolicyId } = sessionData;
-  const { userWalletAddress } = preparedData;
-
-  // Validate nameHash is the expected type and length before building tx
-  if (!preparedData.nameHash || !(preparedData.nameHash instanceof Uint8Array) || preparedData.nameHash.length !== 32) {
-    return res.status(500).json({ error: 'Invalid nameHash prepared for transaction.' });
+  const envMintFee = toBigIntOrNull(STATIC_MINT_FEE);
+  if (!mintFeeMist && envMintFee !== null) {
+    mintFeeMist = envMintFee.toString();
+    mintFeeSource = 'env';
   }
 
-  // Determine which jurisdiction policy object to pass to the Move call:
-  // prefer session-specific policyId, fall back to global env JURISDICTION_POLICY_ID
-  const policyObjectId = sessionPolicyId || JURISDICTION_POLICY_ID;
-  if (!policyObjectId) {
-    console.error('No jurisdiction policy object id available for this mint operation.');
-    return res.status(500).json({ error: 'Jurisdiction policy not configured for this country.' });
+  if (chainMintFee !== null && envMintFee !== null && chainMintFee !== envMintFee) {
+    console.error('Mint fee mismatch between on-chain ProtocolConfig and backend .env value.', {
+      onChain: chainMintFee.toString(),
+      env: envMintFee.toString(),
+    });
+    return res.status(500).json({
+      error: 'Mint fee configuration mismatch between on-chain protocol config and server environment.',
+      details: {
+        onChain: chainMintFee.toString(),
+        env: envMintFee.toString(),
+      },
+    });
+  }
+
+  const mintFeeSui = mintFeeMist ? formatSuiFromMist(mintFeeMist) : null;
+
+  res.json({
+    success: true,
+    packageId: PACKAGE_ID,
+    protocolConfigId: PROTOCOL_CONFIG_ID || null,
+    attestationRegistryId: ATTESTATION_REGISTRY_ID,
+    defaultPolicyId: JURISDICTION_POLICY_ID || null,
+    mintFee: mintFeeMist,
+    mintFeeMist,
+    mintFeeSui,
+    mintFeeSource,
+    contractVersion,
+    treasuryAddress,
+  });
+});
+
+/**
+ * Check for an existing, unconsumed mint request for the given wallet address.
+ * Returns the most recent MintRequestCreated event (if any) that matches the wallet
+ * and has not yet been finalised by this server instance.
+ */
+app.get('/mint-request/:walletAddress', async (req, res) => {
+  if (!suiClient) {
+    return res.status(500).json({ success: false, error: 'Sui client is not configured on the server.' });
+  }
+
+  if (!PACKAGE_ID) {
+    return res.status(500).json({ success: false, error: 'PACKAGE_ID not configured on the server.' });
+  }
+
+  const { walletAddress } = req.params || {};
+  const preferredRequestId = typeof req.query.requestId === 'string' ? req.query.requestId : null;
+  if (!walletAddress) {
+    return res.status(400).json({ success: false, error: 'walletAddress is required.' });
   }
 
   try {
-    if (!TransactionBlock || typeof TransactionBlock !== 'function') {
-      console.error('TransactionBlock constructor not available. Ensure @mysten/sui is up to date.');
-      return res.status(500).json({ error: 'Sui transaction builder not available on the server.' });
+  const pending = await getLatestPendingMintRequest(walletAddress, 50, preferredRequestId);
+    if (pending) {
+      return res.json({ success: true, hasRequest: true, ...pending });
     }
 
-    const txb = new TransactionBlock();
-    const sponsorAddress = sponsorKeypair.getPublicKey().toSuiAddress();
+    res.json({ success: true, hasRequest: false });
+  } catch (error) {
+    console.error('Failed to lookup existing mint request:', error);
+    res.status(500).json({ success: false, error: 'Failed to lookup mint request.' });
+  }
+});
 
-    if (!cachedAdminOwnerAddress && !adminOwnerCheckError) {
-      try {
-        const adminObject = await suiClient.getObject({ id: ADMIN_CAP_ID, options: { showOwner: true } });
-        cachedAdminOwnerAddress = adminObject?.data?.owner?.AddressOwner || null;
-      } catch (ownerErr) {
-        adminOwnerCheckError = ownerErr;
-        console.warn('Unable to determine ADMIN_CAP owner:', ownerErr?.message || ownerErr);
+/**
+ * Admin endpoint: list recent mint requests, optionally filtered by wallet.
+ */
+app.get('/admin/mint-requests', requireAdmin, async (req, res) => {
+  if (!suiClient) {
+    return res.status(500).json({ success: false, error: 'Sui client is not configured on the server.' });
+  }
+  if (!PACKAGE_ID) {
+    return res.status(500).json({ success: false, error: 'PACKAGE_ID not configured on the server.' });
+  }
+
+  const walletAddress = typeof req.query.walletAddress === 'string' ? req.query.walletAddress.trim() : null;
+  const includeConsumed = String(req.query.includeConsumed || 'false').toLowerCase() === 'true';
+  const limitRaw = typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : null;
+  const limit = Math.min(Math.max(limitRaw || 50, 1), 200);
+  let cursorParam;
+  if (typeof req.query.cursor === 'string' && req.query.cursor.length) {
+    const eventSeqParam = typeof req.query.eventSeq === 'string' && req.query.eventSeq.length ? req.query.eventSeq : null;
+    cursorParam = eventSeqParam ? { txDigest: req.query.cursor, eventSeq: eventSeqParam } : { txDigest: req.query.cursor };
+  }
+
+  let query;
+  if (walletAddress) {
+    query = {
+      All: [
+        { MoveEventType: `${PACKAGE_ID}::protocol::MintRequestCreated` },
+        { SenderAddress: walletAddress },
+      ],
+    };
+  } else {
+    query = { MoveEventType: `${PACKAGE_ID}::protocol::MintRequestCreated` };
+  }
+
+  try {
+  const response = await suiClient.queryEvents({ query, limit, cursor: cursorParam });
+    const events = Array.isArray(response?.data) ? response.data : [];
+    const items = [];
+
+    for (const event of events) {
+      const parsed = event?.parsedJson || {};
+      const requestId = parsed.request_id || parsed.requestId || null;
+      const requester = parsed.requester || parsed.requester_address || null;
+      const txDigest = (event?.id && event.id.txDigest) || event?.txDigest || event?.transactionDigest || event?.digest || null;
+      const eventSeq = event?.id && event.id.eventSeq !== undefined ? event.id.eventSeq : null;
+      const timestampMs = event?.timestampMs || null;
+      const consumed = requestId ? isRequestConsumed(requestId) : false;
+
+      if (!includeConsumed && consumed) {
+        continue;
       }
-    }
 
-    if (cachedAdminOwnerAddress && cachedAdminOwnerAddress !== sponsorAddress) {
-      return res.status(500).json({
-        error: 'Admin capability is not owned by the configured sponsor account.',
-        details: {
-          adminOwner: cachedAdminOwnerAddress,
-          sponsorAddress,
-        },
+      const stored = requestId && typeof db.getConsumedMintRequest === 'function'
+        ? db.getConsumedMintRequest(requestId.toLowerCase())
+        : null;
+
+      items.push({
+        requestId,
+        requester,
+        txDigest,
+        eventSeq,
+        timestampMs,
+        isConsumed: consumed,
+        stored,
       });
     }
 
-    const sponsorCoins = await suiClient.getCoins({ owner: sponsorAddress, coinType: '0x2::sui::SUI', limit: 50 });
-    if (!sponsorCoins || !Array.isArray(sponsorCoins.data) || sponsorCoins.data.length === 0) {
-      return res.status(500).json({ error: 'Sponsor account does not hold any SUI coins to cover minting.' });
-    }
-
-    const sortedCoins = [...sponsorCoins.data].sort((a, b) => {
-      const balanceA = BigInt(a.balance);
-      const balanceB = BigInt(b.balance);
-      if (balanceA === balanceB) return 0;
-      return balanceA > balanceB ? -1 : 1;
+    res.json({
+      success: true,
+      items,
+      nextCursor: response?.nextCursor || null,
     });
-    const gasCoin = sortedCoins[0];
-    const paymentCoin = sortedCoins[1];
+  } catch (error) {
+    console.error('Admin mint request listing failed:', error);
+    res.status(500).json({ success: false, error: 'Failed to list mint requests.' });
+  }
+});
 
-    if (!paymentCoin) {
-      return res.status(500).json({ error: 'Sponsor account needs at least two SUI coins (one for gas, one for mint fee). Split a coin and retry.' });
+/**
+ * Admin endpoint: manually mark a mint request as consumed to prevent reuse.
+ */
+app.post('/admin/mint-request/consume', requireAdmin, (req, res) => {
+  const { requestId, note } = req.body || {};
+  if (!requestId || typeof requestId !== 'string') {
+    return res.status(400).json({ success: false, error: 'requestId is required.' });
+  }
+
+  markRequestConsumed(requestId, { note: note || null, source: 'manual-admin', eventType: 'admin-force-consume' });
+
+  res.json({
+    success: true,
+    requestId: requestId.toLowerCase(),
+  });
+});
+
+/**
+ * Finalize attestation minting after a user has created a mint request on-chain.
+ */
+app.post('/finalize-mint', async (req, res) => {
+  const { sessionId, requestId: rawRequestId, requestTxDigest } = req.body || {};
+
+  if (!sessionId) {
+    return res.status(400).json({ error: 'sessionId is required.' });
+  }
+
+  let requestId = typeof rawRequestId === 'string' && rawRequestId.trim().length ? rawRequestId.trim() : null;
+  let requestDigestInput = typeof requestTxDigest === 'string' && requestTxDigest.trim().length ? requestTxDigest.trim() : null;
+
+  if (!suiClient) {
+    return res.status(500).json({ error: 'Sui client is not configured on the server.' });
+  }
+
+  if (!adminKeypair) {
+    return res.status(500).json({ error: 'Admin signer is not configured on the server.' });
+  }
+
+  if (!TransactionBlock || typeof TransactionBlock !== 'function') {
+    return res.status(500).json({ error: 'Sui transaction builder not available on the server.' });
+  }
+
+  if (!ADMIN_CAP_ID || !PROTOCOL_CONFIG_ID || !ATTESTATION_REGISTRY_ID) {
+    return res.status(500).json({ error: 'Protocol objects (admin cap, config, registry) are not fully configured.' });
+  }
+
+  const sessionData = verificationSessionStore.get(sessionId);
+  if (!sessionData || !sessionData.preparedData) {
+    return res.status(404).json({ error: 'Verification session not found or incomplete.' });
+  }
+
+  const { preparedData, country, idNumber, policyId: sessionPolicyId } = sessionData;
+  const policyObjectId = sessionPolicyId || JURISDICTION_POLICY_ID;
+  if (!policyObjectId) {
+    return res.status(500).json({ error: 'Jurisdiction policy not configured for this session.' });
+  }
+
+  const auditNameHash = sessionData?.govRecord?.fullName ? hashFullNameForStorage(sessionData.govRecord.fullName) : null;
+
+  const { userWalletAddress, jurisdictionCode, verifierSource, verificationLevel, nameHash, isHumanVerified, isOver18, verifierVersion } = preparedData;
+
+  try {
+    const pending = await getLatestPendingMintRequest(userWalletAddress, 50, requestId);
+    if (pending) {
+      if (!requestId || pending.requestId.toLowerCase() !== requestId.toLowerCase()) {
+        console.log(`Finalizing mint using request ${pending.requestId} for wallet ${userWalletAddress} (was ${requestId || 'auto-detected'}).`);
+      }
+      requestId = pending.requestId;
+      if (!requestDigestInput) {
+        requestDigestInput = pending.requestTxDigest || null;
+      }
+    } else if (requestId) {
+      if (isRequestConsumed(requestId)) {
+        const existingAttestation = await getExistingAttestation(userWalletAddress);
+        if (existingAttestation) {
+          return res.status(409).json({
+            error: 'Wallet already holds an attestation.',
+            attestation: existingAttestation,
+          });
+        }
+      }
+      const fallback = await getLatestPendingMintRequest(userWalletAddress, 50, null);
+      if (fallback) {
+        console.log(`Requested mint id ${requestId} not pending, falling back to ${fallback.requestId} for wallet ${userWalletAddress}.`);
+        requestId = fallback.requestId;
+        if (!requestDigestInput) {
+          requestDigestInput = fallback.requestTxDigest || null;
+        }
+      }
     }
+  } catch (pendingErr) {
+    console.error('Failed to resolve pending mint request:', pendingErr);
+  }
 
-    txb.setGasOwner(sponsorAddress);
-    txb.setGasPayment([
-      {
-        objectId: gasCoin.coinObjectId,
-        digest: gasCoin.digest,
-        version: gasCoin.version,
-      },
-    ]);
+  if (!requestId) {
+    return res.status(409).json({ error: 'No pending mint request found for this wallet. Please create a mint request first.' });
+  }
 
-    const feeAmount = typeof MINT_FEE === 'bigint' ? MINT_FEE.toString() : String(MINT_FEE);
-    const [feeCoin] = txb.splitCoins(txb.object(paymentCoin.coinObjectId), [txb.pure.u64(feeAmount)]);
+  if (isRequestConsumed(requestId)) {
+    return res.status(409).json({ error: 'Mint request has already been processed.' });
+  }
+
+  const existingAttestation = await getExistingAttestation(userWalletAddress);
+  if (existingAttestation) {
+    markRequestConsumed(requestId, {
+      note: 'Detected existing attestation prior to finalization',
+      walletAddress: userWalletAddress,
+      eventType: 'existing-attestation',
+      source: 'finalize-handler',
+    });
+    db.markUsedGovId(
+      country,
+      idNumber,
+      Object.assign(
+        {
+          walletAddress: userWalletAddress,
+          attestationId: existingAttestation.objectId,
+          requestId: requestId || null,
+          detectedAt: new Date().toISOString(),
+          eventType: 'existing-attestation',
+          source: 'finalize-handler',
+          requestedRequestId: rawRequestId || null,
+          requestTxDigest: requestDigestInput || null,
+        },
+        auditNameHash ? { fullNameHash: auditNameHash } : {}
+      )
+    );
+    verificationSessionStore.delete(sessionId);
+    return res.status(409).json({ error: 'Wallet already holds an attestation.', attestation: existingAttestation });
+  }
+
+  if (!nameHash || !(nameHash instanceof Uint8Array) || nameHash.length !== 32) {
+    return res.status(500).json({ error: 'Invalid name hash stored for this session.' });
+  }
+
+  try {
+    const txb = new TransactionBlock();
+    const adminAddress = adminKeypair.getPublicKey().toSuiAddress();
 
     const nameHashVector = typeof txb.pure.vector === 'function'
-      ? txb.pure.vector('u8', Array.from(preparedData.nameHash))
-      : txb.pure(Array.from(preparedData.nameHash));
+      ? txb.pure.vector('u8', Array.from(nameHash))
+      : txb.pure(Array.from(nameHash));
 
     txb.moveCall({
       target: `${PACKAGE_ID}::protocol::mint_attestation`,
       arguments: [
-        txb.object(ADMIN_CAP_ID), txb.object(PROTOCOL_CONFIG_ID), feeCoin,
-        txb.object(ATTESTATION_REGISTRY_ID), txb.object(policyObjectId), // use per-country policy here
-        txb.pure.address(userWalletAddress), txb.pure.u16(Number(preparedData.jurisdictionCode)),
-        txb.pure.u8(preparedData.verifierSource), txb.pure.u8(preparedData.verificationLevel),
-        // pass the nameHash explicitly as a vector<u8>
-        nameHashVector, txb.pure.bool(preparedData.isHumanVerified),
-        txb.pure.bool(preparedData.isOver18), txb.pure.u8(preparedData.verifierVersion),
+        txb.object(ADMIN_CAP_ID),
+        txb.object(PROTOCOL_CONFIG_ID),
+        txb.object(ATTESTATION_REGISTRY_ID),
+        txb.pure.address(requestId),
+        txb.object(policyObjectId),
+        txb.pure.address(userWalletAddress),
+        txb.pure.u16(Number(jurisdictionCode)),
+        txb.pure.u8(Number(verifierSource)),
+        txb.pure.u8(Number(verificationLevel)),
+        nameHashVector,
+        txb.pure.bool(Boolean(isHumanVerified)),
+        txb.pure.bool(Boolean(isOver18)),
+        txb.pure.u8(Number(verifierVersion)),
       ],
     });
 
-    txb.setSender(userWalletAddress);
-    txb.setGasBudget(30000000);
+    txb.setSender(adminAddress);
+    txb.setGasBudget(50_000_000);
 
-    const transactionBytes = await txb.build({ client: suiClient });
-    const serializedTx = Buffer.from(transactionBytes).toString('base64');
-
-    pendingSponsoredTransactions.set(sessionId, {
-      transaction: serializedTx,
-      userWalletAddress,
-      country,
-      idNumber,
-      sponsorAddress,
-      createdAt: Date.now(),
-    });
-
-    res.json({ success: true, transaction: serializedTx, sponsorAddress });
-  } catch (error) {
-    console.error('Error building transaction:', error);
-    res.status(500).json({ success: false, error: 'Failed to build transaction.', details: error && error.message ? error.message : String(error) });
-  }
-});
-
-app.post('/submit-mint-signature', async (req, res) => {
-  const { sessionId, userSignature, transaction } = req.body;
-  if (!sessionId || !userSignature) {
-    return res.status(400).json({ error: 'sessionId and userSignature are required.' });
-  }
-
-  if (!suiClient) {
-    console.warn('submit-mint-signature called but suiClient is not configured.');
-    return res.status(500).json({ error: 'Sui client is not configured on the server.' });
-  }
-
-  if (!sponsorKeypair) {
-    console.warn('submit-mint-signature called but sponsor keypair is not configured.');
-    return res.status(500).json({ error: 'Sponsor account not configured on the server.' });
-  }
-
-  const pending = pendingSponsoredTransactions.get(sessionId);
-  if (!pending) {
-    return res.status(404).json({ error: 'No pending sponsored transaction found for this session.' });
-  }
-
-  const { transaction: storedTx, userWalletAddress, country, idNumber } = pending;
-  if (transaction && transaction !== storedTx) {
-    return res.status(400).json({ error: 'Provided transaction does not match pending transaction. Please restart the mint step.' });
-  }
-
-  const txBase64 = storedTx;
-  const txBytes = Buffer.from(txBase64, 'base64');
-
-  try {
-    async function trySign(methodName, arg) {
-      const fn = sponsorKeypair && sponsorKeypair[methodName];
-      if (typeof fn !== 'function') return null;
-      try {
-        const result = fn.call(sponsorKeypair, arg);
-        return result && typeof result.then === 'function' ? await result : result;
-      } catch (err) {
-        console.warn(`Sponsor keypair ${methodName} failed:`, err && err.message ? err.message : err);
-        return null;
-      }
-    }
-
-    let signaturePayload = await trySign('signTransactionBlock', txBytes);
-    if (!signaturePayload) {
-      signaturePayload = await trySign('signTransaction', txBytes);
-    }
-    if (!signaturePayload) {
-      signaturePayload = await trySign('signTransaction', txBase64);
-    }
-    if (!signaturePayload) {
-      signaturePayload = await trySign('sign', txBytes);
-    }
-
-    if (!signaturePayload) {
-      throw new Error('Sponsor keypair does not support transaction signing with the available methods.');
-    }
-
-    let sponsorSignature = signaturePayload.signature ?? signaturePayload;
-    if (Array.isArray(sponsorSignature)) {
-      sponsorSignature = sponsorSignature[0];
-    }
-    if (sponsorSignature instanceof Uint8Array) {
-      sponsorSignature = Buffer.from(sponsorSignature).toString('base64');
-    }
-    if (typeof sponsorSignature !== 'string') {
-      throw new Error('Unsupported sponsor signature format returned by keypair.');
-    }
+    const txBytes = await txb.build({ client: suiClient });
+    const signature = await signTransactionWithKeypair(adminKeypair, txBytes);
+    const txBase64 = Buffer.from(txBytes).toString('base64');
 
     const executionResult = await suiClient.executeTransactionBlock({
       transactionBlock: txBase64,
-      signature: [userSignature, sponsorSignature],
+      signature,
       options: { showEffects: true, showEvents: true },
       requestType: 'WaitForLocalExecution',
     });
 
     const digest = executionResult?.digest || executionResult?.effects?.transactionDigest || null;
 
-    pendingMints.set(userWalletAddress, { country, idNumber });
-    pendingSponsoredTransactions.delete(sessionId);
+    if (requestId && typeof requestId === 'string') {
+      markRequestConsumed(requestId, {
+        finalizedAt: new Date().toISOString(),
+        finalizeDigest: digest,
+        walletAddress: userWalletAddress,
+        eventType: 'mint-finalized',
+        source: 'finalize-handler',
+        requestTxDigest: requestDigestInput || null,
+        requestedRequestId: rawRequestId || null,
+      });
+    }
+
+    pendingMints.set(
+      userWalletAddress,
+      Object.assign(
+        { country, idNumber, requestId, requestedRequestId: rawRequestId || null },
+        auditNameHash ? { fullNameHash: auditNameHash } : {}
+      )
+    );
+    try {
+      db.markUsedGovId(
+        country,
+        idNumber,
+        Object.assign(
+          {
+            walletAddress: userWalletAddress,
+            requestId,
+            finalizeDigest: digest,
+            recordedAt: new Date().toISOString(),
+            eventType: 'mint-finalized',
+            source: 'finalize-handler',
+            requestTxDigest: requestDigestInput || null,
+            requestedRequestId: rawRequestId || null,
+          },
+          auditNameHash ? { fullNameHash: auditNameHash } : {}
+        )
+      );
+    } catch (markErr) {
+      console.error('Failed to persist mint completion metadata:', markErr);
+    }
     verificationSessionStore.delete(sessionId);
 
-    res.json({ success: true, digest, effects: executionResult?.effects ?? null });
+  res.json({ success: true, digest, finalizeTxDigest: digest, requestTxDigest: requestDigestInput || null, effects: executionResult?.effects ?? null });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error('Failed to execute sponsored transaction:', message);
-    res.status(500).json({ success: false, error: 'Failed to execute sponsored transaction.', details: message });
+    console.error('Failed to finalize mint:', message);
+    res.status(500).json({ success: false, error: 'Failed to finalize mint transaction.', details: message });
   }
 });
 
@@ -634,13 +1070,44 @@ async function startIndexer() {
           (event && event.payload && event.payload.recipient) ||
           (event && event.parsedJson && event.parsedJson.recipient) ||
           null;
+        const requestIdFromEvent =
+          (event && event.payload && event.payload.request_id) ||
+          (event && event.parsedJson && (event.parsedJson.request_id || event.parsedJson.requestId)) ||
+          null;
+        if (requestIdFromEvent) {
+          markRequestConsumed(requestIdFromEvent, {
+            finalizedAt: new Date().toISOString(),
+            source: 'event-indexer',
+            eventType: 'indexer-attestation',
+            walletAddress: recipient || null,
+            recipient,
+          });
+        }
         if (!recipient) return;
 
         const pendingMint = pendingMints.get(recipient);
         if (pendingMint) {
           try {
-            db.markUsedGovId(pendingMint.country, pendingMint.idNumber, { walletAddress: recipient });
-            console.log(`✅ SUCCESS: Permanently recorded ${pendingMint.country}:${pendingMint.idNumber} for wallet ${recipient}.`);
+            const record = db.markUsedGovId(
+              pendingMint.country,
+              pendingMint.idNumber,
+              Object.assign(
+                {
+                  walletAddress: recipient,
+                  eventType: 'indexer-attestation',
+                  source: 'event-indexer',
+                  indexedAt: new Date().toISOString(),
+                  requestId: pendingMint.requestId || null,
+                  requestedRequestId: pendingMint.requestedRequestId || null,
+                },
+                pendingMint.fullNameHash ? { fullNameHash: pendingMint.fullNameHash } : {}
+              )
+            );
+            if (record && record.idHash) {
+              console.log(`✅ SUCCESS: Recorded attestation for wallet ${recipient} (country=${pendingMint.country}, idHash=${record.idHash.slice(0, 12)}…).`);
+            } else {
+              console.log(`✅ SUCCESS: Recorded attestation for wallet ${recipient} (country=${pendingMint.country}).`);
+            }
           } catch (e) {
             console.error('Failed to mark gov id as used in persistent DB:', e);
           }
@@ -672,6 +1139,21 @@ let server = null;
 const START_PORT = parseInt(process.env.PORT, 10) || 4000;
 const MAX_RETRIES = 10;
 
+function getLanAddresses(port) {
+  const result = [];
+  const nets = os.networkInterfaces();
+  Object.values(nets).forEach((entries) => {
+    if (!entries) return;
+    entries.forEach((entry) => {
+      if (!entry || entry.internal) return;
+      if (entry.family === 'IPv4') {
+        result.push(`http://${entry.address}:${port}`);
+      }
+    });
+  });
+  return Array.from(new Set(result));
+}
+
 function startServer(port = START_PORT, attempts = 0) {
   if (attempts > MAX_RETRIES) {
     console.error(`Failed to bind server after ${MAX_RETRIES} retries. Exiting.`);
@@ -679,9 +1161,16 @@ function startServer(port = START_PORT, attempts = 0) {
   }
 
   try {
-    server = app.listen(port, () => {
-      console.log(`Server listening on port ${port}`);
+    server = app.listen(port, HOST, () => {
+      console.log(`Server listening on http://${HOST}:${port}`);
       console.log(`Health: http://localhost:${port}/health`);
+      const lanUrls = getLanAddresses(port);
+      if (lanUrls.length) {
+        console.log('LAN access:');
+        lanUrls.forEach((url) => console.log(`  → ${url}`));
+      } else {
+        console.log('No LAN IPv4 addresses detected; ensure your network interfaces are active.');
+      }
       // start indexer only once, and only if sui client configured
       try {
         startIndexer();
