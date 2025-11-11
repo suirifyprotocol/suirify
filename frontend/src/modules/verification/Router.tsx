@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { useVerificationStatus } from "@/hooks/useVerificationStatus";
 import LoadingSpinner from "./ui/LoadingSpinner";
 import VerificationPortal from "./portal/VerificationPortal";
 import Dashboard from "./dashboard/Dashboard";
 import { ConnectButton } from "@mysten/dapp-kit";
+import { useNavigate } from "react-router-dom";
 
 /**
  * Verification Router (entry for /verify)
@@ -17,9 +18,21 @@ import { ConnectButton } from "@mysten/dapp-kit";
 const Router: React.FC = () => {
   const account = useCurrentAccount();
   const { checkAttestation } = useVerificationStatus();
+  const navigate = useNavigate();
   const [verificationState, setVerificationState] = useState<
     "checking" | "verified" | "unverified"
   >("checking");
+
+  const wasConnected = useRef<boolean>(!!account?.address);
+
+  // Redirect to home when wallet disconnects (connected -> undefined)
+  useEffect(() => {
+    const nowConnected = !!account?.address;
+    if (wasConnected.current && !nowConnected) {
+      navigate("/");
+    }
+    wasConnected.current = nowConnected;
+  }, [account?.address, navigate]);
 
   useEffect(() => {
     const run = async () => {
@@ -47,7 +60,9 @@ const Router: React.FC = () => {
   }
 
   if (verificationState === "checking") {
-    return <LoadingSpinner message="Checking your verification status..." />;
+    return (
+      <LoadingSpinner message="Checking your verification status..." />
+    );
   }
 
   return verificationState === "verified" ? <Dashboard /> : <VerificationPortal />;

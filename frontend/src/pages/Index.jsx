@@ -15,8 +15,8 @@ const Index = () => {
 
   return (
     <>
-      {/* Header / Navigation */}
       <div className="hero">
+        {/* Header / Navigation */}
         <header className="header">
           <div className="logo">
             <img src={suiLogo} alt="Sui Logo" />
