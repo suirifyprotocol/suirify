@@ -2,8 +2,9 @@ import React, { useCallback, useEffect, useState } from "react";
 import type { VerificationForm } from "../VerificationPortal";
 import LoadingSpinner from "../common/LoadingSpinner";
 import { explorer } from "../../lib/config";
-import { createMintTransaction, submitMintSignature } from "../../lib/apiService";
-import { useCurrentAccount, useSignTransaction } from "@mysten/dapp-kit";
+import { fetchMintConfig, finalizeMint, lookupMintRequest } from "../../lib/apiService";
+import { useCurrentAccount, useSignAndExecuteTransaction, useSuiClient } from "@mysten/dapp-kit";
+import { Transaction } from "@mysten/sui/transactions";
 
 const MintingStep: React.FC<{
   formData: VerificationForm;
@@ -12,13 +13,39 @@ const MintingStep: React.FC<{
   onBack: () => void;
 }> = ({ formData, setFormData, onBack }) => {
   const account = useCurrentAccount();
-  const signTransaction = useSignTransaction();
-  const [status, setStatus] = useState<"idle" | "preparing" | "signing" | "submitting" | "success" | "error">(
+  const signAndExecute = useSignAndExecuteTransaction();
+  const suiClient = useSuiClient();
+  const [status, setStatus] = useState<
+    "idle" | "configuring" | "requesting" | "finalizing" | "success" | "error"
+  >(
     formData.mintDigest ? "success" : "idle"
   );
   const [transactionDigest, setTransactionDigest] = useState(formData.mintDigest || "");
   const [error, setError] = useState("");
-  const [transactionPreview, setTransactionPreview] = useState("");
+  const [requestId, setRequestIdState] = useState<string | null>(formData.mintRequestId ?? null);
+  const [requestTxDigest, setRequestTxDigestState] = useState(formData.mintRequestDigest ?? "");
+
+  const setRequestId = useCallback(
+    (value: string | null) => {
+      setRequestIdState(value);
+      setFormData((prev) => ({
+        ...prev,
+        mintRequestId: value,
+      }));
+    },
+    [setFormData]
+  );
+
+  const setRequestTxDigest = useCallback(
+    (value: string) => {
+      setRequestTxDigestState(value);
+      setFormData((prev) => ({
+        ...prev,
+        mintRequestDigest: value || null,
+      }));
+    },
+    [setFormData]
+  );
 
   const runMintFlow = useCallback(async () => {
     if (!formData.sessionId) {
@@ -26,41 +53,114 @@ const MintingStep: React.FC<{
       setError("Verification session missing or already consumed. Please restart the process.");
       return;
     }
-    if (!account) {
+    if (!account?.address) {
       setStatus("error");
       setError("Connect your wallet to sign the transaction.");
       return;
     }
 
     try {
-    setError("");
-    setStatus("preparing");
-    const { transaction } = await createMintTransaction({ sessionId: formData.sessionId });
-    setTransactionPreview(`${transaction.slice(0, 24)}…`);
+      setError("");
 
-      setStatus("signing");
-      const signed = await signTransaction.mutateAsync({ transaction });
-      const userSignature = (signed as any)?.signature ?? signed;
-      if (!userSignature || typeof userSignature !== "string") {
-        throw new Error("Wallet did not return a signature.");
+      setStatus("configuring");
+
+      let currentRequestId = requestId;
+      let currentRequestDigest = requestTxDigest;
+
+      if (!currentRequestId) {
+        try {
+          const existing = await lookupMintRequest(account.address);
+          if (existing?.hasRequest && existing.requestId) {
+            const digest = existing.requestTxDigest || "";
+            setRequestId(existing.requestId);
+            setRequestTxDigest(digest);
+            currentRequestId = existing.requestId;
+            currentRequestDigest = digest;
+          }
+        } catch (lookupError) {
+          console.warn("Failed to check for existing mint request:", lookupError);
+        }
       }
 
-      setStatus("submitting");
-      const submitResult = await submitMintSignature({
+      let config: Awaited<ReturnType<typeof fetchMintConfig>> | null = null;
+
+      if (!currentRequestId) {
+        config = await fetchMintConfig();
+        if (!config?.packageId || !config.attestationRegistryId) {
+          throw new Error("Protocol configuration is incomplete. Please try again later.");
+        }
+        const mintFeeMist = config.mintFeeMist ?? config.mintFee;
+        if (!mintFeeMist) {
+          throw new Error("Mint fee not available. Please contact support.");
+        }
+
+        setStatus("requesting");
+        const tx = new Transaction();
+        tx.setSender(account.address);
+        const mintFee = BigInt(mintFeeMist).toString();
+        const [feeCoin] = tx.splitCoins(tx.gas, [tx.pure.u64(mintFee)]);
+        tx.moveCall({
+          target: `${config.packageId}::protocol::create_mint_request`,
+          arguments: [tx.object(config.attestationRegistryId), feeCoin],
+        });
+
+        const requestResult = await signAndExecute.mutateAsync({ transaction: tx });
+        const requestDigest = requestResult.digest;
+        if (!requestDigest) {
+          throw new Error("Mint request transaction did not return a digest.");
+        }
+
+        const packageId = config.packageId;
+        const txDetails: any = await suiClient.waitForTransaction({
+          digest: requestDigest,
+          options: {
+            showEvents: true,
+          },
+        });
+
+        const mintEvent = (txDetails.events || []).find(
+          (evt: any) => evt.type === `${packageId}::protocol::MintRequestCreated`
+        );
+        const eventRequestId = mintEvent?.parsedJson?.request_id || mintEvent?.parsedJson?.requestId || null;
+        const eventRequester = mintEvent?.parsedJson?.requester || mintEvent?.parsedJson?.requester_address || null;
+        if (!eventRequestId) {
+          throw new Error("Mint request transaction did not emit a request id.");
+        }
+        if (eventRequester && eventRequester.toLowerCase() !== account.address.toLowerCase()) {
+          throw new Error("Mint request was created for a different wallet. Please contact support.");
+        }
+
+        setRequestId(eventRequestId);
+        setRequestTxDigest(requestDigest);
+
+        currentRequestId = eventRequestId;
+        currentRequestDigest = requestDigest;
+      }
+
+      if (!currentRequestId) {
+        throw new Error("Mint request not available. Please retry the minting step.");
+      }
+
+      setStatus("finalizing");
+      const finalizeResult = await finalizeMint({
         sessionId: formData.sessionId,
-        userSignature,
-        transaction,
+        requestId: currentRequestId,
+        requestTxDigest: currentRequestDigest || undefined,
       });
 
-      const digest = submitResult.digest;
-      if (!digest) throw new Error("Wallet did not return a transaction digest.");
+      const digest = finalizeResult.digest;
+      if (!digest) throw new Error("Mint finalization did not return a digest.");
 
       setTransactionDigest(digest);
       setStatus("success");
+      setRequestId(null);
+      setRequestTxDigest("");
       setFormData((prev) => ({
         ...prev,
         sessionId: null,
         mintDigest: digest,
+        mintRequestId: null,
+        mintRequestDigest: null,
       }));
 
       if (typeof window !== "undefined") {
@@ -69,11 +169,25 @@ const MintingStep: React.FC<{
         }, 3000);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to mint attestation.";
-      setError(message);
+      if (err instanceof Error && (err as Error & { status?: number }).status === 409) {
+        setError(err.message || "Wallet already holds an attestation. Please check your dashboard.");
+      } else {
+        const message = err instanceof Error ? err.message : "Failed to mint attestation.";
+        setError(message);
+      }
       setStatus("error");
     }
-  }, [account, formData.sessionId, setFormData, signTransaction]);
+  }, [
+    account,
+    formData.sessionId,
+    requestId,
+    requestTxDigest,
+    setFormData,
+    setRequestId,
+    setRequestTxDigest,
+    signAndExecute,
+    suiClient,
+  ]);
 
   useEffect(() => {
     if (status === "idle") {
@@ -81,7 +195,7 @@ const MintingStep: React.FC<{
     }
   }, [runMintFlow, status]);
 
-  if (status === "idle" || status === "preparing") {
+  if (status === "idle" || status === "configuring") {
     return (
       <div>
         <LoadingSpinner message="Minting your SUIrify Attestation..." />
@@ -90,20 +204,24 @@ const MintingStep: React.FC<{
     );
   }
 
-  if (status === "signing") {
+  if (status === "requesting") {
     return (
       <div>
-        <LoadingSpinner message="Approve the transaction in your wallet to continue." />
-        {transactionPreview && <p style={{ color: "#9ca3af" }}>Tx preview: {transactionPreview}</p>}
+        <LoadingSpinner message="Approve the mint request in your wallet." />
+        <p style={{ color: "#9ca3af" }}>You will be prompted to pay the mint fee.</p>
       </div>
     );
   }
 
-  if (status === "submitting") {
+  if (status === "finalizing") {
     return (
       <div>
-        <LoadingSpinner message="Submitting sponsored transaction..." />
-        {transactionPreview && <p style={{ color: "#9ca3af" }}>Tx preview: {transactionPreview}</p>}
+        <LoadingSpinner message="Finalizing your attestation on-chain..." />
+        {requestTxDigest && (
+          <p style={{ color: "#9ca3af" }}>
+            Mint request submitted (digest: {requestTxDigest.slice(0, 10)}…)
+          </p>
+        )}
       </div>
     );
   }
@@ -122,7 +240,6 @@ const MintingStep: React.FC<{
               onClick={() => {
                 setError("");
                 setTransactionDigest("");
-                setTransactionPreview("");
                 setStatus("idle");
               }}
               style={{ padding: "8px 12px", borderRadius: 8, background: "#2563eb", color: "white" }}

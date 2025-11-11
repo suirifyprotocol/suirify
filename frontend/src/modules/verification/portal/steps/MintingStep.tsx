@@ -2,25 +2,49 @@ import React, { useCallback, useEffect, useState } from "react";
 import type { StepComponentProps } from "../VerificationPortal";
 import LoadingSpinner from "@/modules/verification/ui/LoadingSpinner";
 import { explorer } from "@/lib/config";
-import { useCurrentAccount, useSignTransaction } from "@mysten/dapp-kit";
-import { createMintTransaction, submitMintSignature } from "@/lib/apiService";
+import { useCurrentAccount, useSignAndExecuteTransaction, useSuiClient } from "@mysten/dapp-kit";
+import { fetchMintConfig, finalizeMint, lookupMintRequest } from "@/lib/apiService";
+import { Transaction } from "@mysten/sui/transactions";
 
-type MintStatus = "idle" | "preparing" | "signing" | "submitting" | "success" | "error";
+type MintStatus = "idle" | "configuring" | "requesting" | "finalizing" | "success" | "error";
 
 const MintingStep: React.FC<StepComponentProps> = ({ formData, setFormData, onBack }) => {
   const account = useCurrentAccount();
-  const signTransaction = useSignTransaction();
+  const signAndExecute = useSignAndExecuteTransaction();
+  const suiClient = useSuiClient();
 
   const [status, setStatus] = useState<MintStatus>(formData.mintDigest ? "success" : "idle");
   const [error, setError] = useState<string | null>(null);
   const [digest, setDigest] = useState<string | null>(formData.mintDigest);
-  const [transactionPreview, setTransactionPreview] = useState<string | null>(null);
+  const [requestId, setRequestIdState] = useState<string | null>(formData.mintRequestId ?? null);
+  const [requestDigest, setRequestDigestState] = useState<string | null>(formData.mintRequestDigest ?? null);
 
   const sessionId = formData.sessionId;
 
+  const setRequestId = useCallback(
+    (value: string | null) => {
+      setRequestIdState(value);
+      setFormData((prev) => ({
+        ...prev,
+        mintRequestId: value,
+      }));
+    },
+    [setFormData]
+  );
+
+  const setRequestDigest = useCallback(
+    (value: string | null) => {
+      setRequestDigestState(value);
+      setFormData((prev) => ({
+        ...prev,
+        mintRequestDigest: value,
+      }));
+    },
+    [setFormData]
+  );
+
   const resetError = () => {
     setError(null);
-    setTransactionPreview(null);
   };
 
   const runMintFlow = useCallback(async () => {
@@ -29,7 +53,7 @@ const MintingStep: React.FC<StepComponentProps> = ({ formData, setFormData, onBa
       setError("Verification session missing or already consumed. Please restart the flow.");
       return;
     }
-    if (!account) {
+    if (!account?.address) {
       setStatus("error");
       setError("Connect your wallet to sign the transaction.");
       return;
@@ -37,21 +61,94 @@ const MintingStep: React.FC<StepComponentProps> = ({ formData, setFormData, onBa
 
     try {
       resetError();
-      setStatus("preparing");
-      const { transaction } = await createMintTransaction({ sessionId });
-      setTransactionPreview(`${transaction.slice(0, 24)}…`);
+      setStatus("configuring");
+      let currentRequestId = requestId;
+      let currentRequestDigest = requestDigest;
 
-      setStatus("signing");
-      const signed = await signTransaction.mutateAsync({ transaction });
-      const userSignature = (signed as any)?.signature ?? signed;
-      if (!userSignature || typeof userSignature !== "string") {
-        throw new Error("Wallet did not return a signature.");
+      if (!currentRequestId) {
+        try {
+          const existing = await lookupMintRequest(account.address);
+          if (existing?.hasRequest && existing.requestId) {
+            const digest = existing.requestTxDigest || null;
+            setRequestId(existing.requestId);
+            setRequestDigest(digest);
+            currentRequestId = existing.requestId;
+            currentRequestDigest = digest;
+          }
+        } catch (lookupError) {
+          console.warn("Failed to check for existing mint request:", lookupError);
+        }
       }
 
-      setStatus("submitting");
-      const submitResult = await submitMintSignature({ sessionId, userSignature, transaction });
-      const digestValue = submitResult.digest;
-      if (!digestValue) throw new Error("Wallet did not return a transaction digest.");
+      let config: Awaited<ReturnType<typeof fetchMintConfig>> | null = null;
+
+      if (!currentRequestId) {
+        config = await fetchMintConfig();
+        if (!config?.packageId || !config.attestationRegistryId) {
+          throw new Error("Protocol configuration is incomplete.");
+        }
+        const mintFeeMist = config.mintFeeMist ?? config.mintFee;
+        if (!mintFeeMist) {
+          throw new Error("Mint fee not available. Please try again later.");
+        }
+
+        setStatus("requesting");
+        const tx = new Transaction();
+        tx.setSender(account.address);
+        const mintFee = BigInt(mintFeeMist).toString();
+        const [feeCoin] = tx.splitCoins(tx.gas, [tx.pure.u64(mintFee)]);
+        tx.moveCall({
+          target: `${config.packageId}::protocol::create_mint_request`,
+          arguments: [tx.object(config.attestationRegistryId), feeCoin],
+        });
+
+        const requestResult = await signAndExecute.mutateAsync({ transaction: tx });
+
+        const mintRequestDigest = requestResult.digest || null;
+        if (!mintRequestDigest) {
+          throw new Error("Mint request transaction did not return a digest.");
+        }
+
+        const packageId = config.packageId;
+        const txDetails: any = await suiClient.waitForTransaction({
+          digest: mintRequestDigest,
+          options: {
+            showEvents: true,
+          },
+        });
+
+        const mintEvent = (txDetails.events || []).find(
+          (evt: any) => evt.type === `${packageId}::protocol::MintRequestCreated`
+        );
+        const eventRequestId = mintEvent?.parsedJson?.request_id || mintEvent?.parsedJson?.requestId || null;
+        const eventRequester = mintEvent?.parsedJson?.requester || mintEvent?.parsedJson?.requester_address || null;
+        if (!eventRequestId) {
+          throw new Error("Mint request transaction did not emit a request id.");
+        }
+        if (eventRequester && eventRequester.toLowerCase() !== account.address.toLowerCase()) {
+          throw new Error("Mint request was created for a different wallet. Please contact support.");
+        }
+
+        setRequestId(eventRequestId);
+        setRequestDigest(mintRequestDigest);
+
+        currentRequestId = eventRequestId;
+        currentRequestDigest = mintRequestDigest;
+      }
+
+      if (!currentRequestId) {
+        throw new Error("Mint request not available. Please retry the minting step.");
+      }
+
+      setStatus("finalizing");
+      const finalizeResult = await finalizeMint({
+        sessionId,
+        requestId: currentRequestId,
+        requestTxDigest: currentRequestDigest || undefined,
+      });
+
+      const digestValue = finalizeResult.digest;
+      if (!digestValue) throw new Error("Mint finalisation did not return a digest.");
 
       setDigest(digestValue);
       setStatus("success");
@@ -59,13 +156,31 @@ const MintingStep: React.FC<StepComponentProps> = ({ formData, setFormData, onBa
         ...prev,
         sessionId: null,
         mintDigest: digestValue,
+        mintRequestId: null,
+        mintRequestDigest: null,
       }));
+      setRequestId(null);
+      setRequestDigest(null);
     } catch (err) {
       setStatus("error");
-      const message = err instanceof Error ? err.message : "Failed to mint attestation.";
-      setError(message);
+      if (err instanceof Error && (err as Error & { status?: number }).status === 409) {
+        setError(err.message || "Wallet already holds an attestation. Please visit your dashboard.");
+      } else {
+        const message = err instanceof Error ? err.message : "Failed to mint attestation.";
+        setError(message);
+      }
     }
-  }, [account, sessionId, setFormData, signTransaction]);
+  }, [
+    account,
+    requestDigest,
+    requestId,
+    sessionId,
+    setFormData,
+    setRequestDigest,
+    setRequestId,
+    signAndExecute,
+    suiClient,
+  ]);
 
   useEffect(() => {
     if (status === "idle" && !digest) {
@@ -85,31 +200,30 @@ const MintingStep: React.FC<StepComponentProps> = ({ formData, setFormData, onBa
     );
   }
 
-  if (status === "preparing") {
+  if (status === "configuring") {
     return (
       <div className="v-grid">
         <h2 className="v-section-title">Preparing Transaction</h2>
-        <LoadingSpinner message="Building a sponsored transaction on the server..." />
+        <LoadingSpinner message="Fetching protocol configuration..." />
       </div>
     );
   }
 
-  if (status === "signing") {
+  if (status === "requesting") {
     return (
       <div className="v-grid">
         <h2 className="v-section-title">Awaiting Wallet Signature</h2>
-        <LoadingSpinner message="Approve the transaction in your wallet to mint the attestation." />
-        {transactionPreview && <div className="v-muted v-small">Tx bytes: {transactionPreview}</div>}
+        <LoadingSpinner message="Approve the mint request in your wallet to lock the mint fee." />
       </div>
     );
   }
 
-  if (status === "submitting") {
+  if (status === "finalizing") {
     return (
       <div className="v-grid">
         <h2 className="v-section-title">Submitting Transaction</h2>
-        <LoadingSpinner message="Finalising the sponsored transaction on Sui..." />
-        {transactionPreview && <div className="v-muted v-small">Tx bytes: {transactionPreview}</div>}
+        <LoadingSpinner message="Finalising the attestation with the protocol admin..." />
+        {requestDigest && <div className="v-muted v-small">Mint request digest: {requestDigest}</div>}
       </div>
     );
   }
@@ -123,7 +237,13 @@ const MintingStep: React.FC<StepComponentProps> = ({ formData, setFormData, onBa
           <button onClick={onBack} className="v-btn-secondary">
             Back
           </button>
-          <button onClick={() => setStatus("idle")} className="v-btn-primary">
+          <button
+            onClick={() => {
+              resetError();
+              setStatus("idle");
+            }}
+            className="v-btn-primary"
+          >
             Retry Minting
           </button>
         </div>

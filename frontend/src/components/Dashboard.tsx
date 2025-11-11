@@ -36,23 +36,23 @@ const Dashboard: React.FC = () => {
       };
     };
 
-    const loadFallbackAttestation = async (wallet: string) => {
-      try {
-        const fallback = await fetchAttestation(wallet);
-        if (fallback.hasAttestation && fallback.data) {
-          setAttestation(mapBackendAttestation(fallback.data));
-        } else {
-          setAttestation(null);
-        }
-      } catch {
-        setAttestation(null);
-      }
-    };
-
     const run = async () => {
       if (!account?.address) {
         setLoading(false);
         return;
+      }
+
+      let backendHasAttestation = false;
+
+      try {
+        const fallback = await fetchAttestation(account.address);
+        if (fallback.hasAttestation && fallback.data) {
+          setAttestation(mapBackendAttestation(fallback.data));
+          backendHasAttestation = true;
+          setLoading(false);
+        }
+      } catch {
+        // ignore backend errors here; we'll rely on chain lookup next
       }
 
       try {
@@ -65,16 +65,35 @@ const Dashboard: React.FC = () => {
           const first = attestations.data[0];
           if (first && !first.error) {
             setAttestation(first as AttestationLike);
-          } else {
-            await loadFallbackAttestation(account.address);
+            backendHasAttestation = true;
+            setLoading(false);
+          } else if (!backendHasAttestation) {
+            setAttestation(null);
           }
-        } else {
-          await loadFallbackAttestation(account.address);
+        } else if (!backendHasAttestation) {
+          setAttestation(null);
         }
       } catch (e) {
-        await loadFallbackAttestation(account.address);
+        if (!backendHasAttestation) {
+          try {
+            const fallback = await fetchAttestation(account.address);
+            if (fallback.hasAttestation && fallback.data) {
+              setAttestation(mapBackendAttestation(fallback.data));
+              backendHasAttestation = true;
+              setLoading(false);
+            } else {
+              setAttestation(null);
+              setLoading(false);
+            }
+          } catch {
+            setAttestation(null);
+            setLoading(false);
+          }
+        }
       } finally {
-        setLoading(false);
+        if (!backendHasAttestation) {
+          setLoading(false);
+        }
       }
     };
     run();

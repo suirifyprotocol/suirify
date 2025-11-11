@@ -83,15 +83,44 @@ export async function completeVerification(payload: { sessionId: string; walletA
   );
 }
 
-export async function createMintTransaction(payload: { sessionId: string }) {
-  return request<{ success: boolean; transaction: string; sponsorAddress?: string }>("/create-mint-tx", {
-    method: "POST",
-    body: JSON.stringify(payload),
+export type MintConfigResponse = {
+  success: boolean;
+  packageId: string;
+  protocolConfigId: string | null;
+  attestationRegistryId: string;
+  defaultPolicyId: string | null;
+  mintFee: string | null;
+  mintFeeMist?: string | null;
+  mintFeeSui?: string | null;
+  mintFeeSource?: string | null;
+  contractVersion: number | null;
+  treasuryAddress: string | null;
+};
+
+export async function fetchMintConfig() {
+  return request<MintConfigResponse>("/mint-config", {
+    method: "GET",
   });
 }
 
-export async function submitMintSignature(payload: { sessionId: string; userSignature: string; transaction?: string }) {
-  return request<{ success: boolean; digest: string }>("/submit-mint-signature", {
+export type MintRequestLookupResponse = {
+  success: boolean;
+  hasRequest: boolean;
+  requestId?: string | null;
+  requestTxDigest?: string | null;
+  eventSequence?: string | number | null;
+  timestampMs?: string | number | null;
+};
+
+export async function lookupMintRequest(walletAddress: string) {
+  const encoded = encodeURIComponent(walletAddress);
+  return request<MintRequestLookupResponse>(`/mint-request/${encoded}`, {
+    method: "GET",
+  });
+}
+
+export async function finalizeMint(payload: { sessionId: string; requestId: string; requestTxDigest?: string }) {
+  return request<{ success: boolean; digest: string }>("/finalize-mint", {
     method: "POST",
     body: JSON.stringify(payload),
   });

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import type { StepComponentProps } from "../VerificationPortal";
 import LoadingSpinner from "@/modules/verification/ui/LoadingSpinner";
 import { useCurrentAccount } from "@mysten/dapp-kit";
@@ -19,7 +19,7 @@ const DataFetchStep: React.FC<StepComponentProps> = ({ formData, setFormData, on
   const hasFetchedData = Boolean(formData.fullName);
   const age = formData.dateOfBirth ? calculateAge(formData.dateOfBirth) : null;
 
-  const handleFetch = async () => {
+  const handleFetch = useCallback(async () => {
     if (!formData.sessionId) {
       setError("Your verification session expired. Please start again.");
       return;
@@ -48,7 +48,13 @@ const DataFetchStep: React.FC<StepComponentProps> = ({ formData, setFormData, on
     } finally {
       setLoading(false);
     }
-  };
+  }, [account, formData.sessionId, setFormData]);
+
+  useEffect(() => {
+    if (hasVerifiedFace && !hasFetchedData && !loading && account && formData.sessionId) {
+      void handleFetch();
+    }
+  }, [account, formData.sessionId, handleFetch, hasFetchedData, hasVerifiedFace, loading]);
 
   if (!hasVerifiedFace) {
     return (
@@ -78,7 +84,7 @@ const DataFetchStep: React.FC<StepComponentProps> = ({ formData, setFormData, on
         <LoadingSpinner message="Contacting the verification service..." />
       ) : (
         <>
-          {!hasFetchedData && (
+          {!hasFetchedData && !loading && account && (
             <button className="v-btn-primary" onClick={handleFetch}>
               Fetch My Verified Data
             </button>
@@ -102,14 +108,29 @@ const DataFetchStep: React.FC<StepComponentProps> = ({ formData, setFormData, on
                   </span>
                 )}
               </div>
-              {formData.photoReference && (
-                <div className="v-grid">
-                  <label>Reference Photo</label>
-                  <img
-                    src={formData.photoReference}
-                    alt="Government reference"
-                    style={{ borderRadius: 12, maxWidth: 180 }}
-                  />
+
+              {(formData.photoReference || formData.livePhoto) && (
+                <div className="v-photo-compare" role="group" aria-label="Photo verification recap">
+                  {formData.photoReference && (
+                    <figure className="v-photo-card">
+                      <span className="v-photo-label">Government Reference</span>
+                      <img
+                        src={formData.photoReference}
+                        alt="Government ID reference"
+                        className="v-photo-image"
+                      />
+                    </figure>
+                  )}
+                  {formData.livePhoto && (
+                    <figure className="v-photo-card">
+                      <span className="v-photo-label">Live Capture</span>
+                      <img
+                        src={formData.livePhoto}
+                        alt="Live selfie captured during verification"
+                        className="v-photo-image"
+                      />
+                    </figure>
+                  )}
                 </div>
               )}
             </div>

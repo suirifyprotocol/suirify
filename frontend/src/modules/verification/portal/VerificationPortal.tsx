@@ -20,6 +20,8 @@ export type VerificationForm = {
   faceDiffPercent: number | null;
   consentGiven: boolean;
   mintDigest: string | null;
+  mintRequestId: string | null;
+  mintRequestDigest: string | null;
 };
 
 export type StepComponentProps = {
@@ -50,6 +52,8 @@ const initialFormData: VerificationForm = {
   faceDiffPercent: null,
   consentGiven: false,
   mintDigest: null,
+  mintRequestId: null,
+  mintRequestDigest: null,
 };
 
 /**

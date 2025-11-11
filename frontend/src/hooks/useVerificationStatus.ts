@@ -1,5 +1,5 @@
 import { useCurrentAccount, useSuiClient } from "@mysten/dapp-kit";
-import type { SuiObjectResponse, SuiObjectResponseError } from "@mysten/sui/client";
+import type { ObjectResponseError, SuiObjectResponse } from "@mysten/sui/client";
 import { STRUCT_ATTESTATION } from "../lib/config";
 import { fetchAttestation } from "../lib/apiService";
 
@@ -28,7 +28,7 @@ export const useVerificationStatus = () => {
     }
   };
 
-  const fallbackCheck = async (walletAddress: string): Promise<VerificationCheck> => {
+  const backendCheck = async (walletAddress: string): Promise<VerificationCheck> => {
     try {
       const backendResult = await fetchAttestation(walletAddress);
       if (backendResult.hasAttestation && backendResult.data) {
@@ -43,7 +43,7 @@ export const useVerificationStatus = () => {
     return { hasAttestation: false, isValid: false, attestation: null };
   };
 
-  const extractObjectId = (item: SuiObjectResponse | SuiObjectResponseError | null | undefined): string | null => {
+  const extractObjectId = (item: SuiObjectResponse | ObjectResponseError | null | undefined): string | null => {
     if (!item || typeof item !== "object") return null;
     if ("data" in item && item.data && "objectId" in item.data) {
       return item.data.objectId as string;
@@ -52,6 +52,11 @@ export const useVerificationStatus = () => {
   };
 
   const checkAttestation = async (walletAddress: string): Promise<VerificationCheck> => {
+    const backendResult = await backendCheck(walletAddress);
+    if (backendResult.hasAttestation) {
+      return backendResult;
+    }
+
     try {
       const attestations = await client.getOwnedObjects({
         owner: walletAddress,
@@ -67,13 +72,13 @@ export const useVerificationStatus = () => {
         }
       }
 
-      return fallbackCheck(walletAddress);
+      return backendResult;
     } catch (error: any) {
       const partialObjectId = extractObjectId(error?.data);
       if (partialObjectId) {
         return { hasAttestation: true, isValid: false, attestation: null };
       }
-      return fallbackCheck(walletAddress);
+      return backendResult;
     }
   };
 

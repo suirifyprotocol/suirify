@@ -19,6 +19,8 @@ export type VerificationForm = {
   faceSimilarity: number | null;
   faceDiffPercent: number | null;
   mintDigest: string | null;
+  mintRequestId: string | null;
+  mintRequestDigest: string | null;
 };
 
 const VerificationPortal: React.FC = () => {
@@ -36,6 +38,8 @@ const VerificationPortal: React.FC = () => {
     faceSimilarity: null,
     faceDiffPercent: null,
     mintDigest: null,
+    mintRequestId: null,
+    mintRequestDigest: null,
   });
 
   const steps = [
