@@ -84,7 +84,14 @@ export async function completeVerification(payload: { sessionId: string; walletA
 }
 
 export async function createMintTransaction(payload: { sessionId: string }) {
-  return request<{ success: boolean; transaction: string }>("/create-mint-tx", {
+  return request<{ success: boolean; transaction: string; sponsorAddress?: string }>("/create-mint-tx", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function submitMintSignature(payload: { sessionId: string; userSignature: string; transaction?: string }) {
+  return request<{ success: boolean; digest: string }>("/submit-mint-signature", {
     method: "POST",
     body: JSON.stringify(payload),
   });

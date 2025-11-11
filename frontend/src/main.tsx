@@ -13,9 +13,14 @@ import { getFullnodeUrl } from "@mysten/sui/client";
 
 const { networkConfig } = createNetworkConfig({
   localnet: { url: getFullnodeUrl("localnet") },
+  devnet: { url: getFullnodeUrl("devnet") },
   testnet: { url: getFullnodeUrl("testnet") },
   mainnet: { url: getFullnodeUrl("mainnet") },
 });
+
+const configuredNetwork = (import.meta.env.VITE_SUI_NETWORK as string) || "devnet";
+const defaultNetwork =
+  configuredNetwork in networkConfig ? (configuredNetwork as keyof typeof networkConfig) : "devnet";
 
 const queryClient = new QueryClient();
 
@@ -24,7 +29,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <BrowserRouter>
       <QueryClientProvider client={queryClient}>
-        <SuiClientProvider networks={networkConfig} defaultNetwork="testnet">
+  <SuiClientProvider networks={networkConfig} defaultNetwork={defaultNetwork}>
           <WalletProvider autoConnect>
             <App />
           </WalletProvider>

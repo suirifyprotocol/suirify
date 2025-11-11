@@ -2,14 +2,14 @@ import React, { useCallback, useEffect, useState } from "react";
 import type { StepComponentProps } from "../VerificationPortal";
 import LoadingSpinner from "@/modules/verification/ui/LoadingSpinner";
 import { explorer } from "@/lib/config";
-import { useCurrentAccount, useSignAndExecuteTransaction } from "@mysten/dapp-kit";
-import { createMintTransaction } from "@/lib/apiService";
+import { useCurrentAccount, useSignTransaction } from "@mysten/dapp-kit";
+import { createMintTransaction, submitMintSignature } from "@/lib/apiService";
 
-type MintStatus = "idle" | "preparing" | "signing" | "success" | "error";
+type MintStatus = "idle" | "preparing" | "signing" | "submitting" | "success" | "error";
 
 const MintingStep: React.FC<StepComponentProps> = ({ formData, setFormData, onBack }) => {
   const account = useCurrentAccount();
-  const signAndExecute = useSignAndExecuteTransaction();
+  const signTransaction = useSignTransaction();
 
   const [status, setStatus] = useState<MintStatus>(formData.mintDigest ? "success" : "idle");
   const [error, setError] = useState<string | null>(null);
@@ -42,9 +42,15 @@ const MintingStep: React.FC<StepComponentProps> = ({ formData, setFormData, onBa
       setTransactionPreview(`${transaction.slice(0, 24)}…`);
 
       setStatus("signing");
-      const response = await signAndExecute.mutateAsync({ transaction });
+      const signed = await signTransaction.mutateAsync({ transaction });
+      const userSignature = (signed as any)?.signature ?? signed;
+      if (!userSignature || typeof userSignature !== "string") {
+        throw new Error("Wallet did not return a signature.");
+      }
 
-      const digestValue = (response as any)?.digest || (response as any)?.effects?.transactionDigest;
+      setStatus("submitting");
+      const submitResult = await submitMintSignature({ sessionId, userSignature, transaction });
+      const digestValue = submitResult.digest;
       if (!digestValue) throw new Error("Wallet did not return a transaction digest.");
 
       setDigest(digestValue);
@@ -59,7 +65,7 @@ const MintingStep: React.FC<StepComponentProps> = ({ formData, setFormData, onBa
       const message = err instanceof Error ? err.message : "Failed to mint attestation.";
       setError(message);
     }
-  }, [account, sessionId, setFormData, signAndExecute]);
+  }, [account, sessionId, setFormData, signTransaction]);
 
   useEffect(() => {
     if (status === "idle" && !digest) {
@@ -93,6 +99,16 @@ const MintingStep: React.FC<StepComponentProps> = ({ formData, setFormData, onBa
       <div className="v-grid">
         <h2 className="v-section-title">Awaiting Wallet Signature</h2>
         <LoadingSpinner message="Approve the transaction in your wallet to mint the attestation." />
+        {transactionPreview && <div className="v-muted v-small">Tx bytes: {transactionPreview}</div>}
+      </div>
+    );
+  }
+
+  if (status === "submitting") {
+    return (
+      <div className="v-grid">
+        <h2 className="v-section-title">Submitting Transaction</h2>
+        <LoadingSpinner message="Finalising the sponsored transaction on Sui..." />
         {transactionPreview && <div className="v-muted v-small">Tx bytes: {transactionPreview}</div>}
       </div>
     );

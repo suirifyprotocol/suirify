@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useState } from "react";
 import type { VerificationForm } from "../VerificationPortal";
 import LoadingSpinner from "../common/LoadingSpinner";
 import { explorer } from "../../lib/config";
-import { createMintTransaction } from "../../lib/apiService";
-import { useCurrentAccount, useSignAndExecuteTransaction } from "@mysten/dapp-kit";
+import { createMintTransaction, submitMintSignature } from "../../lib/apiService";
+import { useCurrentAccount, useSignTransaction } from "@mysten/dapp-kit";
 
 const MintingStep: React.FC<{
   formData: VerificationForm;
@@ -12,8 +12,8 @@ const MintingStep: React.FC<{
   onBack: () => void;
 }> = ({ formData, setFormData, onBack }) => {
   const account = useCurrentAccount();
-  const signAndExecute = useSignAndExecuteTransaction();
-  const [status, setStatus] = useState<"idle" | "preparing" | "signing" | "success" | "error">(
+  const signTransaction = useSignTransaction();
+  const [status, setStatus] = useState<"idle" | "preparing" | "signing" | "submitting" | "success" | "error">(
     formData.mintDigest ? "success" : "idle"
   );
   const [transactionDigest, setTransactionDigest] = useState(formData.mintDigest || "");
@@ -33,14 +33,26 @@ const MintingStep: React.FC<{
     }
 
     try {
-      setError("");
-      setStatus("preparing");
-      const { transaction } = await createMintTransaction({ sessionId: formData.sessionId });
-      setTransactionPreview(`${transaction.slice(0, 24)}…`);
+    setError("");
+    setStatus("preparing");
+    const { transaction } = await createMintTransaction({ sessionId: formData.sessionId });
+    setTransactionPreview(`${transaction.slice(0, 24)}…`);
 
       setStatus("signing");
-      const response = await signAndExecute.mutateAsync({ transaction });
-      const digest = (response as any)?.digest || (response as any)?.effects?.transactionDigest;
+      const signed = await signTransaction.mutateAsync({ transaction });
+      const userSignature = (signed as any)?.signature ?? signed;
+      if (!userSignature || typeof userSignature !== "string") {
+        throw new Error("Wallet did not return a signature.");
+      }
+
+      setStatus("submitting");
+      const submitResult = await submitMintSignature({
+        sessionId: formData.sessionId,
+        userSignature,
+        transaction,
+      });
+
+      const digest = submitResult.digest;
       if (!digest) throw new Error("Wallet did not return a transaction digest.");
 
       setTransactionDigest(digest);
@@ -61,7 +73,7 @@ const MintingStep: React.FC<{
       setError(message);
       setStatus("error");
     }
-  }, [account, formData.sessionId, setFormData, signAndExecute]);
+  }, [account, formData.sessionId, setFormData, signTransaction]);
 
   useEffect(() => {
     if (status === "idle") {
@@ -82,6 +94,15 @@ const MintingStep: React.FC<{
     return (
       <div>
         <LoadingSpinner message="Approve the transaction in your wallet to continue." />
+        {transactionPreview && <p style={{ color: "#9ca3af" }}>Tx preview: {transactionPreview}</p>}
+      </div>
+    );
+  }
+
+  if (status === "submitting") {
+    return (
+      <div>
+        <LoadingSpinner message="Submitting sponsored transaction..." />
         {transactionPreview && <p style={{ color: "#9ca3af" }}>Tx preview: {transactionPreview}</p>}
       </div>
     );
