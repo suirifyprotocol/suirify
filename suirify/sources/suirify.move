@@ -10,8 +10,8 @@ module suirify::protocol {
     use sui::table::{Self, Table};
     use sui::display;
     use std::string;
+    use sui::balance::Balance;
     use sui::coin::{Self, Coin};
-    //use sui::balance::{Balance};
     use sui::sui::SUI;
 
     // Custom Errors
@@ -21,23 +21,15 @@ module suirify::protocol {
     const EJURISDICTION_MISMATCH: u64 = 3;
     const EINVALID_VERIFIER_SOURCE: u64 = 4;
     const EATTESTATION_ALREADY_EXISTS: u64 = 5;
-    const EINSUFFICIENT_FEE: u64 = 6;
+    const EINVALID_MINT_REQUEST_AMOUNT: u64 = 7;
+    const EREQUEST_RECIPIENT_MISMATCH: u64 = 8;
 
     // Constants
     const STATUS_ACTIVE: u8 = 1;
-    #[allow(unused_const)]
     const STATUS_EXPIRED: u8 = 2;
     const STATUS_REVOKED: u8 = 3;
 
     // Structs
-    // A capability object that grants the holder the exclusive authority
-    // to mint, revoke, and manage the protocol's configuration.
-    // public struct VerifierAdminCap has key, store {
-    //     id: UID,
-    // }
-
-    /// The primary credential object. It is a Soulbound (non-transferable), user-
-    /// owned object representing a successful identity verification.
     public struct Suirify_Attestation has key, store {
         id: UID,
         owner: address,
@@ -78,6 +70,12 @@ module suirify::protocol {
     public struct AttestationRegistry has key {
         id: UID,
         user_attestations: Table<address, ID>,
+        pending_mint_requests: Table<ID, MintRequest>,
+    }
+
+    public struct MintRequest has store {
+        payment: Balance<SUI>,
+        requester: address,
     }
 
     // Events
@@ -107,8 +105,8 @@ module suirify::protocol {
             allowlists: vector[],
             default_expiry_duration_ms: 31536000000, // 1 year
             renewal_period_ms: 2592000000, // 30 days
-            mint_fee: 100000000, // 0.1 SUI
-            upgrade_fee: 50000000, // 0.05 SUI
+            mint_fee: 1000000000, // 1 SUI
+            upgrade_fee: 500000000, // 0.5 SUI
             treasury_address: tx_context::sender(ctx),
             global_mint_limit_per_day: 1000,
             mints_today: 0,
@@ -124,7 +122,7 @@ module suirify::protocol {
         let registry = AttestationRegistry {
             id: object::new(ctx),
             user_attestations: table::new(ctx),
-        
+            pending_mint_requests: table::new(ctx),
         };
         transfer::share_object(registry);
 
@@ -164,13 +162,29 @@ module suirify::protocol {
 
     }
 
+    public fun create_mint_request(
+        registry: &mut AttestationRegistry,
+        payment: Coin<SUI>,
+        ctx: &mut TxContext,
+    ): ID {
+        let request_uid = object::new(ctx);
+        let request_id = object::uid_to_inner(&request_uid);
+        let request = MintRequest {
+            payment: coin::into_balance(payment),
+            requester: tx_context::sender(ctx),
+        };
+        table::add(&mut registry.pending_mint_requests, request_id, request);
+        object::delete(request_uid);
+        request_id
+    }
+
     /// Creates a new Suirify_Attestation with extended metadata and transfers it
     /// to the recipient.
     public fun mint_attestation(
         _cap: &VerifierAdminCap,
         config: &mut ProtocolConfig,
-        payment_fee: &mut Coin<SUI>,
         registry: &mut AttestationRegistry,
+        request_id: ID,
         policy: &JurisdictionPolicy,
         recipient: address,
         jurisdiction_code: u16,
@@ -182,12 +196,17 @@ module suirify::protocol {
         verifier_version: u8,
         ctx: &mut TxContext,
     ) {
+        {
+            let request_ref = table::borrow_mut(&mut registry.pending_mint_requests, request_id);
+            assert!(request_ref.requester == recipient, EREQUEST_RECIPIENT_MISMATCH);
+            let locked_amount = sui::balance::value(&request_ref.payment);
+            assert!(locked_amount == config.mint_fee, EINVALID_MINT_REQUEST_AMOUNT);
+        };
 
-        assert!(coin::value(payment_fee) >= config.mint_fee, EINSUFFICIENT_FEE);
-        let fee_coin: Coin<SUI> = coin::split(payment_fee, config.mint_fee, ctx);
-
+        let MintRequest { payment, requester: _ } =
+            table::remove(&mut registry.pending_mint_requests, request_id);
+        let fee_coin = coin::from_balance(payment, ctx);
         transfer::public_transfer(fee_coin, config.treasury_address);
-
 
         let now = tx_context::epoch_timestamp_ms(ctx);
 
@@ -299,6 +318,25 @@ module suirify::protocol {
 
     public fun get_owner(attestation: &Suirify_Attestation): address {
         attestation.owner
+    }
+
+    public fun is_active(attestation: &Suirify_Attestation): bool {
+        attestation.status == STATUS_ACTIVE
+    }
+
+    public fun is_expired_status(attestation: &Suirify_Attestation): bool {
+        attestation.status == STATUS_EXPIRED
+    }
+
+    public fun get_mint_fee(config: &ProtocolConfig): u64 {
+        config.mint_fee
+    }
+
+    /// Marks the attestation as expired if its expiry time has passed.
+    public fun mark_expired_if_needed(attestation: &mut Suirify_Attestation, now_ms: u64) {
+        if (!attestation.revoked && attestation.status == STATUS_ACTIVE && now_ms >= attestation.expiry_time_ms) {
+            attestation.status = STATUS_EXPIRED;
+        };
     }
     // Admin functions to update protocol configuration
     // Updates the upgrade fee
@@ -430,11 +468,12 @@ module suirify::attestation_utils {
     use suirify::protocol::{Self, Suirify_Attestation};
 
     /// Returns true if the attestation is currently active,
-    /// not revoked, and not expired.
-    public fun is_valid(attestation: &Suirify_Attestation, clock: &Clock): bool {
-        protocol::get_status(attestation) == 1 && // STATUS_ACTIVE
-        !protocol::is_revoked(attestation) &&
-        clock.timestamp_ms() < protocol::get_expiry_time(attestation)
+    /// not revoked, and not expired. Updates status to expired if needed.
+    public fun is_valid(attestation: &mut Suirify_Attestation, clock: &Clock): bool {
+    protocol::mark_expired_if_needed(attestation, clock.timestamp_ms());
+
+    protocol::is_active(attestation) &&
+    !protocol::is_revoked(attestation)
     }
 
     /// Returns the stored name_hash from the attestation.
@@ -511,4 +550,4 @@ module suirify::jurisdictions {
         &policy.allowed_sources
     }
 
-}
+} 
