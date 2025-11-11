@@ -63,6 +63,7 @@ export type FaceVerificationResponse = {
   match: boolean;
   similarity: number;
   diffPercent: number;
+  bypassed?: boolean;
 };
 
 export async function verifyFace(payload: { sessionId: string; livePhoto: string }): Promise<FaceVerificationResponse> {

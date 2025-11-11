@@ -147,6 +147,7 @@ const FaceVerificationStep: React.FC<{
         sessionId: formData.sessionId,
         livePhoto,
       });
+      const bypassed = Boolean(result.bypassed);
 
       setFormData((prev) => ({
         ...prev,
@@ -159,7 +160,8 @@ const FaceVerificationStep: React.FC<{
       if (result.match) {
         cleanupStream();
         setStatus("success");
-        setTimeout(() => onNext(), 1200);
+        const nextDelay = bypassed ? 600 : 1200;
+        setTimeout(() => onNext(), nextDelay);
       } else {
         setStatus("error");
         setError("Face verification failed. Please ensure good lighting and try again.");

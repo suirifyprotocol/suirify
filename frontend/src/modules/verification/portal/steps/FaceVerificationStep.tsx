@@ -5,6 +5,16 @@ import { verifyFace } from "@/lib/apiService";
 
 type CaptureState = "idle" | "initializing" | "ready" | "capturing" | "verifying" | "success" | "error";
 
+const CAPTURE_TONES: Record<CaptureState, { label: string; color: string }> = {
+  idle: { label: "Start the camera to continue", color: "#60a5fa" },
+  initializing: { label: "Requesting camera access", color: "#38bdf8" },
+  ready: { label: "Align your face with the guide", color: "#34d399" },
+  capturing: { label: "Hold still — capturing", color: "#facc15" },
+  verifying: { label: "Comparing your capture", color: "#a855f7" },
+  success: { label: "Face match confirmed", color: "#34d399" },
+  error: { label: "Adjust your position and retry", color: "#f87171" },
+};
+
 /**
  * Step 2: Face Verification
  * Handles camera permissions, captures a high-quality snapshot, and submits it to the backend.
@@ -24,6 +34,8 @@ const FaceVerificationStep: React.FC<StepComponentProps> = ({ formData, setFormD
   const [diffPercent, setDiffPercent] = useState<number | null>(formData.faceDiffPercent);
 
   const sessionId = formData.sessionId;
+  const tone = CAPTURE_TONES[status] ?? CAPTURE_TONES.idle;
+  const hasActiveStream = Boolean(streamRef.current);
 
   const cleanupStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -183,6 +195,7 @@ const FaceVerificationStep: React.FC<StepComponentProps> = ({ formData, setFormD
       setStatus("verifying");
 
       const result = await verifyFace({ sessionId, livePhoto });
+      const bypassed = Boolean(result.bypassed);
       setSimilarity(result.similarity);
       setDiffPercent(result.diffPercent);
 
@@ -208,7 +221,7 @@ const FaceVerificationStep: React.FC<StepComponentProps> = ({ formData, setFormD
         faceDiffPercent: result.diffPercent,
       }));
 
-      setHint("Face match confirmed! Moving to the next step...");
+      setHint(bypassed ? "Face check bypassed for testing. Moving to the next step..." : "Face match confirmed! Moving to the next step...");
       setError(null);
       setStatus("success");
       cleanupStream();
@@ -259,21 +272,63 @@ const FaceVerificationStep: React.FC<StepComponentProps> = ({ formData, setFormD
       <h2 className="v-section-title">Face Verification</h2>
 
       <div className="v-grid-lg">
-        <div>
-          <video
-            ref={videoRef}
-            playsInline
-            muted
-            className="v-webcam"
-            style={{ border: "2px solid rgba(96,165,250,0.35)", background: "#050b18" }}
-          />
-          <canvas ref={canvasRef} hidden aria-hidden="true" />
+        <div className="v-webcam-column">
+          <div
+            className="v-webcam-frame"
+            style={{
+              borderColor: `${tone.color}55`,
+              boxShadow: `0 24px 60px rgba(15, 23, 42, 0.55), 0 0 0 1px ${tone.color}22`,
+            }}
+          >
+            <video
+              ref={videoRef}
+              playsInline
+              muted
+              className="v-webcam-feed"
+              style={{
+                opacity: hasActiveStream ? 1 : 0,
+                filter: status === "error" ? "grayscale(0.35)" : "none",
+              }}
+            />
 
-          {status === "capturing" && (
-            <div className="v-row v-margin-top" style={{ justifyContent: "center", fontSize: 32 }}>
-              {countdown > 0 ? countdown : "📸"}
-            </div>
-          )}
+            <div className="v-webcam-overlay" aria-hidden="true" />
+            <div className="v-webcam-ring" aria-hidden="true" />
+
+            {!hasActiveStream && (
+              <div className="v-webcam-placeholder">
+                {status === "success"
+                  ? "Face captured successfully."
+                  : status === "initializing"
+                  ? "Starting camera..."
+                  : "Camera preview will appear here when ready."}
+              </div>
+            )}
+
+            {status === "capturing" && (
+              <div className="v-webcam-countdown" aria-live="polite">
+                {countdown > 0 ? countdown : "Hold steady"}
+              </div>
+            )}
+
+            {status === "verifying" && hasActiveStream && (
+              <div className="v-webcam-countdown v-webcam-countdown--small" aria-live="polite">
+                Checking...
+              </div>
+            )}
+          </div>
+
+          <div
+            className="v-webcam-status"
+            style={{
+              color: tone.color,
+              borderColor: `${tone.color}55`,
+              background: `${tone.color}18`,
+            }}
+          >
+            {tone.label}
+          </div>
+
+          <canvas ref={canvasRef} hidden aria-hidden="true" />
         </div>
 
         <div className="v-grid">

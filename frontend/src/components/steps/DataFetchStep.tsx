@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import type { VerificationForm } from "../VerificationPortal";
 import LoadingSpinner from "../common/LoadingSpinner";
 import { completeVerification } from "../../lib/apiService";
@@ -16,7 +16,7 @@ const DataFetchStep: React.FC<{
   const [success, setSuccess] = useState("");
   const account = useCurrentAccount();
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!formData.sessionId) {
       setError("Your verification session has expired. Please go back and start again.");
       return;
@@ -37,15 +37,10 @@ const DataFetchStep: React.FC<{
       if (data) {
         setFormData((prev) => ({
           ...prev,
-          fullName: data.fullName || "",
-          dateOfBirth: data.dateOfBirth || "",
-          photoReference: data.photoReference || null,
+          fullName: data.fullName || prev.fullName || "",
+          dateOfBirth: data.dateOfBirth || prev.dateOfBirth || "",
+          photoReference: data.photoReference || prev.photoReference || null,
           walletAddress: account.address,
-          livePhoto: null,
-          faceVerified: false,
-          faceSimilarity: null,
-          faceDiffPercent: null,
-          mintDigest: null,
         }));
         setSuccess("Government record retrieved successfully.");
       } else {
@@ -57,7 +52,13 @@ const DataFetchStep: React.FC<{
     } finally {
       setLoading(false);
     }
-  };
+  }, [account, formData.sessionId, setFormData]);
+
+  useEffect(() => {
+    if (formData.faceVerified && !formData.fullName && !loading && account && formData.sessionId) {
+      void fetchData();
+    }
+  }, [account, fetchData, formData.faceVerified, formData.fullName, formData.sessionId, loading]);
 
   const age = formData.dateOfBirth ? calculateAge(formData.dateOfBirth) : null;
 
@@ -83,6 +84,23 @@ const DataFetchStep: React.FC<{
                 <span style={{ marginLeft: 8, color: "#10b981" }}>✓ Verified</span>
               </div>
 
+              {(formData.photoReference || formData.livePhoto) && (
+                <div className="v-photo-compare" role="group" aria-label="Photo verification recap">
+                  {formData.photoReference && (
+                    <figure className="v-photo-card">
+                      <span className="v-photo-label">Government Reference</span>
+                      <img src={formData.photoReference} alt="Government ID reference" className="v-photo-image" />
+                    </figure>
+                  )}
+                  {formData.livePhoto && (
+                    <figure className="v-photo-card">
+                      <span className="v-photo-label">Live Capture</span>
+                      <img src={formData.livePhoto} alt="Live selfie captured during verification" className="v-photo-image" />
+                    </figure>
+                  )}
+                </div>
+              )}
+
               <div>
                 {age !== null && (
                   <div style={{
@@ -104,9 +122,11 @@ const DataFetchStep: React.FC<{
             </div>
           ) : (
             <>
-              <button onClick={fetchData} style={{ padding: "10px 14px", borderRadius: 8, background: "#2563eb", color: "white" }}>
+              {account && (
+                <button onClick={fetchData} style={{ padding: "10px 14px", borderRadius: 8, background: "#2563eb", color: "white" }}>
                 Fetch My Verified Data
-              </button>
+                </button>
+              )}
             </>
           )}
 
