@@ -127,7 +127,9 @@ module suirify::protocol {
         let keys = vector[
             string::utf8(b"name"),
             string::utf8(b"description"),
+            string::utf8(b"link"),
             string::utf8(b"image_url"),
+            string::utf8(b"thumbnail_url"),
             string::utf8(b"creator"),
             string::utf8(b"project_url"),
             string::utf8(b"jurisdiction")
@@ -136,9 +138,11 @@ module suirify::protocol {
         let values = vector[
             string::utf8(b"Suirify Attestation"),
             string::utf8(b"A soulbound, non-transferable identity attestation for the Sui ecosystem."),
+            string::utf8(b"https://devnet.suirify.com"),
+            string::utf8(b"https://i.ibb.co/NnQJgG9p/suirifyimg.png"),
             string::utf8(b"https://i.ibb.co/NnQJgG9p/suirifyimg.png"),
             string::utf8(b"Suirify Protocol"),
-            string::utf8(b"https://testnet.suirify.test"),
+            string::utf8(b"https://devnet.suirify.com"),
             string::utf8(b"Jurisdiction Code: {jurisdiction_code}")
         ];
 
