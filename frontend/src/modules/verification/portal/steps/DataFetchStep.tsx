@@ -1,105 +1,132 @@
 import React, { useState } from "react";
-import type { VerificationForm } from "../VerificationPortal.tsx";
-import LoadingSpinner from "../../ui/LoadingSpinner";
-import { fetchGovernmentData } from "@/lib/mockApi";
+import type { StepComponentProps } from "../VerificationPortal";
+import LoadingSpinner from "@/modules/verification/ui/LoadingSpinner";
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { calculateAge } from "@/lib/identityUtils";
+import { completeVerification } from "@/lib/apiService";
 
 /**
- * Step 2: Government Data Verification (Mock)
- * - Calls a mock API with country + idNumber + wallet address.
- * - Populates fullName, dateOfBirth, and photoReference on success.
- * - Blocks progression if age < 18.
+ * Step 3: Fetch verified data once the face match succeeds.
+ * Requires the connected wallet address to be sent to the backend.
  */
-const DataFetchStep: React.FC<{
-  formData: VerificationForm;
-  setFormData: React.Dispatch<React.SetStateAction<VerificationForm>>;
-  onNext: () => void;
-  onBack: () => void;
-}> = ({ formData, setFormData, onNext, onBack }) => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+const DataFetchStep: React.FC<StepComponentProps> = ({ formData, setFormData, onNext, onBack }) => {
   const account = useCurrentAccount();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
-  const fetchData = async () => {
-    if (!account) return;
+  const hasVerifiedFace = formData.faceVerified;
+  const hasFetchedData = Boolean(formData.fullName);
+  const age = formData.dateOfBirth ? calculateAge(formData.dateOfBirth) : null;
+
+  const handleFetch = async () => {
+    if (!formData.sessionId) {
+      setError("Your verification session expired. Please start again.");
+      return;
+    }
+    if (!account) {
+      setError("Connect your wallet to continue.");
+      return;
+    }
     setLoading(true);
-    setError("");
+    setError(null);
+    setSuccess(null);
     try {
-      const res = await fetchGovernmentData({
-        country: formData.country,
-        idNumber: formData.idNumber,
+      const result = await completeVerification({ sessionId: formData.sessionId, walletAddress: account.address });
+      const consent = result.consentData;
+      setFormData((prev) => ({
+        ...prev,
+        fullName: consent.fullName,
+        dateOfBirth: consent.dateOfBirth,
+        photoReference: consent.photoReference || null,
         walletAddress: account.address,
-      });
-      if (res.success && res.data) {
-        setFormData((prev) => ({
-          ...prev,
-          fullName: res.data!.fullName,
-          dateOfBirth: res.data!.dateOfBirth,
-          photoReference: res.data!.photoReference,
-        }));
-      } else {
-        setError(res.message || "Failed to verify your ID");
-      }
-    } catch (e) {
-      setError("Network error. Please try again.");
+      }));
+      setSuccess("Verified record retrieved successfully.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to fetch verification data.";
+      setError(message);
     } finally {
       setLoading(false);
     }
   };
 
-  const age = formData.dateOfBirth ? calculateAge(formData.dateOfBirth) : null;
-
-  return (
-    <div>
-      <h2 className="v-section-title">Verify Your Identity</h2>
-
-      {loading ? (
-        <LoadingSpinner message="Verifying your ID with government database..." />
-      ) : (
-        <>
-          {formData.fullName ? (
-            <div className="v-grid">
-              <div>
-                <label>Full Name</label>
-                <input type="text" value={formData.fullName} disabled className="v-input" />
-                <span className="v-success"> ✓ Verified</span>
-              </div>
-
-              <div>
-                <label>Date of Birth</label>
-                <input type="text" value={formData.dateOfBirth} disabled className="v-input" />
-                <span className="v-success"> ✓ Verified</span>
-              </div>
-
-              <div>
-                {age !== null && (
-                  <div className={age >= 18 ? "v-success" : "v-error v-strong"}>
-                    {age >= 18 ? `✓ Age verified (${age} years)` : `✗ Must be 18 or older (${age} years)`}
-                  </div>
-                )}
-              </div>
-
-              {age !== null && age >= 18 ? (
-                <button onClick={onNext} className="v-btn-primary">
-                  Continue to Face Verification
-                </button>
-              ) : (
-                <div className="v-error">You must be 18 or older to use SUIrify services.</div>
-              )}
-            </div>
-          ) : (
-            <>
-              <button onClick={fetchData} className="v-btn-primary">
-                Fetch My Verified Data
-              </button>
-              {error && <div className="v-error v-margin-top">{error}</div>}
-            </>
-          )}
-
-          <button onClick={onBack} className="v-btn-secondary v-margin-top">
+  if (!hasVerifiedFace) {
+    return (
+      <div className="v-grid">
+        <h2 className="v-section-title">Government Data Lookup</h2>
+        <div className="v-error">
+          Complete the face verification step before requesting your government record.
+        </div>
+        <div className="v-row v-margin-top">
+          <button onClick={onBack} className="v-btn-secondary">
             Back
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="v-grid">
+      <h2 className="v-section-title">Government Data Lookup</h2>
+      <p className="v-muted">
+        We'll retrieve your verified identity data using the secure session established in the previous steps. Only
+        anonymised hashes are stored after minting.
+      </p>
+
+      {loading ? (
+        <LoadingSpinner message="Contacting the verification service..." />
+      ) : (
+        <>
+          {!hasFetchedData && (
+            <button className="v-btn-primary" onClick={handleFetch}>
+              Fetch My Verified Data
+            </button>
+          )}
+
+          {success && <div className="v-success">{success}</div>}
+          {error && <div className="v-error">{error}</div>}
+
+          {hasFetchedData && (
+            <div className="v-grid-lg">
+              <div className="v-grid">
+                <label>Full Name</label>
+                <input className="v-input" value={formData.fullName} disabled />
+              </div>
+              <div className="v-grid">
+                <label>Date of Birth</label>
+                <input className="v-input" value={formData.dateOfBirth} disabled />
+                {age !== null && (
+                  <span className={age >= 18 ? "v-success" : "v-error v-strong"}>
+                    {age >= 18 ? `Age verified (${age} years)` : `Must be at least 18 (${age} years)`}
+                  </span>
+                )}
+              </div>
+              {formData.photoReference && (
+                <div className="v-grid">
+                  <label>Reference Photo</label>
+                  <img
+                    src={formData.photoReference}
+                    alt="Government reference"
+                    style={{ borderRadius: 12, maxWidth: 180 }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="v-row v-margin-top">
+            <button onClick={onBack} className="v-btn-secondary">
+              Back
+            </button>
+            <button
+              onClick={onNext}
+              className={`v-btn-primary ${!hasFetchedData || (age !== null && age < 18) ? "v-btn-disabled" : ""}`}
+              disabled={!hasFetchedData || (age !== null && age < 18)}
+            >
+              Continue to Consent
+            </button>
+          </div>
         </>
       )}
     </div>

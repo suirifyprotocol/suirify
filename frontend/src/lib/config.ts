@@ -1,8 +1,6 @@
-// Central configuration for SUIrify front-end
+export const PACKAGE_ID = import.meta.env.VITE_SUIRIFY_PACKAGE_ID || "0x1cc1b9ab5cf490c65e05b227910b702feb262054b4d29f1186b0757608c7dd59";
 
-export const PACKAGE_ID = import.meta.env.VITE_SUIRIFY_PACKAGE_ID || "0xYOUR_SUIRIFY_PACKAGE_ID";
-
-export const STRUCT_ATTESTATION = `${PACKAGE_ID}::protocol::SUIrify_Attestation`;
+export const STRUCT_ATTESTATION = `${PACKAGE_ID}::protocol::Suirify_Attestation`;
 
 export const DEFAULT_EXPLORER_BASE = "https://suiexplorer.com"; // Sui explorer
 

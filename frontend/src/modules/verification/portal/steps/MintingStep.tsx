@@ -1,64 +1,113 @@
-import React, { useEffect, useState } from "react";
-import type { VerificationForm } from "../VerificationPortal.tsx";
-import LoadingSpinner from "../../ui/LoadingSpinner";
-import { mintAttestation } from "@/lib/mockApi";
+import React, { useCallback, useEffect, useState } from "react";
+import type { StepComponentProps } from "../VerificationPortal";
+import LoadingSpinner from "@/modules/verification/ui/LoadingSpinner";
 import { explorer } from "@/lib/config";
+import { useCurrentAccount, useSignAndExecuteTransaction } from "@mysten/dapp-kit";
+import { createMintTransaction } from "@/lib/apiService";
 
-/**
- * Step 5: Attestation Minting (Mock)
- * - Calls mock mint API, shows success with links, then redirects to /dashboard.
- */
-const MintingStep: React.FC<{
-  formData: VerificationForm;
-  onNext: () => void;
-}> = ({ formData }) => {
-  const [status, setStatus] = useState<"minting" | "success" | "error">("minting");
-  const [transactionDigest, setTransactionDigest] = useState("");
-  const [attestationId, setAttestationId] = useState("");
+type MintStatus = "idle" | "preparing" | "signing" | "success" | "error";
+
+const MintingStep: React.FC<StepComponentProps> = ({ formData, setFormData, onBack }) => {
+  const account = useCurrentAccount();
+  const signAndExecute = useSignAndExecuteTransaction();
+
+  const [status, setStatus] = useState<MintStatus>(formData.mintDigest ? "success" : "idle");
+  const [error, setError] = useState<string | null>(null);
+  const [digest, setDigest] = useState<string | null>(formData.mintDigest);
+  const [transactionPreview, setTransactionPreview] = useState<string | null>(null);
+
+  const sessionId = formData.sessionId;
+
+  const resetError = () => {
+    setError(null);
+    setTransactionPreview(null);
+  };
+
+  const runMintFlow = useCallback(async () => {
+    if (!sessionId) {
+      setStatus("error");
+      setError("Verification session missing or already consumed. Please restart the flow.");
+      return;
+    }
+    if (!account) {
+      setStatus("error");
+      setError("Connect your wallet to sign the transaction.");
+      return;
+    }
+
+    try {
+      resetError();
+      setStatus("preparing");
+      const { transaction } = await createMintTransaction({ sessionId });
+      setTransactionPreview(`${transaction.slice(0, 24)}…`);
+
+      setStatus("signing");
+      const response = await signAndExecute.mutateAsync({ transaction });
+
+      const digestValue = (response as any)?.digest || (response as any)?.effects?.transactionDigest;
+      if (!digestValue) throw new Error("Wallet did not return a transaction digest.");
+
+      setDigest(digestValue);
+      setStatus("success");
+      setFormData((prev) => ({
+        ...prev,
+        sessionId: null,
+        mintDigest: digestValue,
+      }));
+    } catch (err) {
+      setStatus("error");
+      const message = err instanceof Error ? err.message : "Failed to mint attestation.";
+      setError(message);
+    }
+  }, [account, sessionId, setFormData, signAndExecute]);
 
   useEffect(() => {
-    const run = async () => {
-      try {
-        const res = await mintAttestation({
-          walletAddress: "demo",
-          fullName: formData.fullName,
-          country: formData.country,
-          verificationLevel: 1,
-          claims: { is_human_verified: true, is_over_18: true },
-        });
-        if (res.success) {
-          setTransactionDigest(res.transactionDigest || "");
-          setAttestationId(res.attestationObjectId || "");
-          setStatus("success");
-          setTimeout(() => {
-            window.location.href = "/dashboard";
-          }, 3000);
-        } else {
-          setStatus("error");
-        }
-      } catch {
-        setStatus("error");
-      }
-    };
-    run();
-  }, []);
+    if (status === "idle" && !digest) {
+      runMintFlow();
+    }
+  }, [digest, runMintFlow, status]);
 
-  if (status === "minting") {
+  if (!sessionId && !digest) {
     return (
-      <div>
-        <LoadingSpinner message="Minting your SUIrify Attestation..." />
-        <p>This may take a few moments. Please don't close this window.</p>
+      <div className="v-grid">
+        <h2 className="v-section-title">Mint Attestation</h2>
+        <div className="v-error">No active session found. Please restart the verification process.</div>
+        <button onClick={onBack} className="v-btn-secondary v-margin-top">
+          Back
+        </button>
+      </div>
+    );
+  }
+
+  if (status === "preparing") {
+    return (
+      <div className="v-grid">
+        <h2 className="v-section-title">Preparing Transaction</h2>
+        <LoadingSpinner message="Building a sponsored transaction on the server..." />
+      </div>
+    );
+  }
+
+  if (status === "signing") {
+    return (
+      <div className="v-grid">
+        <h2 className="v-section-title">Awaiting Wallet Signature</h2>
+        <LoadingSpinner message="Approve the transaction in your wallet to mint the attestation." />
+        {transactionPreview && <div className="v-muted v-small">Tx bytes: {transactionPreview}</div>}
       </div>
     );
   }
 
   if (status === "error") {
     return (
-      <div>
-        <div className="v-error">
-          <h3>Minting Failed</h3>
-          <p>There was an error creating your attestation. Please try again.</p>
-          <button onClick={() => window.location.reload()} className="v-btn-primary">
+      <div className="v-grid">
+        <h2 className="v-section-title">Mint Attestation</h2>
+        <div className="v-error">{error || "Minting failed."}</div>
+        <div className="v-row v-margin-top">
+          <button onClick={onBack} className="v-btn-secondary">
+            Back
+          </button>
+          <button onClick={() => setStatus("idle")} className="v-btn-primary">
             Retry Minting
           </button>
         </div>
@@ -66,44 +115,46 @@ const MintingStep: React.FC<{
     );
   }
 
+  if (!digest) {
+    return (
+      <div className="v-grid">
+        <h2 className="v-section-title">Mint Attestation</h2>
+        <LoadingSpinner message="Finalising transaction..." />
+      </div>
+    );
+  }
+
   return (
-    <div>
-      <div>🎉</div>
-      <h2>Verification Complete!</h2>
-      <p>Your SUIrify Attestation has been successfully minted.</p>
+    <div className="v-grid">
+      <h2 className="v-section-title">Verification Complete 🎉</h2>
+      <p className="v-muted">
+        Your SUIrify attestation has been minted successfully. It should appear in your wallet momentarily.
+      </p>
 
       <div className="v-card v-margin-top">
         <div className="v-margin-bottom">
-          <strong>Level:</strong> L1 - {formData.country} {formData.country === "Nigeria" ? "NIN" : "ID"} Verified
+          <strong>Owner:</strong> {formData.walletAddress || "Unknown"}
+        </div>
+        <div className="v-margin-bottom">
+          <strong>Jurisdiction:</strong> {formData.country || "—"}
         </div>
         <div className="v-margin-bottom">
           <strong>Status:</strong> <span className="v-success">Active</span>
         </div>
         <div className="v-margin-bottom">
-          <strong>Expires:</strong> 1 year
+          <strong>Claims:</strong> Human ✓ &nbsp; Over 18 ✓
         </div>
         <div>
-          <strong>Claims:</strong> Human ✓ | Over 18 ✓
+          <strong>Transaction Digest:</strong> {digest}
         </div>
       </div>
 
       <div className="v-row v-margin-top">
-        {transactionDigest && (
-          <a href={explorer.tx(transactionDigest)} target="_blank" rel="noreferrer" className="v-link">
-            View Transaction on Explorer
-          </a>
-        )}
-        {attestationId && (
-          <a href={explorer.object(attestationId)} target="_blank" rel="noreferrer" className="v-link">
-            View Attestation Object
-          </a>
-        )}
-      </div>
-
-      <div className="v-margin-top">
-        <p>Redirecting to your dashboard in 3 seconds...</p>
-        <button onClick={() => (window.location.href = "/dashboard")} className="v-btn-primary">
-          Go to Dashboard Now
+        <a href={explorer.tx(digest)} target="_blank" rel="noreferrer" className="v-link">
+          View on Sui Explorer
+        </a>
+        <button className="v-btn-secondary" onClick={() => window.open("/dashboard", "_self") }>
+          Go to Dashboard
         </button>
       </div>
     </div>

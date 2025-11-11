@@ -1,4 +1,3 @@
-
 /*
   conText - small presentational helper that returns a paragraph describing doxxing.
   Section-level comment added to explain purpose at the component level.

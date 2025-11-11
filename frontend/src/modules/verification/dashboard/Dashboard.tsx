@@ -4,7 +4,6 @@ import LoadingSpinner from "../ui/LoadingSpinner";
 import { STRUCT_ATTESTATION } from "@/lib/config";
 import IdentityStatusCard from "./IdentityStatusCard";
 import QuickActionsPanel from "./QuickActionsPanel";
-import { getLastLocalAttestation } from "@/lib/mockApi";
 
 /**
  * Dashboard
@@ -27,9 +26,10 @@ const Dashboard: React.FC = () => {
           options: { showContent: true },
         });
         if (attestations.data.length > 0) setAttestation(attestations.data[0]);
-        else setAttestation(getLastLocalAttestation());
+        else setAttestation(null);
       } catch (e) {
-        setAttestation(getLastLocalAttestation());
+        console.error("Failed to load attestations", e);
+        setAttestation(null);
       } finally {
         setLoading(false);
       }
