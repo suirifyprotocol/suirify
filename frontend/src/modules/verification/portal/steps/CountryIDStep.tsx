@@ -13,6 +13,11 @@ const validateID = (country: string, idNumber: string) => {
   return config.pattern.test(idNumber);
 };
 
+/**
+ * Step 1: Country & ID Selection
+ * - Lets user select country and enter national ID.
+ * - Validates format per-country before allowing next.
+ */
 const CountryIDStep: React.FC<{
   formData: VerificationForm;
   setFormData: React.Dispatch<React.SetStateAction<VerificationForm>>;
@@ -20,15 +25,15 @@ const CountryIDStep: React.FC<{
 }> = ({ formData, setFormData, onNext }) => {
   return (
     <div>
-      <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>Select Your Country & ID</h2>
+      <h2 className="v-section-title">Select Your Country & ID</h2>
 
-      <div style={{ display: "grid", gap: 12 }}>
+      <div className="v-grid">
         <div>
           <label>Country</label>
           <select
             value={formData.country}
             onChange={(e) => setFormData({ ...formData, country: e.target.value, idNumber: "" })}
-            style={{ width: "100%", padding: 8, borderRadius: 8, marginTop: 6 }}
+            className="v-input"
           >
             <option value="">Select Country</option>
             <option value="Nigeria">Nigeria</option>
@@ -45,10 +50,10 @@ const CountryIDStep: React.FC<{
               placeholder={countryConfig[formData.country].placeholder}
               value={formData.idNumber}
               onChange={(e) => setFormData({ ...formData, idNumber: e.target.value })}
-              style={{ width: "100%", padding: 8, borderRadius: 8, marginTop: 6 }}
+              className="v-input"
             />
             {formData.idNumber && !validateID(formData.country, formData.idNumber) && (
-              <div style={{ color: "#ef4444", fontSize: 12, marginTop: 6 }}>
+              <div className="v-error v-small">
                 Please enter a valid {countryConfig[formData.country].idType} number
               </div>
             )}
@@ -58,7 +63,7 @@ const CountryIDStep: React.FC<{
         <button
           onClick={onNext}
           disabled={!formData.country || !validateID(formData.country, formData.idNumber)}
-          style={{ padding: "10px 14px", borderRadius: 8, background: "#2563eb", color: "white" }}
+          className={`v-btn-primary ${!formData.country || !validateID(formData.country, formData.idNumber) ? 'v-btn-disabled' : ''}`}
         >
           Verify My ID
         </button>

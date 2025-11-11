@@ -6,6 +6,14 @@ import VerificationPortal from "./portal/VerificationPortal";
 import Dashboard from "./dashboard/Dashboard";
 import { ConnectButton } from "@mysten/dapp-kit";
 
+/**
+ * Verification Router (entry for /verify)
+ * - Entry point after wallet connects (navigated from VerifyDropdown)
+ * - Checks chain for SUIrify attestation and renders:
+ *   - Dashboard if valid
+ *   - VerificationPortal if missing/expired
+ * - If no wallet is connected, prompts for connection.
+ */
 const Router: React.FC = () => {
   const account = useCurrentAccount();
   const { checkAttestation } = useVerificationStatus();
@@ -27,10 +35,10 @@ const Router: React.FC = () => {
 
   if (!account) {
     return (
-      <div style={{ display: "grid", placeItems: "center", minHeight: "60vh" }}>
-        <div style={{ textAlign: "center" }}>
+      <div className="v-center">
+        <div className="v-center-col">
           <h2>Connect your wallet to get started</h2>
-          <div style={{ marginTop: 12, display: "inline-block" }}>
+          <div className="v-margin-top">
             <ConnectButton />
           </div>
         </div>

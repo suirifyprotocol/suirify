@@ -15,6 +15,11 @@ export type VerificationForm = {
   faceVerified: boolean;
 };
 
+/**
+ * VerificationPortal
+ * Container for the 5-step verification process.
+ * Manages step index and shared formData state.
+ */
 const VerificationPortal: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<VerificationForm>({
@@ -36,15 +41,15 @@ const VerificationPortal: React.FC = () => {
   const CurrentStepComponent: any = steps[currentStep].component;
 
   return (
-    <div style={{ maxWidth: 760, margin: "24px auto", padding: 16 }}>
-      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>SUIrify Verification</h1>
+    <div className="v-container">
+      <h1 className="v-title">SUIrify Verification</h1>
       <ProgressIndicator
         currentStep={currentStep}
         totalSteps={steps.length}
         stepTitles={steps.map((s) => s.title)}
       />
 
-      <div style={{ background: "#0b1220", color: "#e5e7eb", padding: 16, borderRadius: 12 }}>
+      <div className="v-card">
         <CurrentStepComponent
           formData={formData}
           setFormData={setFormData}

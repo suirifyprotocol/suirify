@@ -1,24 +1,15 @@
 import React from "react";
 
-const LoadingSpinner: React.FC<{ message?: string }> = ({ message }) => {
-  return (
-    <div style={{ display: "grid", placeItems: "center", padding: 24 }}>
-      <div
-        className="spin"
-        style={{
-          width: 36,
-          height: 36,
-          border: "3px solid #e5e7eb",
-          borderTopColor: "#2563eb",
-          borderRadius: "50%",
-          animation: "spin 1s linear infinite",
-          marginBottom: 12,
-        }}
-      />
-      {message && <p style={{ color: "#6b7280", textAlign: "center" }}>{message}</p>}
-      <style>{`@keyframes spin {to {transform: rotate(360deg)}}`}</style>
-    </div>
-  );
-};
+/**
+ * LoadingSpinner
+ * Shows a small spinner with an optional message.
+ * Styling is defined in index.css (.v-spinner*, @keyframes v-spin)
+ */
+const LoadingSpinner: React.FC<{ message?: string }> = ({ message }) => (
+  <div className="v-spinner-container">
+    <div className="v-spinner" />
+    {message && <p className="v-muted" style={{ textAlign: "center" }}>{message}</p>}
+  </div>
+);
 
 export default LoadingSpinner;

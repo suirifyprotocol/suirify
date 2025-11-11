@@ -4,6 +4,11 @@ import LoadingSpinner from "../../ui/LoadingSpinner";
 import WebcamFeed from "../../ui/WebcamFeed";
 import { faceMatch } from "@/lib/mockApi";
 
+/**
+ * Step 3: Face Verification (Mock)
+ * - Shows instructions, simulates webcam capture, calls mock faceMatch.
+ * - Auto-advances on success; allows retry on failure.
+ */
 const FaceVerificationStep: React.FC<{
   formData: VerificationForm;
   setFormData: React.Dispatch<React.SetStateAction<VerificationForm>>;
@@ -47,18 +52,18 @@ const FaceVerificationStep: React.FC<{
 
   return (
     <div>
-      <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>Face Verification</h2>
+      <h2 className="v-section-title">Face Verification</h2>
 
       {status === "idle" && (
         <div>
           <h3>Instructions:</h3>
-          <ul style={{ marginBottom: 12, color: "#9ca3af" }}>
+          <ul className="v-muted">
             <li>Ensure good lighting</li>
             <li>Look straight at the camera</li>
             <li>Remove glasses and hats</li>
             <li>We'll compare with your government photo</li>
           </ul>
-          <button onClick={startFaceVerification} style={{ padding: "10px 14px", borderRadius: 8, background: "#2563eb", color: "white" }}>
+          <button onClick={startFaceVerification} className="v-btn-primary">
             Start Face Verification
           </button>
         </div>
@@ -74,25 +79,25 @@ const FaceVerificationStep: React.FC<{
       {status === "verifying" && <LoadingSpinner message="Verifying your face match..." />}
 
       {status === "success" && (
-        <div style={{ color: "#10b981" }}>
-          <div style={{ fontSize: 36 }}>✓</div>
+        <div className="v-success">
+          <div>✓</div>
           <h3>Face Verification Successful!</h3>
           <p>Redirecting to next step...</p>
         </div>
       )}
 
       {status === "error" && (
-        <div style={{ color: "#ef4444" }}>
-          <div style={{ fontSize: 36 }}>✗</div>
+        <div className="v-error">
+          <div>✗</div>
           <h3>Verification Failed</h3>
           <p>{error}</p>
-          <button onClick={() => setStatus("idle")} style={{ padding: "8px 12px", borderRadius: 8, background: "#374151", color: "white" }}>
+          <button onClick={() => setStatus("idle")} className="v-btn-secondary">
             Try Again
           </button>
         </div>
       )}
 
-      <button onClick={onBack} style={{ marginTop: 12, padding: "8px 12px", borderRadius: 8, background: "#374151", color: "white" }}>
+      <button onClick={onBack} className="v-btn-secondary v-margin-top">
         Back
       </button>
     </div>

@@ -6,6 +6,11 @@ import IdentityStatusCard from "./IdentityStatusCard";
 import QuickActionsPanel from "./QuickActionsPanel";
 import { getLastLocalAttestation } from "@/lib/mockApi";
 
+/**
+ * Dashboard
+ * - Displays current attestation (from chain or local fallback).
+ * - Hosts identity status and quick actions.
+ */
 const Dashboard: React.FC = () => {
   const account = useCurrentAccount();
   const client = useSuiClient();
@@ -36,11 +41,11 @@ const Dashboard: React.FC = () => {
 
   if (!attestation) {
     return (
-      <div style={{ display: "grid", placeItems: "center", minHeight: "60vh" }}>
-        <div style={{ textAlign: "center" }}>
+      <div className="v-center">
+        <div>
           <h2>No Attestation Found</h2>
           <p>It seems you don't have a SUIrify attestation yet.</p>
-          <button onClick={() => (window.location.href = "/verify")} style={{ padding: "10px 14px", borderRadius: 8, background: "#2563eb", color: "white" }}>
+          <button onClick={() => (window.location.href = "/verify")} className="v-btn-primary">
             Get Verified Now
           </button>
         </div>
@@ -49,9 +54,9 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div style={{ maxWidth: 960, margin: "24px auto", padding: 16 }}>
-      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Your Dashboard</h1>
-      <div style={{ display: "grid", gap: 16 }}>
+    <div className="v-container">
+      <h1 className="v-title">Your Dashboard</h1>
+      <div className="v-grid-lg">
         <IdentityStatusCard attestation={attestation} />
         <QuickActionsPanel />
         {/* TODO: Add ConnectedApps, History, Privacy sections */}

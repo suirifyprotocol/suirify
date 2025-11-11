@@ -1,6 +1,11 @@
 import React, { useState } from "react";
 import type { VerificationForm } from "../VerificationPortal.tsx";
 
+/**
+ * Step 4: Review & Consent
+ * - Shows verified fields for confirmation.
+ * - Requires explicit consent before minting.
+ */
 const ReviewConsentStep: React.FC<{
   formData: VerificationForm;
   onNext: () => void;
@@ -9,9 +14,9 @@ const ReviewConsentStep: React.FC<{
   const [consentGiven, setConsentGiven] = useState(false);
   return (
     <div>
-      <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>Review & Consent</h2>
+      <h2 className="v-section-title">Review & Consent</h2>
 
-      <div style={{ display: "grid", gap: 8, marginBottom: 12 }}>
+      <div className="v-grid v-margin-bottom">
         <h3>Your Verified Information:</h3>
         <div>
           <strong>Full Name:</strong> {formData.fullName}
@@ -27,12 +32,12 @@ const ReviewConsentStep: React.FC<{
         </div>
       </div>
 
-      <div style={{ background: "#0f172a", padding: 12, borderRadius: 8 }}>
-        <label style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+      <div className="v-card">
+        <label className="v-consent">
           <input type="checkbox" checked={consentGiven} onChange={(e) => setConsentGiven(e.target.checked)} />
           <span>
             I consent to mint my SUIrify Attestation. I understand that:
-            <ul style={{ marginLeft: 20 }}>
+            <ul>
               <li>My personal data will be permanently deleted after verification</li>
               <li>Only cryptographic proofs will be stored on-chain</li>
               <li>I can delete my attestation at any time</li>
@@ -42,11 +47,11 @@ const ReviewConsentStep: React.FC<{
         </label>
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        <button onClick={onBack} style={{ padding: "8px 12px", borderRadius: 8, background: "#374151", color: "white" }}>
+      <div className="v-row v-margin-top">
+        <button onClick={onBack} className="v-btn-secondary">
           Back
         </button>
-        <button onClick={onNext} disabled={!consentGiven} style={{ padding: "10px 14px", borderRadius: 8, background: consentGiven ? "#2563eb" : "#6b7280", color: "white" }}>
+        <button onClick={onNext} disabled={!consentGiven} className={`v-btn-primary ${!consentGiven ? 'v-btn-disabled' : ''}`}>
           Mint My Attestation
         </button>
       </div>

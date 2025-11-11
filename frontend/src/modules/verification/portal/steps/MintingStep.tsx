@@ -4,6 +4,10 @@ import LoadingSpinner from "../../ui/LoadingSpinner";
 import { mintAttestation } from "@/lib/mockApi";
 import { explorer } from "@/lib/config";
 
+/**
+ * Step 5: Attestation Minting (Mock)
+ * - Calls mock mint API, shows success with links, then redirects to /dashboard.
+ */
 const MintingStep: React.FC<{
   formData: VerificationForm;
   onNext: () => void;
@@ -51,10 +55,10 @@ const MintingStep: React.FC<{
   if (status === "error") {
     return (
       <div>
-        <div style={{ color: "#ef4444" }}>
+        <div className="v-error">
           <h3>Minting Failed</h3>
           <p>There was an error creating your attestation. Please try again.</p>
-          <button onClick={() => window.location.reload()} style={{ padding: "8px 12px", borderRadius: 8, background: "#2563eb", color: "white" }}>
+          <button onClick={() => window.location.reload()} className="v-btn-primary">
             Retry Minting
           </button>
         </div>
@@ -64,18 +68,18 @@ const MintingStep: React.FC<{
 
   return (
     <div>
-      <div style={{ fontSize: 36 }}>🎉</div>
+      <div>🎉</div>
       <h2>Verification Complete!</h2>
       <p>Your SUIrify Attestation has been successfully minted.</p>
 
-      <div style={{ background: "#0f172a", padding: 12, borderRadius: 8, marginTop: 12 }}>
-        <div style={{ marginBottom: 6 }}>
+      <div className="v-card v-margin-top">
+        <div className="v-margin-bottom">
           <strong>Level:</strong> L1 - {formData.country} {formData.country === "Nigeria" ? "NIN" : "ID"} Verified
         </div>
-        <div style={{ marginBottom: 6 }}>
-          <strong>Status:</strong> <span style={{ color: "#10b981" }}>Active</span>
+        <div className="v-margin-bottom">
+          <strong>Status:</strong> <span className="v-success">Active</span>
         </div>
-        <div style={{ marginBottom: 6 }}>
+        <div className="v-margin-bottom">
           <strong>Expires:</strong> 1 year
         </div>
         <div>
@@ -83,22 +87,22 @@ const MintingStep: React.FC<{
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
+      <div className="v-row v-margin-top">
         {transactionDigest && (
-          <a href={explorer.tx(transactionDigest)} target="_blank" rel="noreferrer" style={{ color: "#60a5fa" }}>
+          <a href={explorer.tx(transactionDigest)} target="_blank" rel="noreferrer" className="v-link">
             View Transaction on Explorer
           </a>
         )}
         {attestationId && (
-          <a href={explorer.object(attestationId)} target="_blank" rel="noreferrer" style={{ color: "#60a5fa" }}>
+          <a href={explorer.object(attestationId)} target="_blank" rel="noreferrer" className="v-link">
             View Attestation Object
           </a>
         )}
       </div>
 
-      <div style={{ marginTop: 12 }}>
+      <div className="v-margin-top">
         <p>Redirecting to your dashboard in 3 seconds...</p>
-        <button onClick={() => (window.location.href = "/dashboard")} style={{ padding: "8px 12px", borderRadius: 8, background: "#2563eb", color: "white" }}>
+        <button onClick={() => (window.location.href = "/dashboard")} className="v-btn-primary">
           Go to Dashboard Now
         </button>
       </div>

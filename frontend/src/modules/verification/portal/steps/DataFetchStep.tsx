@@ -5,6 +5,12 @@ import { fetchGovernmentData } from "@/lib/mockApi";
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { calculateAge } from "@/lib/identityUtils";
 
+/**
+ * Step 2: Government Data Verification (Mock)
+ * - Calls a mock API with country + idNumber + wallet address.
+ * - Populates fullName, dateOfBirth, and photoReference on success.
+ * - Blocks progression if age < 18.
+ */
 const DataFetchStep: React.FC<{
   formData: VerificationForm;
   setFormData: React.Dispatch<React.SetStateAction<VerificationForm>>;
@@ -46,55 +52,52 @@ const DataFetchStep: React.FC<{
 
   return (
     <div>
-      <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>Verify Your Identity</h2>
+      <h2 className="v-section-title">Verify Your Identity</h2>
 
       {loading ? (
         <LoadingSpinner message="Verifying your ID with government database..." />
       ) : (
         <>
           {formData.fullName ? (
-            <div style={{ display: "grid", gap: 12 }}>
+            <div className="v-grid">
               <div>
                 <label>Full Name</label>
-                <input type="text" value={formData.fullName} disabled style={{ width: "100%", padding: 8, borderRadius: 8, marginTop: 6 }} />
-                <span style={{ marginLeft: 8, color: "#10b981" }}>✓ Verified</span>
+                <input type="text" value={formData.fullName} disabled className="v-input" />
+                <span className="v-success"> ✓ Verified</span>
               </div>
 
               <div>
                 <label>Date of Birth</label>
-                <input type="text" value={formData.dateOfBirth} disabled style={{ width: "100%", padding: 8, borderRadius: 8, marginTop: 6 }} />
-                <span style={{ marginLeft: 8, color: "#10b981" }}>✓ Verified</span>
+                <input type="text" value={formData.dateOfBirth} disabled className="v-input" />
+                <span className="v-success"> ✓ Verified</span>
               </div>
 
               <div>
                 {age !== null && (
-                  <div style={{
-                    color: age >= 18 ? "#10b981" : "#ef4444",
-                    fontWeight: 600,
-                  }}>
+                  <div className={age >= 18 ? "v-success" : "v-error v-strong"}>
                     {age >= 18 ? `✓ Age verified (${age} years)` : `✗ Must be 18 or older (${age} years)`}
                   </div>
                 )}
               </div>
 
               {age !== null && age >= 18 ? (
-                <button onClick={onNext} style={{ padding: "10px 14px", borderRadius: 8, background: "#2563eb", color: "white" }}>
+                <button onClick={onNext} className="v-btn-primary">
                   Continue to Face Verification
                 </button>
               ) : (
-                <div style={{ color: "#ef4444" }}>You must be 18 or older to use SUIrify services.</div>
+                <div className="v-error">You must be 18 or older to use SUIrify services.</div>
               )}
             </div>
           ) : (
             <>
-              <button onClick={fetchData} style={{ padding: "10px 14px", borderRadius: 8, background: "#2563eb", color: "white" }}>
+              <button onClick={fetchData} className="v-btn-primary">
                 Fetch My Verified Data
               </button>
-              {error && <div style={{ color: "#ef4444", marginTop: 8 }}>{error}</div>}
+              {error && <div className="v-error v-margin-top">{error}</div>}
             </>
           )}
 
-          <button onClick={onBack} style={{ marginTop: 12, padding: "8px 12px", borderRadius: 8, background: "#374151", color: "white" }}>
+          <button onClick={onBack} className="v-btn-secondary v-margin-top">
             Back
           </button>
         </>
