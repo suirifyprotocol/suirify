@@ -8,9 +8,10 @@ module suirify::auth {
 
     // Creates the VerifierAdminCap and transfers it to the transaction sender.
     // This should only be called once during the protocol's initialization.
-    public fun create_cap(ctx: &mut TxContext): VerifierAdminCap {
-        VerifierAdminCap {
+    public fun create_and_transfer_cap(recipient: address, ctx: &mut TxContext) {
+        let cap = VerifierAdminCap {
             id: object::new(ctx),
-        }
+        };
+        transfer::transfer(cap, recipient)
     }
 }
