@@ -5,15 +5,17 @@ import { STRUCT_ATTESTATION } from "../lib/config";
 import IdentityStatusCard from "./dashboard/IdentityStatusCard.tsx";
 import QuickActionsPanel from "./dashboard/QuickActionsPanel.tsx";
 import { fetchAttestation } from "../lib/apiService";
+import type { AttestationSummary } from "../lib/apiService";
+import type { AttestationLike } from "../types/attestation";
 
 const Dashboard: React.FC = () => {
   const account = useCurrentAccount();
   const client = useSuiClient();
-  const [attestation, setAttestation] = useState<any | null>(null);
+  const [attestation, setAttestation] = useState<AttestationLike | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const mapBackendAttestation = (data: any) => {
+    const mapBackendAttestation = (data: AttestationSummary | null): AttestationLike | null => {
       if (!data) return null;
       const issueMs = data.issueDate ? Date.parse(data.issueDate) : null;
       const expiryMs = data.expiryDate ? Date.parse(data.expiryDate) : null;
@@ -60,7 +62,12 @@ const Dashboard: React.FC = () => {
           options: { showContent: true },
         });
         if (attestations.data.length > 0) {
-          setAttestation(attestations.data[0]);
+          const first = attestations.data[0];
+          if (first && !first.error) {
+            setAttestation(first as AttestationLike);
+          } else {
+            await loadFallbackAttestation(account.address);
+          }
         } else {
           await loadFallbackAttestation(account.address);
         }

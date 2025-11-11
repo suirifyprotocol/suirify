@@ -1,8 +1,10 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { VerificationForm } from "../VerificationPortal";
 import LoadingSpinner from "../common/LoadingSpinner";
 import WebcamFeed from "../common/WebcamFeed";
 import { verifyFace } from "../../lib/apiService";
+
+type CaptureState = "idle" | "preparing" | "capturing" | "verifying" | "success" | "error";
 
 const FaceVerificationStep: React.FC<{
   formData: VerificationForm;
@@ -10,17 +12,105 @@ const FaceVerificationStep: React.FC<{
   onNext: () => void;
   onBack: () => void;
 }> = ({ formData, setFormData, onNext, onBack }) => {
-  const [status, setStatus] = useState<"idle" | "capturing" | "verifying" | "success" | "error">("idle");
+  const [status, setStatus] = useState<CaptureState>("idle");
   const [error, setError] = useState("");
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
-  const captureLivePhoto = async (): Promise<string> => {
-    // Stub: simulate camera capture using existing reference photo when available.
-    await new Promise((r) => setTimeout(r, 700));
-    if (formData.livePhoto) return formData.livePhoto;
-    if (formData.photoReference) return formData.photoReference;
-    // Transparent 1x1 PNG fallback to keep API happy if no reference photo exists.
-    return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
-  };
+  const cleanupStream = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      try {
+        videoRef.current.pause();
+      } catch {}
+      videoRef.current.srcObject = null;
+    }
+  }, []);
+
+  useEffect(() => () => cleanupStream(), [cleanupStream]);
+
+  const ensureCamera = useCallback(async () => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error("Camera access is not supported in this browser.");
+    }
+
+    if (!streamRef.current) {
+      streamRef.current = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "user",
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
+      });
+    }
+
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (video.srcObject !== streamRef.current) {
+      video.srcObject = streamRef.current;
+    }
+
+    video.muted = true;
+    video.playsInline = true;
+
+    if (video.readyState < 2) {
+      await new Promise<void>((resolve) => {
+        const handleLoaded = () => {
+          video.removeEventListener("loadeddata", handleLoaded);
+          resolve();
+        };
+        video.addEventListener("loadeddata", handleLoaded, { once: true });
+      });
+    }
+
+    await video.play().catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if ((status !== "capturing" && status !== "error") || !streamRef.current) return;
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.srcObject !== streamRef.current) {
+      video.srcObject = streamRef.current;
+    }
+    video.muted = true;
+    video.playsInline = true;
+    video.play().catch(() => undefined);
+  }, [status]);
+
+  const captureLivePhoto = useCallback((): string => {
+    const video = videoRef.current;
+    if (!video) {
+      throw new Error("Camera not ready.");
+    }
+    if (!video.videoWidth || !video.videoHeight) {
+      throw new Error("Camera feed is not ready yet. Please wait a moment.");
+    }
+
+    const canvas = canvasRef.current ?? document.createElement("canvas");
+    canvasRef.current = canvas;
+
+    const size = Math.min(video.videoWidth, video.videoHeight);
+    canvas.width = size;
+    canvas.height = size;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      throw new Error("Unable to access drawing context for capture.");
+    }
+
+    const sx = (video.videoWidth - size) / 2;
+    const sy = (video.videoHeight - size) / 2;
+    ctx.drawImage(video, sx, sy, size, size, 0, 0, size, size);
+
+    return canvas.toDataURL("image/jpeg", 0.9);
+  }, []);
 
   const startFaceVerification = async () => {
     if (!formData.sessionId) {
@@ -28,22 +118,46 @@ const FaceVerificationStep: React.FC<{
       setStatus("error");
       return;
     }
-    setStatus("capturing");
+    setError("");
+    setStatus("preparing");
     try {
-      const livePhoto = await captureLivePhoto();
+      await ensureCamera();
+      setStatus("capturing");
+    } catch (e) {
+      cleanupStream();
+      const message = e instanceof Error ? e.message : "Unable to access your camera.";
+      setError(message.includes("denied") ? "Camera permission was denied. Please allow access to continue." : message);
+      setStatus("error");
+    }
+  };
+
+  const captureAndVerify = useCallback(async () => {
+    if (!formData.sessionId) {
+      setError("Verification session missing. Please restart the process.");
+      setStatus("error");
+      return;
+    }
+
+    try {
+      await ensureCamera();
+      const livePhoto = captureLivePhoto();
       setStatus("verifying");
+
       const result = await verifyFace({
         sessionId: formData.sessionId,
         livePhoto,
       });
+
+      setFormData((prev) => ({
+        ...prev,
+        livePhoto,
+        faceVerified: result.match,
+        faceSimilarity: result.similarity,
+        faceDiffPercent: result.diffPercent,
+      }));
+
       if (result.match) {
-        setFormData((prev) => ({
-          ...prev,
-          livePhoto,
-          faceVerified: true,
-          faceSimilarity: result.similarity,
-          faceDiffPercent: result.diffPercent,
-        }));
+        cleanupStream();
         setStatus("success");
         setTimeout(() => onNext(), 1200);
       } else {
@@ -51,11 +165,33 @@ const FaceVerificationStep: React.FC<{
         setError("Face verification failed. Please ensure good lighting and try again.");
       }
     } catch (e) {
-      setStatus("error");
       const message = e instanceof Error ? e.message : "Face verification failed. Please try again.";
       setError(message);
+      setStatus("error");
     }
-  };
+  }, [captureLivePhoto, cleanupStream, ensureCamera, formData.sessionId, onNext, setFormData]);
+
+  const handleRetry = useCallback(async () => {
+    setError("");
+    if (!formData.sessionId) {
+      cleanupStream();
+      setStatus("idle");
+      return;
+    }
+    try {
+      await ensureCamera();
+      setStatus("capturing");
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Unable to access your camera.";
+      setError(message);
+      setStatus("error");
+    }
+  }, [cleanupStream, ensureCamera, formData.sessionId]);
+
+  const handleBack = useCallback(() => {
+    cleanupStream();
+    onBack();
+  }, [cleanupStream, onBack]);
 
   const metrics = useMemo(() => {
     if (formData.faceSimilarity == null || formData.faceDiffPercent == null) return null;
@@ -64,6 +200,27 @@ const FaceVerificationStep: React.FC<{
       diff: `${(formData.faceDiffPercent * 100).toFixed(1)}%`,
     };
   }, [formData.faceDiffPercent, formData.faceSimilarity]);
+
+  const hintSet = useMemo(() => {
+    switch (status) {
+      case "capturing":
+        return [
+          "Center your face in the circle",
+          "Keep eyes level and shoulders visible",
+          "Maintain a neutral expression",
+        ];
+      case "error":
+        return [
+          "Check your lighting",
+          "Ensure your entire face fits inside the guide",
+          "Remove hats or glasses",
+        ];
+      default:
+        return [];
+    }
+  }, [status]);
+
+  const isStreamActive = Boolean(streamRef.current);
 
   return (
     <div>
@@ -106,10 +263,24 @@ const FaceVerificationStep: React.FC<{
         </div>
       )}
 
+      {status === "preparing" && <LoadingSpinner message="Accessing your camera..." />}
+
       {status === "capturing" && (
-        <div>
-          <WebcamFeed />
-          <p>Please look straight at the camera...</p>
+        <div style={{ display: "grid", gap: 16 }}>
+          <WebcamFeed status="capturing" hints={hintSet} videoRef={videoRef} isActive={isStreamActive} />
+          <p style={{ color: "#9ca3af", textAlign: "center" }}>Align your face within the guide, then capture when ready.</p>
+          <button
+            onClick={captureAndVerify}
+            style={{ padding: "10px 14px", borderRadius: 8, background: "#2563eb", color: "white" }}
+          >
+            Capture &amp; Verify
+          </button>
+          {metrics && (
+            <div style={{ color: "#9ca3af", textAlign: "center" }}>
+              <div>Last similarity: {metrics.similarity}</div>
+              <div>Pixel difference: {metrics.diff}</div>
+            </div>
+          )}
         </div>
       )}
 
@@ -124,17 +295,26 @@ const FaceVerificationStep: React.FC<{
       )}
 
       {status === "error" && (
-        <div style={{ color: "#ef4444" }}>
-          <div style={{ fontSize: 36 }}>✗</div>
-          <h3>Verification Failed</h3>
-          <p>{error}</p>
-          <button onClick={() => setStatus("idle")} style={{ padding: "8px 12px", borderRadius: 8, background: "#374151", color: "white" }}>
+        <div style={{ color: "#ef4444", display: "grid", gap: 12 }}>
+          <WebcamFeed status="error" hints={hintSet} videoRef={videoRef} isActive={isStreamActive} />
+          <div>
+            <div style={{ fontSize: 36 }}>✗</div>
+            <h3>Verification Failed</h3>
+            <p>{error}</p>
+          </div>
+          {metrics && (
+            <div style={{ color: "#9ca3af" }}>
+              <div>Last similarity: {metrics.similarity}</div>
+              <div>Pixel difference: {metrics.diff}</div>
+            </div>
+          )}
+          <button onClick={handleRetry} style={{ padding: "8px 12px", borderRadius: 8, background: "#374151", color: "white" }}>
             Try Again
           </button>
         </div>
       )}
 
-      <button onClick={onBack} style={{ marginTop: 12, padding: "8px 12px", borderRadius: 8, background: "#374151", color: "white" }}>
+      <button onClick={handleBack} style={{ marginTop: 12, padding: "8px 12px", borderRadius: 8, background: "#374151", color: "white" }}>
         Back
       </button>
     </div>

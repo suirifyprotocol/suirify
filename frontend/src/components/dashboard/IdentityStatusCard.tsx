@@ -1,16 +1,20 @@
-import React from "react";
+import React, { type CSSProperties } from "react";
 import { calculateDaysUntilExpiry } from "../../lib/identityUtils";
+import type { AttestationFields, AttestationLike } from "../../types/attestation";
 
-const IdentityStatusCard: React.FC<{ attestation: any }> = ({ attestation }) => {
-  const fields = attestation?.data?.content?.fields || attestation?.content?.fields || {};
+const statusStyles: Record<string, { label: string; className: CSSProperties }> = {
+  ACTIVE: { label: "Active", className: { color: "#10b981" } },
+  EXPIRED: { label: "Expired", className: { color: "#ef4444" } },
+  REVOKED: { label: "Revoked", className: { color: "#ef4444" } },
+  PENDING_BURN: { label: "Pending Deletion", className: { color: "#f59e0b" } },
+};
+
+const emptyFields: AttestationFields = {};
+
+const IdentityStatusCard: React.FC<{ attestation: AttestationLike }> = ({ attestation }) => {
+  const fields = attestation?.data?.content?.fields || attestation?.content?.fields || emptyFields;
   const status = String(fields.status || "ACTIVE");
-  const statusMap: any = {
-    ACTIVE: { label: "Active", className: { color: "#10b981" } },
-    EXPIRED: { label: "Expired", className: { color: "#ef4444" } },
-    REVOKED: { label: "Revoked", className: { color: "#ef4444" } },
-    PENDING_BURN: { label: "Pending Deletion", className: { color: "#f59e0b" } },
-  };
-  const statusInfo = statusMap[status] || statusMap.ACTIVE;
+  const statusInfo = statusStyles[status] || statusStyles.ACTIVE;
 
   const objectId = attestation?.data?.objectId || attestation?.objectId || "";
 

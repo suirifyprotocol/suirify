@@ -1,3 +1,39 @@
+/* Tailwind core layers must be declared before custom CSS */
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+/* Design tokens (shadcn style) so classes like bg-card/text-foreground work) */
+@layer base {
+  :root {
+    /* Core palette (dark-leaning by default for this site) */
+    --background: 210 20% 4%;           /* near-black */
+    --foreground: 210 40% 98%;          /* white-ish */
+    --muted: 215 16% 14%;
+    --muted-foreground: 215 20% 70%;
+    --popover: 210 20% 6%;
+    --popover-foreground: 210 40% 98%;
+    --card: 210 16% 8%;                 /* dark panel */
+    --card-foreground: 210 40% 98%;
+    --border: 220 13% 18%;              /* subtle border */
+    --input: 220 13% 18%;
+    --primary: 212 72% 59%;             /* SUI blue */
+    --primary-foreground: 210 40% 98%;
+    --secondary: 215 16% 14%;
+    --secondary-foreground: 210 40% 98%;
+    --accent: 215 16% 14%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 210 40% 98%;
+    --ring: 212 72% 59%;
+    --radius: 0.75rem;
+  }
+
+  /* Avoid @apply to keep CSS validators happy; expand to raw CSS */
+  * { border-color: hsl(var(--border)); border-style: solid; }
+  body { background-color: hsl(var(--background)); color: hsl(var(--foreground)); }
+}
+
 /* =============
   Verification module base styles
   (No Tailwind; simple utility classes for layout, spacing, colors)
@@ -68,43 +104,6 @@
 .v-action-icon { font-size: 22px; }
 .v-action-label { font-weight: 600; }
 .v-action-desc { color: #9ca3af; font-size: 12px; }
-/* Tailwind layers: required for utilities/components to work */
-/* Tailwind layers must be present for @layer base to work */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-/* Design tokens (shadcn style) so classes like bg-card/text-foreground work) */
-@layer base {
-  :root {
-    /* Core palette (dark-leaning by default for this site) */
-    --background: 210 20% 4%;           /* near-black */
-    --foreground: 210 40% 98%;          /* white-ish */
-    --muted: 215 16% 14%;
-    --muted-foreground: 215 20% 70%;
-    --popover: 210 20% 6%;
-    --popover-foreground: 210 40% 98%;
-    --card: 210 16% 8%;                 /* dark panel */
-    --card-foreground: 210 40% 98%;
-    --border: 220 13% 18%;              /* subtle border */
-    --input: 220 13% 18%;
-    --primary: 212 72% 59%;             /* SUI blue */
-    --primary-foreground: 210 40% 98%;
-    --secondary: 215 16% 14%;
-    --secondary-foreground: 210 40% 98%;
-    --accent: 215 16% 14%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62% 50%;
-    --destructive-foreground: 210 40% 98%;
-    --ring: 212 72% 59%;
-    --radius: 0.75rem;
-  }
-
-  /* Avoid @apply to keep CSS validators happy; expand to raw CSS */
-  * { border-color: hsl(var(--border)); border-style: solid; }
-  body { background-color: hsl(var(--background)); color: hsl(var(--foreground)); }
-}
-
 * {
   margin: 0;
   padding: 0;
