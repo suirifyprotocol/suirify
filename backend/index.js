@@ -4,12 +4,23 @@ const crypto = require('crypto');
 require('dotenv').config();
 const { govLookup, normalizeCountryKey } = require('./mockDB');
 const { getIsoCode, getCountryList } = require('./countryCodes'); // added
+const { getPolicyId } = require('./jurisdictionPolicies'); // <<-- NEW: use centralized policy resolver
 const db = require('./persistentDB');
 let Jimp;
 try {
   // Support both CommonJS and ESM default export shapes
   const _jimp = require('jimp');
-  Jimp = _jimp && _jimp.default ? _jimp.default : _jimp;
+  if (_jimp && typeof _jimp === 'object') {
+    if (_jimp.Jimp) {
+      Jimp = _jimp.Jimp;
+    } else if (_jimp.default) {
+      Jimp = _jimp.default;
+    } else {
+      Jimp = _jimp;
+    }
+  } else {
+    Jimp = _jimp;
+  }
 } catch (err) {
   // If Jimp isn't installed or fails to load, keep app running with a clear warning.
   console.warn('Jimp not available:', err && err.message ? err.message : err);
@@ -42,7 +53,9 @@ try {
 }
 
 const app = express();
-app.use(bodyParser.json());
+const BODY_LIMIT = process.env.REQUEST_BODY_LIMIT || '25mb';
+app.use(bodyParser.json({ limit: BODY_LIMIT }));
+app.use(bodyParser.urlencoded({ extended: true, limit: BODY_LIMIT }));
 app.use((req, res, next) => {
   const origin = req.headers.origin || '*';
   res.setHeader('Access-Control-Allow-Origin', origin);
@@ -70,17 +83,76 @@ const MINT_FEE = BigInt(process.env.MINT_FEE || 100000000);
 let suiClient;
 let sponsorKeypair;
 
-if (PACKAGE_ID && SPONSOR_PRIVATE_KEY) {
-  suiClient = new SuiClient({ url: SUI_RPC });
-  try {
-    const raw = Buffer.from(SPONSOR_PRIVATE_KEY, 'base64');
-    sponsorKeypair = Ed25519Keypair.fromSecretKey(raw.slice(1));
-    console.log(`Sponsor address loaded: ${sponsorKeypair.getPublicKey().toSuiAddress()}`);
-  } catch (e) {
-    console.error('Failed to load SPONSOR_PRIVATE_KEY. Make sure it is a valid Base64 Ed25519 private key.', e);
-  }
-} else {
-  console.warn('Sui or sponsor env variables are not fully configured. On-chain features may fail.');
+// REPLACED: instantiate SuiClient when available; load sponsor keypair only if provided.
+try {
+	// Instantiate Sui client if constructor is available
+	if (typeof SuiClient === 'function') {
+		try {
+			suiClient = new SuiClient({ url: SUI_RPC });
+			console.log(`Sui client instantiated (rpc=${SUI_RPC}).`);
+		} catch (e) {
+			console.error('Failed to instantiate SuiClient:', e);
+			suiClient = null;
+		}
+	} else {
+		console.warn('Sui client constructor not found in @mysten/sui exports. On-chain features disabled.');
+	}
+
+	// Load sponsor keypair only when provided and supported
+	if (SPONSOR_PRIVATE_KEY) {
+    if (Ed25519Keypair && typeof Ed25519Keypair.fromSecretKey === 'function') {
+      try {
+        const tryLoadSponsorKeypair = (rawValue) => {
+          // First try: assume the value is already in the sui bech32 / encoded format the SDK expects.
+          try {
+            return Ed25519Keypair.fromSecretKey(rawValue);
+          } catch (err1) {
+            // Fallback: attempt to treat as base64 encoded bytes (possibly prefixed with a scheme byte).
+            try {
+              const decoded = Buffer.from(rawValue, 'base64');
+              let secretBytes;
+              if (decoded.length === 33 && decoded[0] === 0) {
+                // some exports prefix with 0 flag + 32 byte seed
+                secretBytes = decoded.slice(1, 33);
+              } else if (decoded.length === 64) {
+                secretBytes = decoded.slice(0, 32);
+              } else if (decoded.length === 65) {
+                secretBytes = decoded.slice(1, 33);
+              } else if (decoded.length >= 32) {
+                secretBytes = decoded.slice(0, 32);
+              } else {
+                secretBytes = decoded;
+              }
+              return Ed25519Keypair.fromSecretKey(secretBytes);
+            } catch (err2) {
+              throw err1;
+            }
+          }
+        };
+        sponsorKeypair = tryLoadSponsorKeypair(SPONSOR_PRIVATE_KEY);
+        console.log(`Sponsor address loaded: ${sponsorKeypair.getPublicKey().toSuiAddress()}`);
+      } catch (e) {
+        console.error('Failed to load SPONSOR_PRIVATE_KEY. Provide either a sui encoded secret key (suiprivkey...) or a base64 seed.', e);
+        sponsorKeypair = null;
+      }
+		} else {
+			console.warn('SPONSOR_PRIVATE_KEY provided but Ed25519Keypair helper not available. Sponsor will not be used.');
+		}
+	} else {
+		console.info('No SPONSOR_PRIVATE_KEY provided. Transactions will be sponsor-less unless configured.');
+	}
+
+	// Inform about missing important env vars but do not prevent server start
+	if (!PACKAGE_ID) {
+		console.warn('PACKAGE_ID not set. On-chain mint operations will fail until PACKAGE_ID is configured.');
+	}
+	if (!ADMIN_CAP_ID || !PROTOCOL_CONFIG_ID || !ATTESTATION_REGISTRY_ID) {
+		console.warn('One or more protocol env IDs (ADMIN_CAP_ID, PROTOCOL_CONFIG_ID, ATTESTATION_REGISTRY_ID) are not set. Some on-chain calls may fail.');
+	}
+} catch (outerErr) {
+	console.error('Unexpected error during Sui client / sponsor initialization:', outerErr);
+	suiClient = null;
+	sponsorKeypair = null;
 }
 
 const verificationSessionStore = new Map();
@@ -320,10 +392,10 @@ app.post('/create-mint-tx', async (req, res) => {
     // Store pending mint info so the indexer can persist it on event
     pendingMints.set(userWalletAddress, { country, idNumber });
     verificationSessionStore.delete(sessionId);
-    res.json({ transaction: serializedTx });
+    res.json({ success: true, transaction: serializedTx });
   } catch (error) {
     console.error('Error building transaction:', error);
-    res.status(500).json({ error: 'Failed to build transaction.', details: error && error.message ? error.message : String(error) });
+    res.status(500).json({ success: false, error: 'Failed to build transaction.', details: error && error.message ? error.message : String(error) });
   }
 });
 
@@ -437,30 +509,6 @@ function decodeDataUrl(dataUrl) {
 const fs = require('fs');
 const path = require('path');
 
-// helper to resolve per-country jurisdiction policy object id from env
-function getPolicyId(countryKey) {
-  if (!countryKey || typeof countryKey !== 'string') return null;
-
-  // 1) Try a JSON map from env: JURISDICTION_POLICY_MAP='{"united states":"0xabc...", "kenya":"0xdef..."}'
-  const mapRaw = process.env.JURISDICTION_POLICY_MAP;
-  if (mapRaw) {
-    try {
-      const map = JSON.parse(mapRaw);
-      if (map && typeof map === 'object' && map[countryKey]) return map[countryKey];
-    } catch (e) {
-      // ignore parse errors, fall through to other methods
-      console.warn('Failed to parse JURISDICTION_POLICY_MAP:', e && e.message ? e.message : e);
-    }
-  }
-
-  // 2) Try a per-country env var like JURISDICTION_POLICY_UNITED_STATES
-  const envKey = 'JURISDICTION_POLICY_' + countryKey.toUpperCase().replace(/[^A-Z0-9]+/g, '_');
-  if (process.env[envKey]) return process.env[envKey];
-
-  // 3) Nothing found
-  return null;
-}
-
 // POST /face-verify
 app.post('/face-verify', async (req, res) => {
   // Guard early if Jimp isn't available or doesn't expose .read
@@ -551,6 +599,43 @@ app.post('/face-verify', async (req, res) => {
     return res.status(500).json({ success: false, error: 'Face verification failed on server' });
   }
 });
+
+// Add graceful shutdown helper so SIGINT/SIGTERM handlers can close server and persist DB
+function shutdown(signal) {
+  try {
+    console.log(`Received ${signal}. Shutting down gracefully...`);
+    if (server && typeof server.close === 'function') {
+      server.close(() => {
+        console.log('HTTP server closed.');
+        try {
+          if (db && typeof db.save === 'function') db.save();
+        } catch (e) {
+          console.error('Failed to save DB during shutdown:', e);
+        }
+        process.exit(0);
+      });
+      // In case server.close never calls back, ensure exit after timeout
+      setTimeout(() => {
+        console.warn('Forcing shutdown after timeout.');
+        try {
+          if (db && typeof db.save === 'function') db.save();
+        } catch (e) {}
+        process.exit(0);
+      }, 5000).unref();
+    } else {
+      // no server to close, just persist and exit
+      try {
+        if (db && typeof db.save === 'function') db.save();
+      } catch (e) {
+        console.error('Failed to save DB during shutdown:', e);
+      }
+      process.exit(0);
+    }
+  } catch (err) {
+    console.error('Shutdown error:', err);
+    process.exit(1);
+  }
+}
 
 // existing graceful shutdown code (leave unchanged)
 process.on('SIGINT', () => shutdown('SIGINT'));
