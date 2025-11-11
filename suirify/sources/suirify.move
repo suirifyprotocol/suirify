@@ -89,6 +89,11 @@ module suirify::protocol {
         reason_code: u8,
     }
 
+    public struct MintRequestCreated has copy, drop {
+        request_id: ID,
+        requester: address,
+    }
+
     public struct PROTOCOL has drop {}
 
     // Functions
@@ -169,12 +174,19 @@ module suirify::protocol {
     ): ID {
         let request_uid = object::new(ctx);
         let request_id = object::uid_to_inner(&request_uid);
+        let requester =tx_context::sender(ctx);
         let request = MintRequest {
             payment: coin::into_balance(payment),
-            requester: tx_context::sender(ctx),
+            requester: requester,
         };
         table::add(&mut registry.pending_mint_requests, request_id, request);
         object::delete(request_uid);
+         
+        event::emit(MintRequestCreated {
+            request_id,
+            requester,
+        });
+
         request_id
     }
 
