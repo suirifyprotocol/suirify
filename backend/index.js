@@ -134,6 +134,22 @@ const ADMIN_API_KEY = process.env.ADMIN_API_KEY || null;
 const HOST = process.env.HOST || '0.0.0.0';
 const MIST_PER_SUI = BigInt(1_000_000_000);
 
+const STATUS_CODE_ACTIVE = 1;
+const STATUS_CODE_EXPIRED = 2;
+const STATUS_CODE_REVOKED = 3;
+
+const STATUS_CODE_TO_NAME = {
+  [STATUS_CODE_ACTIVE]: 'ACTIVE',
+  [STATUS_CODE_EXPIRED]: 'EXPIRED',
+  [STATUS_CODE_REVOKED]: 'REVOKED',
+};
+
+const STATUS_NAME_TO_CODE = {
+  ACTIVE: STATUS_CODE_ACTIVE,
+  EXPIRED: STATUS_CODE_EXPIRED,
+  REVOKED: STATUS_CODE_REVOKED,
+};
+
 function toBigIntOrNull(value) {
   if (value === null || value === undefined) return null;
   try {
@@ -257,24 +273,89 @@ function summarizeAttestationObject(attestationObject) {
 
   const issueDateMs = toNumberOrNull(fields.issue_time_ms);
   const expiryDateMs = toNumberOrNull(fields.expiry_time_ms);
-  const statusField = fields.status ? String(fields.status).toUpperCase() : null;
+  const rawStatus = fields.status;
+  const numericStatus = rawStatus !== undefined && rawStatus !== null ? Number(rawStatus) : null;
   const revoked = Boolean(fields.revoked);
-  const status = statusField || (revoked ? 'REVOKED' : 'ACTIVE');
-  const statusLabel = status === 'ACTIVE' ? 'Active' : status === 'REVOKED' ? 'Revoked' : status;
+  let statusCode = Number.isFinite(numericStatus) ? numericStatus : null;
+  let status = null;
+  if (statusCode && STATUS_CODE_TO_NAME[statusCode]) {
+    status = STATUS_CODE_TO_NAME[statusCode];
+  } else if (rawStatus !== undefined && rawStatus !== null) {
+    status = String(rawStatus).toUpperCase();
+  }
+  if (revoked) {
+    status = 'REVOKED';
+    statusCode = STATUS_CODE_REVOKED;
+  }
+  if (!status) {
+    status = 'ACTIVE';
+  }
+  if (!statusCode && STATUS_NAME_TO_CODE[status]) {
+    statusCode = STATUS_NAME_TO_CODE[status];
+  }
+  const statusLabel = status === 'ACTIVE' ? 'Active' : status === 'REVOKED' ? 'Revoked' : status === 'EXPIRED' ? 'Expired' : status;
   const isExpired = expiryDateMs !== null && Date.now() > expiryDateMs;
   const isValid = status === 'ACTIVE' && !isExpired;
+  const jurisdictionCode = toNumberOrNull(fields.jurisdiction_code);
+  const verificationLevel = toNumberOrNull(fields.verification_level);
 
   return {
     objectId: data.objectId,
-    jurisdictionCode: fields?.jurisdiction_code ?? null,
-    verificationLevel: fields?.verification_level ?? null,
+    jurisdictionCode,
+    verificationLevel,
     issueDateMs,
     expiryDateMs,
     status,
     statusLabel,
+    statusCode,
     revoked,
     isValid,
   };
+}
+
+function summarizeStoredAttestation(walletAddress) {
+  if (!db || typeof db.getAttestationSummaryForWallet !== 'function') return null;
+  const stored = db.getAttestationSummaryForWallet(walletAddress);
+  if (!stored || !stored.record) return null;
+  const statusCode = stored.statusCode ?? (stored.status ? STATUS_NAME_TO_CODE[String(stored.status).toUpperCase()] : null);
+  const status = stored.status ? String(stored.status).toUpperCase() : (statusCode && STATUS_CODE_TO_NAME[statusCode]) || 'ACTIVE';
+  const statusLabel = stored.statusLabel || (status === 'ACTIVE' ? 'Active' : status === 'REVOKED' ? 'Revoked' : status === 'EXPIRED' ? 'Expired' : status);
+  const issueDateMs = stored.issueDateMs ?? null;
+  const expiryDateMs = stored.expiryDateMs ?? null;
+  const isExpired = expiryDateMs !== null && Date.now() > expiryDateMs;
+  const isValid = status === 'ACTIVE' && !isExpired;
+
+  return {
+    objectId: stored.attestationId || null,
+    jurisdictionCode: stored.jurisdictionCode ?? null,
+    verificationLevel: stored.verificationLevel ?? null,
+    issueDateMs,
+    expiryDateMs,
+    status,
+    statusLabel,
+    statusCode: statusCode ?? (STATUS_NAME_TO_CODE[status] || null),
+    revoked: status === 'REVOKED',
+    isValid,
+    source: 'db',
+  };
+}
+
+function extractAttestationFromChanges(objectChanges) {
+  if (!Array.isArray(objectChanges)) return null;
+  for (const change of objectChanges) {
+    if (!change || typeof change !== 'object') continue;
+    if (change.type !== 'created' && change.type !== 'mutated') continue;
+    const objectType = change.objectType || change.type_ || null;
+    if (!objectType || objectType !== `${PACKAGE_ID}::protocol::Suirify_Attestation`) continue;
+    const fields = change.objectFields || change.fields || (change.content && change.content.fields) || null;
+    if (!fields) continue;
+    const objectId = change.objectId || (change.reference && change.reference.objectId) || null;
+    const summary = summarizeAttestationObject({ data: { objectId, content: { fields } } });
+    if (summary) {
+      return summary;
+    }
+  }
+  return null;
 }
 
 async function getExistingAttestation(walletAddress) {
@@ -486,6 +567,27 @@ app.get('/attestation/:walletAddress', async (req, res) => {
   if (!suiClient) return res.status(500).json({ error: 'Sui client is not configured.' });
   const { walletAddress } = req.params;
   try {
+    const storedSummary = summarizeStoredAttestation(walletAddress);
+    const toIsoOrNull = (ms) => {
+      if (ms === null || ms === undefined) return null;
+      const date = new Date(ms);
+      return Number.isNaN(date.getTime()) ? null : date.toISOString();
+    };
+
+    if (storedSummary && storedSummary.objectId) {
+      const dashboardData = {
+        objectId: storedSummary.objectId,
+        jurisdictionCode: storedSummary.jurisdictionCode,
+        verificationLevel: storedSummary.verificationLevel,
+        issueDate: toIsoOrNull(storedSummary.issueDateMs),
+        expiryDate: toIsoOrNull(storedSummary.expiryDateMs),
+        status: storedSummary.statusLabel || storedSummary.status,
+        statusCode: storedSummary.status,
+        source: 'db',
+      };
+      return res.json({ hasAttestation: true, isValid: storedSummary.isValid, data: dashboardData, source: 'db' });
+    }
+
     const ownedObjects = await suiClient.getOwnedObjects({
       owner: walletAddress,
       filter: { StructType: `${PACKAGE_ID}::protocol::Suirify_Attestation` },
@@ -494,12 +596,6 @@ app.get('/attestation/:walletAddress', async (req, res) => {
     const attestationObject = ownedObjects.data.find((obj) => !obj.error);
     const summary = summarizeAttestationObject(attestationObject);
     if (!summary) return res.json({ hasAttestation: false, isValid: false, data: null });
-
-    const toIsoOrNull = (ms) => {
-      if (ms === null || ms === undefined) return null;
-      const date = new Date(ms);
-      return Number.isNaN(date.getTime()) ? null : date.toISOString();
-    };
 
     const dashboardData = {
       objectId: summary.objectId,
@@ -511,7 +607,7 @@ app.get('/attestation/:walletAddress', async (req, res) => {
       statusCode: summary.status,
       revoked: summary.revoked,
     };
-    res.json({ hasAttestation: true, isValid: summary.isValid, data: dashboardData });
+    res.json({ hasAttestation: true, isValid: summary.isValid, data: dashboardData, source: 'chain' });
   } catch (error) {
     console.error(`Error fetching attestation for ${req.params.walletAddress}:`, error);
     res.status(500).json({ error: 'Failed to query the blockchain.' });
@@ -933,6 +1029,14 @@ app.post('/finalize-mint', async (req, res) => {
       walletAddress: userWalletAddress,
       eventType: 'existing-attestation',
       source: 'finalize-handler',
+      attestationId: existingAttestation.objectId,
+      status: existingAttestation.status || null,
+      statusCode: existingAttestation.statusCode ?? null,
+      statusLabel: existingAttestation.statusLabel || null,
+      jurisdictionCode: existingAttestation.jurisdictionCode ?? null,
+      verificationLevel: existingAttestation.verificationLevel ?? null,
+      issueDateMs: existingAttestation.issueDateMs ?? null,
+      expiryDateMs: existingAttestation.expiryDateMs ?? null,
     });
     db.markUsedGovId(
       country,
@@ -947,6 +1051,13 @@ app.post('/finalize-mint', async (req, res) => {
           source: 'finalize-handler',
           requestedRequestId: rawRequestId || null,
           requestTxDigest: requestDigestInput || null,
+          status: existingAttestation.status || null,
+          statusCode: existingAttestation.statusCode ?? null,
+          statusLabel: existingAttestation.statusLabel || null,
+          jurisdictionCode: existingAttestation.jurisdictionCode ?? null,
+          verificationLevel: existingAttestation.verificationLevel ?? null,
+          issueDateMs: existingAttestation.issueDateMs ?? null,
+          expiryDateMs: existingAttestation.expiryDateMs ?? null,
         },
         auditNameHash ? { fullNameHash: auditNameHash } : {}
       )
@@ -996,11 +1107,13 @@ app.post('/finalize-mint', async (req, res) => {
     const executionResult = await suiClient.executeTransactionBlock({
       transactionBlock: txBase64,
       signature,
-      options: { showEffects: true, showEvents: true },
+      options: { showEffects: true, showEvents: true, showObjectChanges: true },
       requestType: 'WaitForLocalExecution',
     });
 
     const digest = executionResult?.digest || executionResult?.effects?.transactionDigest || null;
+    const attestationSummary = extractAttestationFromChanges(executionResult?.objectChanges);
+    const attestationObjectId = attestationSummary?.objectId || null;
 
     if (requestId && typeof requestId === 'string') {
       markRequestConsumed(requestId, {
@@ -1011,13 +1124,28 @@ app.post('/finalize-mint', async (req, res) => {
         source: 'finalize-handler',
         requestTxDigest: requestDigestInput || null,
         requestedRequestId: rawRequestId || null,
+        attestationId: attestationObjectId,
+        status: attestationSummary?.status || null,
+        statusCode: attestationSummary?.statusCode ?? null,
+        statusLabel: attestationSummary?.statusLabel || null,
+        jurisdictionCode: attestationSummary?.jurisdictionCode ?? null,
+        verificationLevel: attestationSummary?.verificationLevel ?? null,
+        issueDateMs: attestationSummary?.issueDateMs ?? null,
+        expiryDateMs: attestationSummary?.expiryDateMs ?? null,
       });
     }
 
     pendingMints.set(
       userWalletAddress,
       Object.assign(
-        { country, idNumber, requestId, requestedRequestId: rawRequestId || null },
+        {
+          country,
+          idNumber,
+          requestId,
+          requestedRequestId: rawRequestId || null,
+          attestationId: attestationObjectId,
+          attestationSummary,
+        },
         auditNameHash ? { fullNameHash: auditNameHash } : {}
       )
     );
@@ -1035,6 +1163,14 @@ app.post('/finalize-mint', async (req, res) => {
             source: 'finalize-handler',
             requestTxDigest: requestDigestInput || null,
             requestedRequestId: rawRequestId || null,
+            attestationId: attestationObjectId,
+            status: attestationSummary?.status || null,
+            statusCode: attestationSummary?.statusCode ?? null,
+            statusLabel: attestationSummary?.statusLabel || null,
+            jurisdictionCode: attestationSummary?.jurisdictionCode ?? null,
+            verificationLevel: attestationSummary?.verificationLevel ?? null,
+            issueDateMs: attestationSummary?.issueDateMs ?? null,
+            expiryDateMs: attestationSummary?.expiryDateMs ?? null,
           },
           auditNameHash ? { fullNameHash: auditNameHash } : {}
         )
@@ -1044,7 +1180,15 @@ app.post('/finalize-mint', async (req, res) => {
     }
     verificationSessionStore.delete(sessionId);
 
-  res.json({ success: true, digest, finalizeTxDigest: digest, requestTxDigest: requestDigestInput || null, effects: executionResult?.effects ?? null });
+    res.json({
+      success: true,
+      digest,
+      finalizeTxDigest: digest,
+      requestTxDigest: requestDigestInput || null,
+      attestationId: attestationObjectId,
+      effects: executionResult?.effects ?? null,
+      objectChanges: executionResult?.objectChanges ?? null,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error('Failed to finalize mint:', message);
@@ -1064,7 +1208,7 @@ async function startIndexer() {
   try {
     await suiClient.subscribeEvent({
       filter: { MoveEventType: `${PACKAGE_ID}::protocol::AttestationMinted` },
-      onMessage: (event) => {
+      onMessage: async (event) => {
         // Be a bit defensive about payload shape
         const recipient =
           (event && event.payload && event.payload.recipient) ||
@@ -1074,10 +1218,18 @@ async function startIndexer() {
           (event && event.payload && event.payload.request_id) ||
           (event && event.parsedJson && (event.parsedJson.request_id || event.parsedJson.requestId)) ||
           null;
+        const attestationObjectIdFromEvent =
+          (event && event.payload && event.payload.objectId) ||
+          (event && event.parsedJson && event.parsedJson.objectId) ||
+          null;
         if (requestIdFromEvent) {
           markRequestConsumed(requestIdFromEvent, {
             finalizedAt: new Date().toISOString(),
             source: 'event-indexer',
+            attestationId: attestationObjectIdFromEvent || null,
+            status: 'ACTIVE',
+            statusCode: STATUS_CODE_ACTIVE,
+            statusLabel: 'Active',
             eventType: 'indexer-attestation',
             walletAddress: recipient || null,
             recipient,
@@ -1087,6 +1239,15 @@ async function startIndexer() {
 
         const pendingMint = pendingMints.get(recipient);
         if (pendingMint) {
+          let attSummary = pendingMint.attestationSummary;
+          if (!attSummary) {
+            try {
+              attSummary = await getExistingAttestation(recipient);
+            } catch (summaryErr) {
+              console.error('Indexer failed to load attestation summary:', summaryErr);
+            }
+          }
+          const attestationIdFromSummary = attSummary?.objectId || pendingMint.attestationId || attestationObjectIdFromEvent || null;
           try {
             const record = db.markUsedGovId(
               pendingMint.country,
@@ -1099,6 +1260,14 @@ async function startIndexer() {
                   indexedAt: new Date().toISOString(),
                   requestId: pendingMint.requestId || null,
                   requestedRequestId: pendingMint.requestedRequestId || null,
+                  attestationId: attestationIdFromSummary,
+                  status: attSummary?.status || 'ACTIVE',
+                  statusCode: attSummary?.statusCode ?? STATUS_CODE_ACTIVE,
+                  statusLabel: attSummary?.statusLabel || 'Active',
+                  jurisdictionCode: attSummary?.jurisdictionCode ?? null,
+                  verificationLevel: attSummary?.verificationLevel ?? null,
+                  issueDateMs: attSummary?.issueDateMs ?? null,
+                  expiryDateMs: attSummary?.expiryDateMs ?? null,
                 },
                 pendingMint.fullNameHash ? { fullNameHash: pendingMint.fullNameHash } : {}
               )
