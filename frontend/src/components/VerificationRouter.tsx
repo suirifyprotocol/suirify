@@ -16,8 +16,8 @@ const VerificationRouter: React.FC = () => {
   useEffect(() => {
     const run = async () => {
       if (account?.address) {
-        const { isValid } = await checkAttestation(account.address);
-        setVerificationState(isValid ? "verified" : "unverified");
+        const { hasAttestation } = await checkAttestation(account.address);
+        setVerificationState(hasAttestation ? "verified" : "unverified");
       } else {
         setVerificationState("unverified");
       }
