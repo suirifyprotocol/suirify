@@ -7,22 +7,35 @@ import ReviewConsentStep from "./steps/ReviewConsentStep.tsx";
 import MintingStep from "./steps/MintingStep.tsx";
 
 export type VerificationForm = {
+  sessionId: string | null;
   country: string;
   idNumber: string;
   fullName: string;
   dateOfBirth: string;
-  photoReference?: string;
+  photoReference: string | null;
+  walletAddress: string | null;
+  livePhoto: string | null;
   faceVerified: boolean;
+  faceSimilarity: number | null;
+  faceDiffPercent: number | null;
+  mintDigest: string | null;
 };
 
 const VerificationPortal: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<VerificationForm>({
+    sessionId: null,
     country: "",
     idNumber: "",
     fullName: "",
     dateOfBirth: "",
+    photoReference: null,
+    walletAddress: null,
+    livePhoto: null,
     faceVerified: false,
+    faceSimilarity: null,
+    faceDiffPercent: null,
+    mintDigest: null,
   });
 
   const steps = [

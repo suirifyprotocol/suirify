@@ -4,7 +4,7 @@ import LoadingSpinner from "./common/LoadingSpinner";
 import { STRUCT_ATTESTATION } from "../lib/config";
 import IdentityStatusCard from "./dashboard/IdentityStatusCard.tsx";
 import QuickActionsPanel from "./dashboard/QuickActionsPanel.tsx";
-import { getLastLocalAttestation } from "../lib/mockApi";
+import { fetchAttestation } from "../lib/apiService";
 
 const Dashboard: React.FC = () => {
   const account = useCurrentAccount();
@@ -13,18 +13,59 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const mapBackendAttestation = (data: any) => {
+      if (!data) return null;
+      const issueMs = data.issueDate ? Date.parse(data.issueDate) : null;
+      const expiryMs = data.expiryDate ? Date.parse(data.expiryDate) : null;
+      return {
+        data: {
+          objectId: data.objectId,
+          content: {
+            fields: {
+              verification_level: data.verificationLevel,
+              issue_time_ms: issueMs ?? null,
+              expiry_time_ms: expiryMs ?? null,
+              status: (data.status || "ACTIVE").toUpperCase(),
+              is_human_verified: true,
+              is_over_18: true,
+            },
+          },
+        },
+      };
+    };
+
+    const loadFallbackAttestation = async (wallet: string) => {
+      try {
+        const fallback = await fetchAttestation(wallet);
+        if (fallback.hasAttestation && fallback.data) {
+          setAttestation(mapBackendAttestation(fallback.data));
+        } else {
+          setAttestation(null);
+        }
+      } catch {
+        setAttestation(null);
+      }
+    };
+
     const run = async () => {
-      if (!account?.address) return setLoading(false);
+      if (!account?.address) {
+        setLoading(false);
+        return;
+      }
+
       try {
         const attestations = await client.getOwnedObjects({
           owner: account.address,
           filter: { StructType: STRUCT_ATTESTATION },
           options: { showContent: true },
         });
-        if (attestations.data.length > 0) setAttestation(attestations.data[0]);
-        else setAttestation(getLastLocalAttestation());
+        if (attestations.data.length > 0) {
+          setAttestation(attestations.data[0]);
+        } else {
+          await loadFallbackAttestation(account.address);
+        }
       } catch (e) {
-        setAttestation(getLastLocalAttestation());
+        await loadFallbackAttestation(account.address);
       } finally {
         setLoading(false);
       }

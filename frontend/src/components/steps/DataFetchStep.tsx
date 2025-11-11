@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import type { VerificationForm } from "../VerificationPortal";
 import LoadingSpinner from "../common/LoadingSpinner";
-import { fetchGovernmentData } from "../../lib/mockApi";
+import { completeVerification } from "../../lib/apiService";
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { calculateAge } from "../../lib/identityUtils";
 
@@ -13,30 +13,47 @@ const DataFetchStep: React.FC<{
 }> = ({ formData, setFormData, onNext, onBack }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const account = useCurrentAccount();
 
   const fetchData = async () => {
-    if (!account) return;
+    if (!formData.sessionId) {
+      setError("Your verification session has expired. Please go back and start again.");
+      return;
+    }
+    if (!account) {
+      setError("Connect your wallet to continue.");
+      return;
+    }
     setLoading(true);
     setError("");
+    setSuccess("");
     try {
-      const res = await fetchGovernmentData({
-        country: formData.country,
-        idNumber: formData.idNumber,
+      const res = await completeVerification({
+        sessionId: formData.sessionId,
         walletAddress: account.address,
       });
-      if (res.success && res.data) {
+      const data = res.consentData;
+      if (data) {
         setFormData((prev) => ({
           ...prev,
-          fullName: res.data!.fullName,
-          dateOfBirth: res.data!.dateOfBirth,
-          photoReference: res.data!.photoReference,
+          fullName: data.fullName || "",
+          dateOfBirth: data.dateOfBirth || "",
+          photoReference: data.photoReference || null,
+          walletAddress: account.address,
+          livePhoto: null,
+          faceVerified: false,
+          faceSimilarity: null,
+          faceDiffPercent: null,
+          mintDigest: null,
         }));
+        setSuccess("Government record retrieved successfully.");
       } else {
-        setError(res.message || "Failed to verify your ID");
+        setError("No verification data was returned for this session.");
       }
     } catch (e) {
-      setError("Network error. Please try again.");
+      const message = e instanceof Error ? e.message : "Network error. Please try again.";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -90,7 +107,6 @@ const DataFetchStep: React.FC<{
               <button onClick={fetchData} style={{ padding: "10px 14px", borderRadius: 8, background: "#2563eb", color: "white" }}>
                 Fetch My Verified Data
               </button>
-              {error && <div style={{ color: "#ef4444", marginTop: 8 }}>{error}</div>}
             </>
           )}
 
@@ -99,6 +115,8 @@ const DataFetchStep: React.FC<{
           </button>
         </>
       )}
+      {success && <div style={{ color: "#10b981", marginTop: 12 }}>{success}</div>}
+      {error && !loading && <div style={{ color: "#ef4444", marginTop: 12 }}>{error}</div>}
     </div>
   );
 };

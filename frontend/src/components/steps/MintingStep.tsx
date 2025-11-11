@@ -1,49 +1,88 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import type { VerificationForm } from "../VerificationPortal";
 import LoadingSpinner from "../common/LoadingSpinner";
-import { mintAttestation } from "../../lib/mockApi";
 import { explorer } from "../../lib/config";
+import { createMintTransaction } from "../../lib/apiService";
+import { useCurrentAccount, useSignAndExecuteTransaction } from "@mysten/dapp-kit";
 
 const MintingStep: React.FC<{
   formData: VerificationForm;
+  setFormData: React.Dispatch<React.SetStateAction<VerificationForm>>;
   onNext: () => void;
-}> = ({ formData }) => {
-  const [status, setStatus] = useState<"minting" | "success" | "error">("minting");
-  const [transactionDigest, setTransactionDigest] = useState("");
-  const [attestationId, setAttestationId] = useState("");
+  onBack: () => void;
+}> = ({ formData, setFormData, onBack }) => {
+  const account = useCurrentAccount();
+  const signAndExecute = useSignAndExecuteTransaction();
+  const [status, setStatus] = useState<"idle" | "preparing" | "signing" | "success" | "error">(
+    formData.mintDigest ? "success" : "idle"
+  );
+  const [transactionDigest, setTransactionDigest] = useState(formData.mintDigest || "");
+  const [error, setError] = useState("");
+  const [transactionPreview, setTransactionPreview] = useState("");
+
+  const runMintFlow = useCallback(async () => {
+    if (!formData.sessionId) {
+      setStatus("error");
+      setError("Verification session missing or already consumed. Please restart the process.");
+      return;
+    }
+    if (!account) {
+      setStatus("error");
+      setError("Connect your wallet to sign the transaction.");
+      return;
+    }
+
+    try {
+      setError("");
+      setStatus("preparing");
+      const { transaction } = await createMintTransaction({ sessionId: formData.sessionId });
+      setTransactionPreview(`${transaction.slice(0, 24)}…`);
+
+      setStatus("signing");
+      const response = await signAndExecute.mutateAsync({ transaction });
+      const digest = (response as any)?.digest || (response as any)?.effects?.transactionDigest;
+      if (!digest) throw new Error("Wallet did not return a transaction digest.");
+
+      setTransactionDigest(digest);
+      setStatus("success");
+      setFormData((prev) => ({
+        ...prev,
+        sessionId: null,
+        mintDigest: digest,
+      }));
+
+      if (typeof window !== "undefined") {
+        window.setTimeout(() => {
+          window.location.href = "/dashboard";
+        }, 3000);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to mint attestation.";
+      setError(message);
+      setStatus("error");
+    }
+  }, [account, formData.sessionId, setFormData, signAndExecute]);
 
   useEffect(() => {
-    const run = async () => {
-      try {
-        const res = await mintAttestation({
-          walletAddress: "demo", // wallet used in chain mint in real impl
-          fullName: formData.fullName,
-          country: formData.country,
-          verificationLevel: 1,
-          claims: { is_human_verified: true, is_over_18: true },
-        });
-        if (res.success) {
-          setTransactionDigest(res.transactionDigest || "");
-          setAttestationId(res.attestationObjectId || "");
-          setStatus("success");
-          setTimeout(() => {
-            window.location.href = "/dashboard";
-          }, 3000);
-        } else {
-          setStatus("error");
-        }
-      } catch {
-        setStatus("error");
-      }
-    };
-    run();
-  }, []);
+    if (status === "idle") {
+      runMintFlow();
+    }
+  }, [runMintFlow, status]);
 
-  if (status === "minting") {
+  if (status === "idle" || status === "preparing") {
     return (
       <div>
         <LoadingSpinner message="Minting your SUIrify Attestation..." />
         <p>This may take a few moments. Please don't close this window.</p>
+      </div>
+    );
+  }
+
+  if (status === "signing") {
+    return (
+      <div>
+        <LoadingSpinner message="Approve the transaction in your wallet to continue." />
+        {transactionPreview && <p style={{ color: "#9ca3af" }}>Tx preview: {transactionPreview}</p>}
       </div>
     );
   }
@@ -53,10 +92,23 @@ const MintingStep: React.FC<{
       <div>
         <div style={{ color: "#ef4444" }}>
           <h3>Minting Failed</h3>
-          <p>There was an error creating your attestation. Please try again.</p>
-          <button onClick={() => window.location.reload()} style={{ padding: "8px 12px", borderRadius: 8, background: "#2563eb", color: "white" }}>
-            Retry Minting
-          </button>
+          <p>{error || "There was an error creating your attestation. Please try again."}</p>
+          <div style={{ display: "flex", gap: 12 }}>
+            <button onClick={onBack} style={{ padding: "8px 12px", borderRadius: 8, background: "#374151", color: "white" }}>
+              Back
+            </button>
+            <button
+              onClick={() => {
+                setError("");
+                setTransactionDigest("");
+                setTransactionPreview("");
+                setStatus("idle");
+              }}
+              style={{ padding: "8px 12px", borderRadius: 8, background: "#2563eb", color: "white" }}
+            >
+              Retry Minting
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -87,11 +139,6 @@ const MintingStep: React.FC<{
         {transactionDigest && (
           <a href={explorer.tx(transactionDigest)} target="_blank" rel="noreferrer" style={{ color: "#60a5fa" }}>
             View Transaction on Explorer
-          </a>
-        )}
-        {attestationId && (
-          <a href={explorer.object(attestationId)} target="_blank" rel="noreferrer" style={{ color: "#60a5fa" }}>
-            View Attestation Object
           </a>
         )}
       </div>
