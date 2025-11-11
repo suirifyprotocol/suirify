@@ -54,7 +54,6 @@ const Index = () => {
             <span className="title-blue">Regulatory-Native</span>
             <br />
             <span className="title-white">Identity Protocol</span>
-            <span className="title-underline"></span>
           </h1>
 
           <p className="hero-subtitle">
