@@ -1,6 +1,6 @@
 {
-  "name": "vite_react_shadcn_ts",
-  "version": "0.0.0",
+  "name": "suirify-frontend",
+  "version": "1.0.0",
   "scripts": {
     "suirify": "vite dev --host",
     "frontend": "vite dev --host",
@@ -9,11 +9,11 @@
     "preview": "vite preview"
   },
   "lockfileVersion": 3,
-  "requires": true,
+  "requires": false,
   "packages": {
     "": {
-      "name": "vite_react_shadcn_ts",
-      "version": "0.0.0",
+      "name": "suirify-frontend",
+      "version": "1.0.0",
       "dependencies": {
         "@hookform/resolvers": "^3.10.0",
         "@mysten/dapp-kit": "^0.19.6",
