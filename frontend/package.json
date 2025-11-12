@@ -1,6 +1,13 @@
 {
   "name": "vite_react_shadcn_ts",
   "version": "0.0.0",
+  "scripts": {
+    "suirify": "vite dev --host",
+    "frontend": "vite dev --host",
+    "dev": "vite dev --host",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
   "lockfileVersion": 3,
   "requires": true,
   "packages": {
@@ -8934,5 +8941,8 @@
         }
       }
     }
+  },
+  "dependencies": {
+    "vite": "^7.2.2"
   }
 }
