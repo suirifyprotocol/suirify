@@ -54,7 +54,7 @@ const VerificationPortal: React.FC = () => {
 
   return (
     <div style={{ maxWidth: 760, margin: "24px auto", padding: 16 }}>
-      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>SUIrify Verification</h1>
+  <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Suirify Verification</h1>
       <ProgressIndicator
         currentStep={currentStep}
         totalSteps={steps.length}

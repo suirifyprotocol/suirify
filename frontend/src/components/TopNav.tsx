@@ -5,19 +5,21 @@ import suiLogo from "../assets/suilogo.png";
 
 /**
  * TopNav
- * - Header used only inside the verification flow pages.
- * - It renders the `ConnectButton` on the top-right; the button itself
- *   already shows the connected address and the disconnect action,
- *   so we don't duplicate the address here.
+ * - Mirrors the landing page navigation so verification screens keep the same
+ *   centered, glassmorphic navbar treatment.
+ * - Replaces the landing "Build with Suirify" CTA with the wallet connect
+ *   control while keeping link layout identical.
  */
 const TopNav: React.FC = () => {
   return (
-    <header className="header" style={{ alignItems: "center" }}>
+    <header className="header">
       <div className="logo">
-        <Link to="/"><img src={suiLogo} alt="Sui Logo" /></Link>
+        <Link to="/">
+          <img src={suiLogo} alt="Sui Logo" />
+        </Link>
       </div>
 
-      <nav className="nav-menu" style={{ alignItems: "center" }}>
+      <nav className="nav-menu">
         <a href="#how-it-works" className="nav-link">
           How It Works
         </a>
@@ -30,7 +32,7 @@ const TopNav: React.FC = () => {
         </a>
       </nav>
 
-      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+      <div className="wallet-connect">
         <ConnectButton />
       </div>
     </header>

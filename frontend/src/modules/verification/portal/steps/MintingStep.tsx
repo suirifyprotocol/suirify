@@ -264,7 +264,7 @@ const MintingStep: React.FC<StepComponentProps> = ({ formData, setFormData, onBa
     <div className="v-grid">
       <h2 className="v-section-title">Verification Complete 🎉</h2>
       <p className="v-muted">
-        Your SUIrify attestation has been minted successfully. It should appear in your wallet momentarily.
+  Your Suirify attestation has been minted successfully. It should appear in your wallet momentarily.
       </p>
 
       <div className="v-card v-margin-top">

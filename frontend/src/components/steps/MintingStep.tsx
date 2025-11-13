@@ -198,7 +198,7 @@ const MintingStep: React.FC<{
   if (status === "idle" || status === "configuring") {
     return (
       <div>
-        <LoadingSpinner message="Minting your SUIrify Attestation..." />
+  <LoadingSpinner message="Minting your Suirify Attestation..." />
         <p>This may take a few moments. Please don't close this window.</p>
       </div>
     );
@@ -256,7 +256,7 @@ const MintingStep: React.FC<{
     <div>
       <div style={{ fontSize: 36 }}>🎉</div>
       <h2>Verification Complete!</h2>
-      <p>Your SUIrify Attestation has been successfully minted.</p>
+  <p>Your Suirify Attestation has been successfully minted.</p>
 
       <div style={{ background: "#0f172a", padding: 12, borderRadius: 8, marginTop: 12 }}>
         <div style={{ marginBottom: 6 }}>

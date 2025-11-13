@@ -15,7 +15,7 @@ import passportImg from "@/assets/passport.png";
 
 /*
   Compliance
-  Page that showcases SUIrify product features and marketing content.
+  Page that showcases Suirify product features and marketing content.
   This is a presentational component built from smaller primitives like FeatureCard.
 */
 const Compliance = () => {
@@ -173,7 +173,7 @@ const Compliance = () => {
             Participation.
           </div>
 
-          <div className="quote-attrib">~&nbsp;The SUIrify Team</div>
+          <div className="quote-attrib">~&nbsp;The Suirify Team</div>
         </div>
       </section>
 
@@ -182,8 +182,8 @@ const Compliance = () => {
         <div className="passport-panel">
           <div className="passport-content">
             <h2 className="passport-title">Learn more about<br/>Sovereign Identity & Web3</h2>
-            <p className="passport-desc">Build your knowledge of the new digital economy with SUIrify Learn. Understand everything from the basics of on-chain attestations to the future of compliant finance.</p>
-            <button className="cta-button">Build with SUIrify</button>
+            <p className="passport-desc">Build your knowledge of the new digital economy with Suirify Learn. Understand everything from the basics of on-chain attestations to the future of compliant finance.</p>
+            <button className="Learn-button">Learn About Suirify</button>
           </div>
 
           <div className="passport-art">
@@ -199,7 +199,7 @@ const Compliance = () => {
             <div className="join-future-card">
               <div className="join-future-content">
                 <h3 className="join-future-title">Join the Future of Identity</h3>
-                <p className="join-future-subtitle">Keep up with the latest SUIrify news, protocol upgrades, and insights on compliant Web3.</p>
+                <p className="join-future-subtitle">Keep up with the latest Suirify news, protocol upgrades, and insights on compliant Web3.</p>
               </div>
 
               <div className="join-future-input-wrapper">
@@ -218,12 +218,59 @@ const Compliance = () => {
         <section className="start-building">
           <div className="start-building-container">
             <div className="start-building-content">
-              <h2 className="start-building-title">Start Building With SUIrify</h2>
+              <h2 className="start-building-title">Start Building With Suirify</h2>
               <p className="start-building-subtitle">Instant access to the foundational identity layer for compliant finance in Web3.</p>
             </div>
           </div>
         </section>
       </section>
+
+      <footer className="site-footer">
+        <div className="footer-divider" />
+        <div className="footer-content">
+          <div className="footer-column">
+            <h4 className="footer-heading">Products</h4>
+            <ul className="footer-links">
+              <li><a className="footer-link" href="#">Suirify iOS</a></li>
+              <li><a className="footer-link" href="#">Suirify Android</a></li>
+              <li><a className="footer-link" href="#">Suirify Web</a></li>
+              <li><a className="footer-link" href="#">Suirify Passport</a></li>
+              <li><a className="footer-link" href="#">Suirify Passport Verification</a></li>
+            </ul>
+          </div>
+
+          <div className="footer-column">
+            <h4 className="footer-heading">Company</h4>
+            <ul className="footer-links">
+              <li><a className="footer-link" href="#">Support Center</a></li>
+              <li><a className="footer-link" href="#">Contact Us</a></li>
+              <li><a className="footer-link" href="#">Join Our Team</a></li>
+              <li><a className="footer-link" href="#">Media Kit</a></li>
+              <li><a className="footer-link" href="#">Blog</a></li>
+              <li><a className="footer-link" href="#">Roadmap (Request Feature)</a></li>
+            </ul>
+          </div>
+
+          <div className="footer-column">
+            <h4 className="footer-heading">Developers</h4>
+            <ul className="footer-links">
+              <li><a className="footer-link" href="#">Open Source Repos</a></li>
+              <li><a className="footer-link" href="#">Suirify Governance</a></li>
+              <li><a className="footer-link" href="#">Suirify Developer Portal</a></li>
+              <li><a className="footer-link" href="#">Suirify Technical &amp; API Docs</a></li>
+            </ul>
+          </div>
+
+          <div className="footer-column">
+            <h4 className="footer-heading">Legal</h4>
+            <ul className="footer-links">
+              <li><a className="footer-link" href="#">Terms of Service</a></li>
+              <li><a className="footer-link" href="#">Privacy Policy</a></li>
+              <li><a className="footer-link" href="#">Social</a></li>
+            </ul>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };

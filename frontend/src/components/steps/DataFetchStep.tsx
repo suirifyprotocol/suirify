@@ -117,7 +117,7 @@ const DataFetchStep: React.FC<{
                   Continue to Face Verification
                 </button>
               ) : (
-                <div style={{ color: "#ef4444" }}>You must be 18 or older to use SUIrify services.</div>
+                <div style={{ color: "#ef4444" }}>You must be 18 or older to use Suirify services.</div>
               )}
             </div>
           ) : (

@@ -44,7 +44,7 @@ const Dashboard: React.FC = () => {
       <div className="v-center">
         <div>
           <h2>No Attestation Found</h2>
-          <p>It seems you don't have a SUIrify attestation yet.</p>
+          <p>It seems you don't have a Suirify attestation yet.</p>
           <button onClick={() => (window.location.href = "/verify")} className="v-btn-primary">
             Get Verified Now
           </button>
