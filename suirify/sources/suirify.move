@@ -5,6 +5,7 @@ module suirify::protocol {
     use sui::event;
     use suirify::auth;
     use suirify::auth::VerifierAdminCap;
+    use suirify::enclave;
     use suirify::jurisdictions::{Self, JurisdictionPolicy};
     use sui::package::{Self};
     use sui::table::{Self, Table};
@@ -23,6 +24,8 @@ module suirify::protocol {
     const EATTESTATION_ALREADY_EXISTS: u64 = 5;
     const EINVALID_MINT_REQUEST_AMOUNT: u64 = 7;
     const EREQUEST_RECIPIENT_MISMATCH: u64 = 8;
+    const EENCLAVE_DATA_MISMATCH: u64 = 9;
+    const EENCLAVE_CONFIG_MISMATCH: u64 = 10;
 
     // Constants
     const STATUS_ACTIVE: u8 = 1;
@@ -278,6 +281,55 @@ module suirify::protocol {
         });
 
         transfer::transfer(attestation, recipient);
+    }
+
+    public fun mint_attestation_with_enclave(
+        cap: &VerifierAdminCap,
+        config: &mut ProtocolConfig,
+        registry: &mut AttestationRegistry,
+        request_id: ID,
+        policy: &JurisdictionPolicy,
+        enclave_config: &enclave::EnclaveConfig,
+        enclave_obj: &enclave::Enclave,
+        payload: vector<u8>,
+        signature: vector<u8>,
+        ctx: &mut TxContext,
+    ) {
+    
+        assert!(enclave::get_config_id(enclave_obj) == object::id(enclave_config), EENCLAVE_CONFIG_MISMATCH);
+        assert!(enclave::get_config_version(enclave_obj) == enclave::get_config_version_from_config(enclave_config), EENCLAVE_CONFIG_MISMATCH);
+
+        let (
+            signed_request_id,
+            recipient,
+            jurisdiction_code,
+            verification_level,
+            verifier_source,
+            name_hash,
+            is_human_verified,
+            is_over_18,
+            verifier_version,
+            _issued_ms,
+        ) = enclave::verify_and_extract_mint_data(enclave_obj, &payload, &signature);
+
+        assert!(signed_request_id == request_id, EENCLAVE_DATA_MISMATCH);
+
+        mint_attestation(
+            cap,
+            config,
+            registry,
+            request_id,
+            policy,
+            recipient,
+            jurisdiction_code,
+            verifier_source,
+            verification_level,
+            name_hash,
+            is_human_verified,
+            is_over_18,
+            verifier_version,
+            ctx,
+        );
     }
 
     /// Allows the admin to permanently revoke an existing attestation.
