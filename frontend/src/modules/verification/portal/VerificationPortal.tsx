@@ -98,7 +98,7 @@ const VerificationPortal: React.FC = () => {
 
   return (
     <div className="v-container">
-      <h1 className="v-title">SUIrify Verification</h1>
+  <h1 className="v-title">Suirify Verification</h1>
       <ProgressIndicator
         currentStep={currentStep}
         totalSteps={steps.length}

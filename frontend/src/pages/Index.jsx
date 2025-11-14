@@ -6,7 +6,7 @@ import Compliance from "./compliance";
 import VerifyDropdown from "./VerifyDropdown";
 
 /*
-  Index page - Landing page for SUIrify.
+  Index page - Landing page for Suirify.
   Renders header, hero and main content sections. Component-level and
   section-level comments are used to document intent and structure.
 */
@@ -43,7 +43,7 @@ const Index = () => {
             </a>
           </nav>
 
-          <button className="cta-button">Build with SUIrify</button>
+          <button className="cta-button">Build with Suirify</button>
         </header>
 
         {/* Hero content */}

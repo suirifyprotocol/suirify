@@ -106,7 +106,7 @@ const Dashboard: React.FC = () => {
       <div style={{ display: "grid", placeItems: "center", minHeight: "60vh" }}>
         <div style={{ textAlign: "center" }}>
           <h2>No Attestation Found</h2>
-          <p>It seems you don't have a SUIrify attestation yet.</p>
+          <p>It seems you don't have a Suirify attestation yet.</p>
           <button onClick={() => (window.location.href = "/verify")} style={{ padding: "10px 14px", borderRadius: 8, background: "#2563eb", color: "white" }}>
             Get Verified Now
           </button>

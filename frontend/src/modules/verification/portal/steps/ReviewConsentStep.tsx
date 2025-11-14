@@ -67,7 +67,7 @@ const ReviewConsentStep: React.FC<StepComponentProps> = ({ formData, setFormData
               onChange={(event) => handleConsentChange(event.target.checked)}
             />
             <span>
-              I consent to mint my SUIrify attestation. I understand that:
+              I consent to mint my Suirify attestation. I understand that:
               <ul>
                 <li>Personal data is deleted after minting; only hashes remain on-chain.</li>
                 <li>The attestation is non-transferable and bound to my wallet.</li>

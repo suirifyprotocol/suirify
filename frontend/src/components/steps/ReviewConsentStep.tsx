@@ -31,7 +31,7 @@ const ReviewConsentStep: React.FC<{
         <label style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
           <input type="checkbox" checked={consentGiven} onChange={(e) => setConsentGiven(e.target.checked)} />
           <span>
-            I consent to mint my SUIrify Attestation. I understand that:
+            I consent to mint my Suirify Attestation. I understand that:
             <ul style={{ marginLeft: 20 }}>
               <li>My personal data will be permanently deleted after verification</li>
               <li>Only cryptographic proofs will be stored on-chain</li>

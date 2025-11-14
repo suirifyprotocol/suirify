@@ -10,7 +10,7 @@ import { useNavigate } from "react-router-dom";
 /**
  * Verification Router (entry for /verify)
  * - Entry point after wallet connects (navigated from VerifyDropdown)
- * - Checks chain for SUIrify attestation and renders:
+ * - Checks chain for Suirify attestation and renders:
  *   - Dashboard if valid
  *   - VerificationPortal if missing/expired
  * - If no wallet is connected, prompts for connection.

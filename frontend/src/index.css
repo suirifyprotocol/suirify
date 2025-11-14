@@ -285,10 +285,8 @@ main, section { max-width: 100vw; overflow-x: clip; }
   z-index: 10;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   padding: 20px 60px;
-  /* Reserve space for absolutely positioned logo on large screens */
-  padding-left: 380px;
 }
 
 .logo {
@@ -299,7 +297,7 @@ main, section { max-width: 100vw; overflow-x: clip; }
 }
 
 .logo img {
-  height: 35px;
+  height: 50px; /* Adjust this height to resize the Sui logo */
   width: auto;
   display: block;
 }
@@ -319,6 +317,7 @@ main, section { max-width: 100vw; overflow-x: clip; }
   font-size: 10px;
   max-width: 100%;
   flex-wrap: wrap;
+  margin: 0 auto;
 }
 
 .nav-link {
@@ -351,8 +350,46 @@ main, section { max-width: 100vw; overflow-x: clip; }
   cursor: pointer;
   transition: all 0.3s ease;
   font-family: Urbanist;
+  position: absolute;
+  right: 60px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
+.cta-button:hover {
+  background-color: hsla(166, 100%, 80%, 1);
+  transform: translateY(-2px);
+}
+.wallet-connect {
+  position: absolute;
+  right: 60px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  z-index: 20;
+}
+
+.wallet-connect > * {
+  flex: 0 0 auto;
+}
+.Learn-button{
+  background-color: hsla(166, 100%, 93%, 1);
+  color: hsla(229, 19%, 22%, 1);
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 100%;
+  letter-spacing: 0%;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: Urbanist;
+  right: 60px;
+  top: 50%;
+}
 .cta-button:hover {
   background-color: hsla(166, 100%, 80%, 1);
   transform: translateY(-2px);
@@ -842,10 +879,10 @@ main, section { max-width: 100vw; overflow-x: clip; }
   line-height: 100%;
   letter-spacing: 0%;
 }
-.explore-docs-btn:hover {  
+.explore-docs-btn:hover {
   background-color: hsla(166, 100%, 80%, 1);
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(195, 244, 232, 0.3); }
+}
 
 /* Right column: 2x2 grid of feature tiles */
 .stripe-features {
@@ -977,6 +1014,21 @@ main, section { max-width: 100vw; overflow-x: clip; }
   }
   .logo img { height: 28px; }
   .header { padding-left: 0; }
+  .cta-button {
+    position: static;
+    transform: none;
+    margin-top: 16px;
+  }
+  .wallet-connect {
+    position: static;
+    transform: none;
+    margin-top: 16px;
+    width: 100%;
+    justify-content: center;
+  }
+  .nav-menu {
+    margin: 0;
+  }
   
   .hero-content {
     padding: 40px 20px;
@@ -1339,5 +1391,67 @@ main, section { max-width: 100vw; overflow-x: clip; }
   .start-building-subtitle {
     font-size: 16px;
     padding: 0 16px;
+  }
+}
+
+/* Footer styles for landing page */
+.site-footer {
+  background: #050910;
+  color: rgba(255, 255, 255, 0.72);
+  padding: 72px 20px 80px;
+}
+
+.footer-divider {
+  height: 1px;
+  max-width: 1200px;
+  margin: 0 auto 48px;
+  background: linear-gradient(90deg, rgba(94, 179, 212, 0) 0%, rgba(94, 179, 212, 0.45) 50%, rgba(94, 179, 212, 0) 100%);
+}
+
+.footer-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  gap: 32px;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+.footer-heading {
+  font-family: "Inter", system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0.01em;
+  color: #ffffff;
+  margin-bottom: 18px;
+}
+
+.footer-links {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.footer-link {
+  color: rgba(255, 255, 255, 0.62);
+  text-decoration: none;
+  font-size: 14px;
+  transition: color 0.2s ease;
+}
+
+.footer-link:hover {
+  color: #5eb3d4;
+}
+
+@media (min-width: 640px) {
+  .footer-content {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .footer-content {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
