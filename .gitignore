@@ -2,5 +2,10 @@
 /backend/node_modules/*
 /backend/reference_photos/*
 /backend/.env
-nautilus_edits.js
-backend/nautilusClient.js
+/backend/db.json
+/suirify-enclave-backend/enclave-app/node_modules/*
+/suirify-enclave-backend/enclave-app/.env
+/suirify-enclave-backend/parent-app/node_modules/*
+/suirify-enclave-backend/parent-app/reference_photos/*
+/suirify-enclave-backend/parent-app/.env
+/suirify-enclave-backend/parent-app/db.json
