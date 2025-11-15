@@ -43,11 +43,10 @@ const Compliance = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
-      <section className="container mx-auto px-4 py-20 md:py-32 compliance-section">
+  <section className="container mx-auto px-4 compliance-section">
         <div className="max-w-5xl mx-auto text-center space-y-8">
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight suirify-heading">
-            <span className="text-primary">SUlrify</span>
-            <span className="text-foreground">: Compliance By Design.</span>
+            <span className="text-foreground">Compliance <span className="blue">By Design.</span></span>
           </h1>
           <p className="compliance-text">
             Developers don't want a better cryptographic toolkit; they want their compliance problem<br />
@@ -75,7 +74,7 @@ const Compliance = () => {
       <section className="container mx-auto px-4 py-20 md:py-32">
         <div className="max-w-5xl mx-auto text-center space-y-12">
           <div className="flex justify-center mb-8">
-            <img src={suiLogo} alt="Sui Logo" className="w-11 h-15 suiLogo" />
+            <img src={suiLogo} alt="Sui Logo" className="suiLogo" />
           </div>
           <h2 className="text-4xl md:text-5xl font-bold text-foreground built">
             Built On Sui
@@ -220,6 +219,10 @@ const Compliance = () => {
             <div className="start-building-content">
               <h2 className="start-building-title">Start Building With Suirify</h2>
               <p className="start-building-subtitle">Instant access to the foundational identity layer for compliant finance in Web3.</p>
+              <div className="start-building-buttons">
+                <button type="button" className="start-building-btn start-building-btn--primary">Start Building</button>
+                <button type="button" className="start-building-btn start-building-btn--secondary">Explore</button>
+              </div>
             </div>
           </div>
         </section>
@@ -229,9 +232,9 @@ const Compliance = () => {
         <div className="footer-divider" />
         <div className="footer-content">
           <div className="footer-column">
-            <h4 className="footer-heading">Products</h4>
+            <h4 className="footer-heading">Connect with Us</h4>
             <ul className="footer-links">
-              <li><a className="footer-link" href="#">Suirify iOS</a></li>
+              <li><a className="footer-link" href="#">Suirify ins</a></li>
               <li><a className="footer-link" href="#">Suirify Android</a></li>
               <li><a className="footer-link" href="#">Suirify Web</a></li>
               <li><a className="footer-link" href="#">Suirify Passport</a></li>

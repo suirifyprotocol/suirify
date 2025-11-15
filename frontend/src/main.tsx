@@ -24,13 +24,18 @@ const defaultNetwork =
 
 const queryClient = new QueryClient();
 
+const slushWalletConfig = {
+  name: (import.meta.env.VITE_SLUSH_APP_NAME as string | undefined)?.trim() || "Suirify",
+  origin: (import.meta.env.VITE_SLUSH_ORIGIN as string | undefined)?.trim(),
+};
+
 // --- Wrap the entire app ---
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <BrowserRouter>
       <QueryClientProvider client={queryClient}>
   <SuiClientProvider networks={networkConfig} defaultNetwork={defaultNetwork}>
-          <WalletProvider autoConnect>
+          <WalletProvider autoConnect slushWallet={slushWalletConfig}>
             <App />
           </WalletProvider>
         </SuiClientProvider>

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { useVerificationStatus } from "@/hooks/useVerificationStatus";
 import LoadingSpinner from "./ui/LoadingSpinner";
-import VerificationPortal from "./portal/VerificationPortal";
+import ConnectedVerifyingPortal from "@/modules/VerifyingPortal/ConnectedVerifyingPortal";
 import Dashboard from "./dashboard/Dashboard";
 import { ConnectButton } from "@mysten/dapp-kit";
 import { useNavigate } from "react-router-dom";
@@ -65,7 +65,7 @@ const Router: React.FC = () => {
     );
   }
 
-  return verificationState === "verified" ? <Dashboard /> : <VerificationPortal />;
+  return verificationState === "verified" ? <Dashboard /> : <ConnectedVerifyingPortal />;
 };
 
 export default Router;

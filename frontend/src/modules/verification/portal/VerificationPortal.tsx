@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import ProgressIndicator from "@/modules/verification/ui/ProgressIndicator";
+import "@/modules/verification/verify.css";
 import CountryIDStep from "./steps/CountryIDStep";
 import FaceVerificationStep from "./steps/FaceVerificationStep";
 import DataFetchStep from "./steps/DataFetchStep";

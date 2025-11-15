@@ -1,42 +1,82 @@
-const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:4000").replace(/\/$/, "");
+const resolveCandidateUrls = () => {
+  const candidates = [
+    import.meta.env.VITE_API_URL,
+    typeof window !== "undefined" ? `${window.location.protocol}//${window.location.hostname}:4000` : null,
+    "http://192.168.35.45:4000",
+    "http://127.0.0.1:4000",
+    "http://localhost:4000",
+  ];
+
+  const seen = new Set<string>();
+  return candidates
+    .filter((url): url is string => typeof url === "string" && !!url.trim())
+    .map((url) => url.replace(/\/$/, ""))
+    .filter((url) => {
+      if (seen.has(url)) return false;
+      seen.add(url);
+      return true;
+    });
+};
+
+const API_BASES = resolveCandidateUrls();
 
 const defaultHeaders: HeadersInit = {
   "Content-Type": "application/json",
 };
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25000);
+  if (!API_BASES.length) throw new Error("No API endpoints configured.");
 
-  try {
-    const response = await fetch(`${API_BASE}${path}`, {
-      ...options,
-      headers: {
-        ...defaultHeaders,
-        ...(options.headers || {}),
-      },
-      signal: controller.signal,
-    });
+  const attemptErrors: string[] = [];
+  let lastNetworkError: unknown = null;
 
-    const isJson = response.headers.get("content-type")?.includes("application/json");
-    const payload = isJson ? await response.json() : null;
+  for (const base of API_BASES) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 25000);
 
-    if (!response.ok) {
-      const message = payload?.error || payload?.message || `Request failed with status ${response.status}`;
-      const error = new Error(message) as Error & { status?: number };
-      error.status = response.status;
-      throw error;
+    try {
+      const response = await fetch(`${base}${path}`, {
+        ...options,
+        headers: {
+          ...defaultHeaders,
+          ...(options.headers || {}),
+        },
+        signal: controller.signal,
+      });
+
+      const isJson = response.headers.get("content-type")?.includes("application/json");
+      const payload = isJson ? await response.json() : null;
+
+      if (!response.ok) {
+        const message = payload?.error || payload?.message || `Request failed with status ${response.status}`;
+        const error = new Error(message) as Error & { status?: number };
+        error.status = response.status;
+        throw error;
+      }
+
+      return (payload as T) ?? ({} as T);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        attemptErrors.push(`${base} timed out`);
+        lastNetworkError = error;
+        continue;
+      }
+      if (error && typeof error === "object" && "status" in error) {
+        throw error as Error;
+      }
+      const message = error instanceof Error ? error.message : "Unknown network error";
+      attemptErrors.push(`${base} failed: ${message}`);
+      lastNetworkError = error;
+      continue;
+    } finally {
+      clearTimeout(timeout);
     }
-
-    return (payload as T) ?? ({} as T);
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
-      throw new Error("Request timed out. Please try again.");
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeout);
   }
+
+  const aggregated = attemptErrors.join("; ");
+  const fallbackMessage =
+    aggregated || (lastNetworkError instanceof Error ? lastNetworkError.message : "Unable to reach verification service.");
+  throw new Error(`Unable to reach verification service. Attempts: ${aggregated || fallbackMessage}`);
 }
 
 export type CountryOption = {

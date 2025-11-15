@@ -1,0 +1,203 @@
+/* =============
+	Verification module base styles
+	(No Tailwind; simple utility classes for layout, spacing, colors)
+	============= */
+
+/* Layout containers */
+.v-container { max-width: 960px; margin: 24px auto; padding: 16px; }
+.v-title { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+.v-card { background: #0b1220; color: #e5e7eb; padding: 16px; border-radius: 12px; }
+.v-card-title { font-size: 18px; font-weight: 600; }
+.v-center { display: grid; place-items: center; min-height: 60vh; }
+.v-center-col { text-align: center; }
+.v-grid { display: grid; gap: 12px; }
+.v-grid-lg { display: grid; gap: 16px; }
+.v-grid-narrow { display: grid; gap: 6px; }
+.v-row { display: flex; gap: 8px; align-items: center; }
+.v-row-space { display: flex; justify-content: space-between; align-items: center; }
+
+/* Inputs and text */
+.v-input { width: 100%; padding: 8px; border-radius: 8px; margin-top: 6px; border: 1px solid #1f2937; background: #0f172a; color: #e5e7eb; }
+.v-muted { color: #9ca3af; }
+.v-small { font-size: 12px; }
+.v-strong { font-weight: 600; }
+
+/* Buttons */
+.v-btn-primary { background: #2563eb; color: #fff; padding: 10px 14px; border-radius: 8px; border: none; cursor: pointer; }
+.v-btn-secondary { background: #374151; color: #fff; padding: 8px 12px; border-radius: 8px; border: none; cursor: pointer; }
+.v-btn-disabled { opacity: 0.6; cursor: not-allowed; }
+.v-link { color: #60a5fa; text-decoration: none; }
+
+/* Feedback */
+.v-error { color: #ef4444; }
+.v-success { color: #10b981; }
+.v-badge { padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+.v-badge-success { background: rgba(16,185,129,0.1); color: #10b981; }
+.v-badge-danger { background: rgba(239,68,68,0.1); color: #ef4444; }
+.v-badge-warn { background: rgba(245,158,11,0.1); color: #f59e0b; }
+.v-level-pill { background: #111827; padding: 2px 8px; border-radius: 999px; }
+
+/* Spinner */
+.v-spinner-container { display: grid; place-items: center; padding: 24px; }
+.v-spinner { width: 36px; height: 36px; border: 3px solid #e5e7eb; border-top-color: #2563eb; border-radius: 50%; animation: v-spin 1s linear infinite; margin-bottom: 12px; }
+@keyframes v-spin { to { transform: rotate(360deg); } }
+
+/* Progress indicator */
+.v-exp-container { display: flex; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
+.v-step-chip { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 8px; font-size: 12px; }
+.v-chip-done { background: #e0f2fe; color: #0369a1; }
+.v-chip-pending { background: #f3f4f6; color: #6b7280; }
+.v-dot { width: 18px; height: 18px; border-radius: 999px; display: inline-block; }
+.v-dot-complete { background: #10b981; }
+.v-dot-current { background: #2563eb; }
+.v-dot-upcoming { background: #e5e7eb; }
+
+/* Webcam preview */
+.v-webcam-column { display: grid; gap: 12px; justify-items: center; text-align: center; }
+.v-webcam-frame {
+	position: relative;
+	width: min(360px, 85vw);
+	aspect-ratio: 1 / 1;
+	border-radius: 28px;
+	background: radial-gradient(circle at 50% 45%, rgba(37, 99, 235, 0.15), rgba(5, 11, 24, 0.94));
+	border: 1px solid rgba(96, 165, 250, 0.35);
+	overflow: hidden;
+	transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.v-webcam-frame::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: radial-gradient(circle at 50% 40%, rgba(15, 23, 42, 0) 52%, rgba(15, 23, 42, 0.58) 68%, rgba(15, 23, 42, 0.88) 100%);
+	pointer-events: none;
+}
+.v-webcam-feed {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	transform: scaleX(-1);
+	transition: opacity 0.35s ease;
+}
+.v-webcam-overlay {
+	position: absolute;
+	inset: 0;
+	background: radial-gradient(circle at center, rgba(51, 153, 255, 0.12) 55%, rgba(15, 23, 42, 0.75) 100%);
+	mix-blend-mode: screen;
+	pointer-events: none;
+}
+.v-webcam-ring {
+	position: absolute;
+	inset: 12%;
+	border-radius: 999px;
+	border: 2px solid rgba(148, 197, 255, 0.9);
+	box-shadow: 0 0 30px rgba(59, 130, 246, 0.35);
+	pointer-events: none;
+}
+.v-webcam-placeholder {
+	position: absolute;
+	inset: 0;
+	display: grid;
+	place-items: center;
+	padding: 0 24px;
+	text-align: center;
+	font-size: 14px;
+	line-height: 1.4;
+	color: rgba(226, 232, 240, 0.75);
+	background: linear-gradient(180deg, rgba(5, 11, 24, 0.88), rgba(5, 11, 24, 0.92));
+	backdrop-filter: blur(2px);
+}
+.v-webcam-countdown {
+	position: absolute;
+	inset: 0;
+	display: grid;
+	place-items: center;
+	font-size: clamp(32px, 8vw, 56px);
+	font-weight: 600;
+	color: hsl(0 0% 98%);
+	text-shadow: 0 12px 32px rgba(15, 23, 42, 0.65);
+	pointer-events: none;
+}
+.v-webcam-countdown--small {
+	font-size: clamp(18px, 4vw, 24px);
+	letter-spacing: 0.06em;
+}
+.v-webcam-status {
+	font-size: 13px;
+	letter-spacing: 0.01em;
+	padding: 6px 14px;
+	border-radius: 999px;
+	border: 1px solid rgba(96, 165, 250, 0.35);
+	background: rgba(15, 23, 42, 0.85);
+	box-shadow: 0 16px 40px rgba(15, 23, 42, 0.45);
+}
+
+.v-webcam {
+	display: grid;
+	place-items: center;
+	width: min(360px, 85vw);
+	aspect-ratio: 1 / 1;
+	border-radius: 28px;
+	background: rgba(5, 11, 24, 0.92);
+	border: 1px dashed rgba(148, 197, 255, 0.45);
+	color: #9ca3af;
+	font-size: 13px;
+	text-align: center;
+	padding: 0 16px;
+}
+
+.v-photo-compare {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px;
+	justify-content: flex-start;
+	margin-top: 8px;
+}
+
+.v-photo-card {
+	display: grid;
+	gap: 8px;
+	padding: 14px;
+	border-radius: 16px;
+	background: rgba(10, 18, 32, 0.85);
+	border: 1px solid rgba(96, 165, 250, 0.25);
+	box-shadow: 0 16px 28px rgba(2, 6, 23, 0.35);
+	max-width: 220px;
+	text-align: center;
+}
+
+.v-photo-label {
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: rgba(148, 197, 255, 0.92);
+}
+
+.v-photo-image {
+	width: 100%;
+	border-radius: 12px;
+	border: 1px solid rgba(148, 197, 255, 0.2);
+	background: rgba(15, 23, 42, 0.9);
+}
+
+@media (min-width: 768px) {
+	.v-webcam-frame {
+		width: min(420px, 100%);
+	}
+}
+
+/* Spacing helpers */
+.v-margin-top { margin-top: 12px; }
+.v-margin-bottom { margin-bottom: 12px; }
+
+/* Consent */
+.v-consent { display: flex; gap: 8px; align-items: flex-start; }
+
+/* Actions grid */
+.v-actions-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.v-action-card { text-align: left; padding: 12px; border-radius: 12px; background: #0f172a; color: #e5e7eb; border: 1px solid #1f2937; }
+.v-action-icon { font-size: 22px; }
+.v-action-label { font-weight: 600; }
+.v-action-desc { color: #9ca3af; font-size: 12px; }
