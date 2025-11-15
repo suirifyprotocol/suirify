@@ -73,11 +73,13 @@ const ConnectedVerifyingPortal: React.FC = () => {
   const [form, setForm] = useState<VerificationForm>(initialForm);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [capturedFrame, setCapturedFrame] = useState<string | null>(null);
 
   // camera refs for face capture
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const previewTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -138,6 +140,22 @@ const ConnectedVerifyingPortal: React.FC = () => {
 
   useEffect(() => () => cleanupStream(), [cleanupStream]);
 
+  const clearPreviewTimer = useCallback(() => {
+    if (previewTimerRef.current) {
+      window.clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => clearPreviewTimer(), [clearPreviewTimer]);
+
+  useEffect(() => {
+    if (currentStep !== 2.5) {
+      clearPreviewTimer();
+      setCapturedFrame(null);
+    }
+  }, [clearPreviewTimer, currentStep]);
+
   const ensureCamera = useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error("Camera not supported in this browser.");
     if (!streamRef.current) {
@@ -150,6 +168,16 @@ const ConnectedVerifyingPortal: React.FC = () => {
       video.playsInline = true;
       await video.play().catch(() => undefined);
     }
+  }, []);
+
+  const resumeCamera = useCallback(async () => {
+    const stream = streamRef.current;
+    const video = videoRef.current;
+    if (!stream || !video) return;
+    if (video.srcObject !== stream) video.srcObject = stream;
+    video.muted = true;
+    video.playsInline = true;
+    await video.play().catch(() => undefined);
   }, []);
 
   const captureLivePhoto = useCallback(() => {
@@ -200,15 +228,13 @@ const ConnectedVerifyingPortal: React.FC = () => {
     }
   };
 
-  const startFaceStep = async () => {
-    setError(null);
-    try {
-      await ensureCamera();
-      setCurrentStep(2.5);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Unable to access camera.";
-      setError(msg);
+  const startFaceStep = () => {
+    if (!form.sessionId) {
+      setError("No active verification session. Please restart the process.");
+      return;
     }
+    setError(null);
+    setCurrentStep(2.5);
   };
 
   const captureAndVerify = async () => {
@@ -218,9 +244,11 @@ const ConnectedVerifyingPortal: React.FC = () => {
     }
     setLoading(true);
     setError(null);
+    let shouldResumeStream = true;
     try {
       await ensureCamera();
       const livePhoto = captureLivePhoto();
+      setCapturedFrame(livePhoto);
       const result = await verifyFace({ sessionId: form.sessionId, livePhoto });
       setForm((prev) => ({
         ...prev,
@@ -229,19 +257,49 @@ const ConnectedVerifyingPortal: React.FC = () => {
         faceSimilarity: result.similarity,
         faceDiffPercent: result.diffPercent,
       }));
-      cleanupStream();
+
       if (result.match) {
-        setCurrentStep(3);
+        shouldResumeStream = false;
+        cleanupStream();
+        clearPreviewTimer();
+        previewTimerRef.current = window.setTimeout(() => {
+          setCapturedFrame(null);
+          setCurrentStep(3);
+        }, 3000);
       } else {
         setError("Face verification failed. Please try again.");
+        setCapturedFrame(null);
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Face verification failed.";
       setError(msg);
+      setCapturedFrame(null);
     } finally {
       setLoading(false);
+      if (shouldResumeStream) {
+        await resumeCamera();
+      }
     }
   };
+
+  useEffect(() => {
+    if (currentStep !== 2.5 || !form.sessionId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        await ensureCamera();
+      } catch (e) {
+        if (cancelled) return;
+        cleanupStream();
+        const msg = e instanceof Error ? e.message : "Unable to access your camera.";
+        setError(msg.includes("denied") ? "Camera permission was denied. Please allow access to continue." : msg);
+        setCurrentStep(2);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [cleanupStream, currentStep, ensureCamera, form.sessionId]);
 
   const fetchVerifiedData = useCallback(async () => {
     if (!form.sessionId || !account?.address) return;
@@ -483,13 +541,35 @@ const ConnectedVerifyingPortal: React.FC = () => {
 
               <div className="camera-container">
                 <div className="camera-placeholder">
-                  <video ref={videoRef} className="camera-feed" />
+                  <video
+                    ref={videoRef}
+                    className="camera-feed"
+                    autoPlay
+                    playsInline
+                    muted
+                    style={{ opacity: capturedFrame ? 0 : 1 }}
+                  />
+                  {capturedFrame && (
+                    <img src={capturedFrame} alt="Captured preview" className="camera-feed capture-preview" />
+                  )}
                 </div>
-                <p className="camera-instruction">Please look straight at the camera</p>
+                <p className="camera-instruction">
+                  {capturedFrame ? "Hold on, processing your capture..." : "Please look straight at the camera"}
+                </p>
               </div>
 
               <div className="action-buttons-dual">
-                <button className="back-btn" onClick={() => { cleanupStream(); setCurrentStep(2); }}>Back</button>
+                <button
+                  className="back-btn"
+                  onClick={() => {
+                    clearPreviewTimer();
+                    setCapturedFrame(null);
+                    cleanupStream();
+                    setCurrentStep(2);
+                  }}
+                >
+                  Back
+                </button>
                 <button className="next-btn" onClick={captureAndVerify} disabled={loading}>{loading ? "Verifying..." : "Capture & Verify"}</button>
               </div>
             </>

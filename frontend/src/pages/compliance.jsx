@@ -1,7 +1,8 @@
-import { Link2, Box } from "lucide-react";
+import { Github, Twitter, Mail, MessageCircle } from "lucide-react";
 import FeatureCard from "@/components/FeatureCard";
 import { Button } from "@/components/ui/button";
 import suiLogo from "@/assets/sui.png";
+import suirifyLogo from "@/assets/suilogo.png";
 import wireframeBg from "@/assets/wireframe-bg.png";
 import sovereignImg from "@/assets/Vector.png";
 import zeroPiiImg from "@/assets/Icons.png";
@@ -208,6 +209,9 @@ const Compliance = () => {
                   placeholder="Enter your email address"
                   className="join-future-input"
                 />
+                <button type="button" className="join-future-button">
+                  Subscribe
+                </button>
               </div>
             </div>
           </div>
@@ -231,45 +235,74 @@ const Compliance = () => {
       <footer className="site-footer">
         <div className="footer-divider" />
         <div className="footer-content">
-          <div className="footer-column">
-            <h4 className="footer-heading">Connect with Us</h4>
-            <ul className="footer-links">
-              <li><a className="footer-link" href="#">Suirify ins</a></li>
-              <li><a className="footer-link" href="#">Suirify Android</a></li>
-              <li><a className="footer-link" href="#">Suirify Web</a></li>
-              <li><a className="footer-link" href="#">Suirify Passport</a></li>
-              <li><a className="footer-link" href="#">Suirify Passport Verification</a></li>
-            </ul>
+          <div className="footer-brand">
+            <div className="footer-logo">
+              <img src={suirifyLogo} alt="Suirify logo" />
+            </div>
+            <p className="footer-brand-text">
+              Suirify is the trust layer for compliant identity on Sui, bringing together verifiable
+              credentials, attestations, and developer tooling.
+            </p>
+            <p className="footer-copy">© 2025 Suirify Protocol · Identity Infrastructure</p>
           </div>
 
           <div className="footer-column">
-            <h4 className="footer-heading">Company</h4>
+            <h4 className="footer-heading">Resources</h4>
             <ul className="footer-links">
-              <li><a className="footer-link" href="#">Support Center</a></li>
-              <li><a className="footer-link" href="#">Contact Us</a></li>
-              <li><a className="footer-link" href="#">Join Our Team</a></li>
-              <li><a className="footer-link" href="#">Media Kit</a></li>
-              <li><a className="footer-link" href="#">Blog</a></li>
-              <li><a className="footer-link" href="#">Roadmap (Request Feature)</a></li>
+              <li><a className="footer-link" href="#">News</a></li>
+              <li><a className="footer-link" href="#">Node Setup Guide</a></li>
             </ul>
           </div>
 
           <div className="footer-column">
             <h4 className="footer-heading">Developers</h4>
             <ul className="footer-links">
-              <li><a className="footer-link" href="#">Open Source Repos</a></li>
-              <li><a className="footer-link" href="#">Suirify Governance</a></li>
-              <li><a className="footer-link" href="#">Suirify Developer Portal</a></li>
-              <li><a className="footer-link" href="#">Suirify Technical &amp; API Docs</a></li>
+              <li><a className="footer-link" href="#">RPC Node</a></li>
+              <li><a className="footer-link" href="#">RPC Metrics</a></li>
+              <li><a className="footer-link" href="#">Websocket</a></li>
+              <li><a className="footer-link" href="#">API</a></li>
             </ul>
           </div>
 
           <div className="footer-column">
-            <h4 className="footer-heading">Legal</h4>
+            <h4 className="footer-heading">Explorer</h4>
             <ul className="footer-links">
+              <li><a className="footer-link" href="#">Get Listed</a></li>
+              <li><a className="footer-link" href="#">Partner Referrals</a></li>
+              <li><a className="footer-link" href="#">Bug Report</a></li>
+              <li><a className="footer-link" href="#">Branding Assets</a></li>
               <li><a className="footer-link" href="#">Terms of Service</a></li>
               <li><a className="footer-link" href="#">Privacy Policy</a></li>
-              <li><a className="footer-link" href="#">Social</a></li>
+            </ul>
+          </div>
+
+          <div className="footer-column footer-social-column">
+            <h4 className="footer-heading">Social</h4>
+            <ul className="footer-links footer-social-links">
+              <li>
+                <a className="footer-link footer-social-link" href="#" aria-label="GitHub">
+                  <Github className="footer-social-icon" size={16} />
+                  <span>Github</span>
+                </a>
+              </li>
+              <li>
+                <a className="footer-link footer-social-link" href="#" aria-label="Twitter">
+                  <Twitter className="footer-social-icon" size={16} />
+                  <span>Twitter</span>
+                </a>
+              </li>
+              <li>
+                <a className="footer-link footer-social-link" href="#" aria-label="Discord">
+                  <MessageCircle className="footer-social-icon" size={16} />
+                  <span>Discord</span>
+                </a>
+              </li>
+              <li>
+                <a className="footer-link footer-social-link" href="#" aria-label="Email">
+                  <Mail className="footer-social-icon" size={16} />
+                  <span>Email</span>
+                </a>
+              </li>
             </ul>
           </div>
         </div>

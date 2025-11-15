@@ -30,7 +30,7 @@ const govMockDB = {
             fullName: 'Isaac Benedict',
             givenName: 'Isaac',
             familyName: 'Benedict',
-            dateOfBirth: '2008-05-12',
+            dateOfBirth: '2005-04-24',
             gender: 'male',
             nationality: 'Nigerian',
             address: 'Flat 2B, Ibadan Street, Oyo',
