@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import SquareLoader from '@/components/common/SquareLoader';
+import markIcon from '@/modules/icons/mark.png';
 
 const Index = () => {
   const [country, setCountry] = useState('Nigeria');
@@ -70,13 +72,6 @@ const Index = () => {
           <button className="connect-wallet-btn">Connect wallet</button>
         </nav>
       </header>
-
-      {/* Hero Section */}
-      <section className="hero-section">
-        <h1 className="hero-title">Suirify Verification</h1>
-        <p className="hero-subtitle">Verify your identity and get started</p>
-      </section>
-
       {/* Main Content */}
       <main className="main-container">
         {/* Sidebar */}
@@ -211,7 +206,9 @@ const Index = () => {
                       value={fullName}
                       readOnly
                     />
-                    <span className="verified-icon">✅</span>
+                    <span className="verified-icon">
+                      <img src={markIcon} alt="Verified" />
+                    </span>
                   </div>
                 </div>
 
@@ -227,7 +224,9 @@ const Index = () => {
                       value={dateOfBirth}
                       readOnly
                     />
-                    <span className="verified-icon">✅</span>
+                    <span className="verified-icon">
+                      <img src={markIcon} alt="Verified" />
+                    </span>
                   </div>
                 </div>
 
@@ -303,12 +302,7 @@ const Index = () => {
           {currentStep === 5 && (
             <div className="minting-container">
               <div className="minting-icon-wrapper">
-                <div className="minting-icon">
-                  <svg viewBox="0 0 100 100" className="minting-svg">
-                    <path d="M30 50 L45 65 L45 35 Z" fill="#4a9eff" />
-                    <path d="M55 35 L55 65 L70 50 Z" fill="#4a9eff" />
-                  </svg>
-                </div>
+                <SquareLoader />
               </div>
               <p className="minting-text">This may take a few moments . Please dont close this window .</p>
             </div>

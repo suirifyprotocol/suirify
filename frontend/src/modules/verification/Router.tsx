@@ -52,7 +52,14 @@ const Router: React.FC = () => {
         <div className="v-center-col">
           <h2>Connect your wallet to get started</h2>
           <div className="v-margin-top">
-            <ConnectButton />
+            <ConnectButton
+              className="suirify-connect-btn"
+              connectText="Connect wallet"
+              style={{
+                backgroundColor: "hsla(166, 100%, 93%, 1)",
+                color: "hsla(229, 19%, 22%, 1)",
+              }}
+            />
           </div>
         </div>
       </div>
@@ -61,7 +68,9 @@ const Router: React.FC = () => {
 
   if (verificationState === "checking") {
     return (
-      <LoadingSpinner message="Checking your verification status..." />
+      <div className="v-center">
+        <LoadingSpinner message="Checking your verification status..." />
+      </div>
     );
   }
 

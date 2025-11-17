@@ -32,7 +32,14 @@ const VerificationRouter: React.FC = () => {
         <div style={{ textAlign: "center" }}>
           <h2>Connect your wallet to get started</h2>
           <div style={{ marginTop: 12, display: "inline-block" }}>
-            <ConnectButton />
+            <ConnectButton
+              className="suirify-connect-btn"
+              connectText="Connect wallet"
+              style={{
+                backgroundColor: "hsla(166, 100%, 93%, 1)",
+                color: "hsla(229, 19%, 22%, 1)",
+              }}
+            />
           </div>
         </div>
       </div>

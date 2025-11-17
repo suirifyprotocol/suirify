@@ -8,6 +8,9 @@ body.vp-theme {
   --vp-surface: #0b1220;
   --vp-border: rgba(255, 255, 255, 0.08);
   --vp-text: #ffffff;
+  --vp-step-active-bg: rgba(239, 239, 239, 0.08);
+  --vp-step-active-label: #ffffff;
+  --vp-step-active-weight: 600;
   background-color: var(--vp-background);
 }
 
@@ -48,6 +51,10 @@ body.vp-theme .header {
   font-weight: 600;
   color: #ffffff;
   text-decoration: none;
+  /* Logo customization hook: uncomment and tweak as needed */
+  /* border: 1px solid rgba(255, 255, 255, 0.08);
+     padding: 4px 8px;
+     border-radius: 10px; */
 }
 
 .vp-root .logo-icon {
@@ -106,12 +113,21 @@ body.vp-theme .header {
   align-items: center;
   padding: 14px 20px;
   border-radius: 14px;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.2s ease, color 0.2s ease;
   cursor: pointer;
 }
-.vp-root .step-item:hover,
+/* .vp-root .step-item:hover,
 .vp-root .step-item.active {
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: var(--vp-step-active-bg);
+} */
+.vp-root .step-item.active .step-label,
+.vp-root .step-item.active .step-label-text {
+  color: var(--vp-step-active-label);
+  font-weight: var(--vp-step-active-weight);
+}
+.vp-root .step-item.active .step-label-icon {
+  background-color: hsla(212, 72%, 59%, 1);
+  border-color: hsla(212, 72%, 59%, 1);
 }
 .vp-root .step-label {
   display: inline-flex;
@@ -123,12 +139,23 @@ body.vp-theme .header {
   white-space: nowrap;
 }
 .vp-root .step-label-text {
+  font-family: Poppins;
+  font-size: 22px;
+  font-weight: 300;
+  font-style: light;
+  line-height: 140%;
+  letter-spacing: 0%;
   display: inline-block;
+  color: hsla(0, 0%, 100%, 1);
 }
 .vp-root .step-label-icon {
-  width: 22px;
-  height: 22px;
+  width: 36px;
+  height: 36px;
+  padding: 8px;
+  box-sizing: border-box;
+  border-radius: 50%;
   object-fit: contain;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .vp-root .step-item:not(.active) .step-label {
   color: rgba(255, 255, 255, 0.6);
@@ -142,16 +169,21 @@ body.vp-theme .header {
   flex-direction: column;
 }
 .vp-root .step-header {
-  font-size: 13px;
-  color: #666666;
+  font-size: 15px;
+  color: hsla(0, 0%, 100%, 0.65);
   margin-bottom: 16px;
   font-weight: 500;
+  font-weight: lighter;
+  font-family: Poppins;
 }
 .vp-root .step-title {
-  font-size: 24px;
-  font-weight: 600;
-  margin-bottom: 48px;
-  color: #ffffff;
+  font-family: Poppins;
+  font-size: 21px;
+  font-weight: 400;
+  margin-bottom: 10px;
+  color: hsla(0, 0%, 100%, 1);
+  line-height: 140%;
+  letter-spacing: 0%;
 }
 .vp-root .form-container {
   max-width: 640px;
@@ -160,11 +192,15 @@ body.vp-theme .header {
   margin-bottom: 32px;
 }
 .vp-root .form-label {
+  font-family: "Poppins";
   display: block;
-  font-size: 15px;
-  color: #ffffff;
+  font-size: 20px;
+  font-weight: 300;
+  font-style: light;
+  color: hsla(0, 0%, 100%, 1);
   margin-bottom: 12px;
-  font-weight: 500;
+  line-height: 140%;
+  letter-spacing: 0%;
 }
 .vp-root .form-select,
 .vp-root .form-input {
@@ -209,20 +245,46 @@ body.vp-theme .header {
 }
 .vp-root .action-buttons-dual {
   display: flex;
-  justify-content: space-between;
   gap: 16px;
   margin-top: 32px;
+  margin-left: auto;
+  margin-right: 100px;
+  border-radius: 15px;
+  
+.vp-root .connect-wallet-btn {
+  background-color: hsla(166, 100%, 93%, 1);
+  color: hsla(229, 19%, 22%, 1);
+  border: none;
+  padding: 12px 28px;
+  border-radius: 15px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  font-family: "Urbanist";
+}
+.vp-root .connect-wallet-btn:hover {
+  background-color: #c5eacd;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(171, 240, 218, 0.25);
+}
+.vp-root .connect-wallet-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
 }
 .vp-root .next-btn {
-  background-color: #d4f4dd;
-  color: #0a0a0a;
+  background-color: hsla(166, 100%, 93%, 1);
+  color: hsla(229, 19%, 22%, 1);
   border: none;
-  padding: 14px 40px;
-  border-radius: 14px;
+  padding: 15px 15px;
+  border-radius: 15px;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  max-width: fit-content;
+  font-family: "Urbanist";
 }
 .vp-root .next-btn:hover {
   background-color: #c5eacd;
@@ -233,8 +295,9 @@ body.vp-theme .header {
   transform: translateY(0);
 }
 .vp-root .back-btn {
-  background-color: #666666;
-  color: #ffffff;
+  font-family: Urbanist;
+  background-color: hsla(60, 1%, 69%, 1);
+  color: hsla(229, 19%, 22%, 1);
   border: none;
   padding: 14px 28px;
   border-radius: 14px;
@@ -253,19 +316,25 @@ body.vp-theme .header {
 
 /* Instructions Container */
 .vp-root .instructions-container {
-  margin-top: 48px;
-  margin-bottom: 200px;
+  font-family: "Poppins";
+  margin-bottom: 100px;
+  font-weight: 300;
+  font-style: Light;
+  font-size: 20px;
+  line-height: 120%;
+  margin-top: 20px;
+  letter-spacing: 0%;
 }
 .vp-root .instruction-text {
-  font-size: 16px;
-  color: #ffffff;
+  font-size: 21px;
+  color: hsla(0, 0%, 100%, 1);
   margin-bottom: 16px;
-  line-height: 1.6;
+  line-height: 120%;
+  letter-spacing: 0%;
 }
 
 /* Camera Container */
 .vp-root .camera-container {
-  margin-top: 48px;
   margin-bottom: 48px;
 }
 .vp-root .camera-placeholder {
@@ -289,12 +358,18 @@ body.vp-theme .header {
   top: 0;
   left: 0;
   border-radius: 12px;
+  background-color: hsla(229, 19%, 22%, 1);
 }
 
 .vp-root .camera-instruction {
-  font-size: 15px;
+  font-family: Urbanist;
+  font-size: 20px;
   color: #b0b0b0;
   text-align: left;
+  line-height: 100%;
+  font-style: Light;
+  font-weight: 300;
+  letter-spacing: 0%;
 }
 
 /* Verified Input */
@@ -309,7 +384,16 @@ body.vp-theme .header {
   right: 16px;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 18px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.vp-root .verified-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 /* Review Container */
@@ -318,24 +402,33 @@ body.vp-theme .header {
 }
 .vp-root .review-item {
   display: flex;
-  gap: 16px;
   margin-bottom: 24px;
   font-size: 16px;
+  letter-spacing: 0%;
 }
 .vp-root .review-label {
-  color: #ffffff;
-  font-weight: 600;
+  font-family: Poppins;
+  font-weight: 500;
+  font-style: medium;
+  color: hsla(0, 0%, 100%, 1);
   min-width: 150px;
+  line-height: 140%;
+  letter-spacing: 0%;
 }
 .vp-root .review-value {
-  color: #b0b0b0;
+  font-family: Poppins;
+  font-weight: 300;
+  font-style: light;
+  color: hsla(0, 0%, 100%, 1);
 }
-
+.Review{
+  line-height: 100%;
+  letter-spacing: 0%;
+}
 /* Consent Box */
 .vp-root .consent-box {
-  margin: 48px 0 64px 0;
+  margin: 20px 0 20px 0;
   padding: 24px;
-  background-color: #1a1a1a;
   border-radius: 12px;
 }
 .vp-root .consent-label {
@@ -369,21 +462,6 @@ body.vp-theme .header {
 .vp-root .minting-icon-wrapper {
   margin-bottom: 48px;
 }
-.vp-root .minting-icon {
-  width: 200px;
-  height: 200px;
-  border-radius: 50%;
-  background-color: #2a2a3e;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: pulse 2s ease-in-out infinite;
-}
-.vp-root .minting-svg {
-  width: 80px;
-  height: 80px;
-  animation: rotate 3s linear infinite;
-}
 .vp-root .minting-text {
   font-size: 16px;
   color: #ffffff;
@@ -412,26 +490,6 @@ body.vp-theme .header {
 .vp-root .age-status.age-invalid {
   color: #ef4444;
   background: rgba(239, 68, 68, 0.12);
-}
-
-@keyframes pulse {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.05);
-    opacity: 0.8;
-  }
-}
-
-@keyframes rotate {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .vp-root button:disabled {
