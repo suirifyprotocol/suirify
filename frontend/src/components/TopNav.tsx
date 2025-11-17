@@ -33,7 +33,14 @@ const TopNav: React.FC = () => {
       </nav>
 
       <div className="wallet-connect">
-        <ConnectButton />
+        <ConnectButton
+          className="suirify-connect-btn"
+          connectText="Connect wallet"
+          style={{
+            backgroundColor: "hsla(166, 100%, 93%, 1)",
+            color: "hsla(229, 19%, 22%, 1)",
+          }}
+        />
       </div>
     </header>
   );

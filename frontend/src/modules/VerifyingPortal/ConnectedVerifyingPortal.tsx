@@ -18,6 +18,8 @@ import faceIcon from "@/modules/icons/face.png";
 import docIcon from "@/modules/icons/doc.png";
 import reviewIcon from "@/modules/icons/review.png";
 import mintingIcon from "@/modules/icons/minting.png";
+import markIcon from "@/modules/icons/mark.png";
+import SquareLoader from "@/components/common/SquareLoader";
 
 type Step = 1 | 2 | 2.5 | 3 | 4 | 5;
 
@@ -73,6 +75,8 @@ const ConnectedVerifyingPortal: React.FC = () => {
   const [form, setForm] = useState<VerificationForm>(initialForm);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [faceVerifying, setFaceVerifying] = useState(false);
+  const faceVerifyingRef = useRef(false);
   const [capturedFrame, setCapturedFrame] = useState<string | null>(null);
 
   // camera refs for face capture
@@ -238,13 +242,17 @@ const ConnectedVerifyingPortal: React.FC = () => {
   };
 
   const captureAndVerify = async () => {
+    if (faceVerifyingRef.current) return;
     if (!form.sessionId) {
       setError("No active verification session. Go back and retry.");
       return;
     }
+    faceVerifyingRef.current = true;
+    setFaceVerifying(true);
     setLoading(true);
     setError(null);
     let shouldResumeStream = true;
+    let releaseLockInFinally = true;
     try {
       await ensureCamera();
       const livePhoto = captureLivePhoto();
@@ -260,10 +268,13 @@ const ConnectedVerifyingPortal: React.FC = () => {
 
       if (result.match) {
         shouldResumeStream = false;
+        releaseLockInFinally = false;
         cleanupStream();
         clearPreviewTimer();
         previewTimerRef.current = window.setTimeout(() => {
           setCapturedFrame(null);
+          faceVerifyingRef.current = false;
+          setFaceVerifying(false);
           setCurrentStep(3);
         }, 3000);
       } else {
@@ -275,12 +286,23 @@ const ConnectedVerifyingPortal: React.FC = () => {
       setError(msg);
       setCapturedFrame(null);
     } finally {
+      if (releaseLockInFinally) {
+        faceVerifyingRef.current = false;
+        setFaceVerifying(false);
+      }
       setLoading(false);
       if (shouldResumeStream) {
         await resumeCamera();
       }
     }
   };
+
+  useEffect(() => {
+    if (currentStep !== 2.5 && faceVerifyingRef.current) {
+      faceVerifyingRef.current = false;
+      setFaceVerifying(false);
+    }
+  }, [currentStep]);
 
   useEffect(() => {
     if (currentStep !== 2.5 || !form.sessionId) return;
@@ -444,10 +466,10 @@ const ConnectedVerifyingPortal: React.FC = () => {
       {/* Navbar is rendered by VerificationTopNavPortal to remain unchanged */}
 
       {/* Hero */}
-      <section className="hero-section">
+      {/*<section className="hero-section">
         <h1 className="hero-title">Suirify Verification</h1>
         <p className="hero-subtitle">Verify your identity and get started</p>
-      </section>
+      </section>*/}
 
       {/* Main */}
       <main className="main-container">
@@ -498,7 +520,7 @@ const ConnectedVerifyingPortal: React.FC = () => {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label" htmlFor="ninNumber">{form.country || "NIN"} Number</label>
+                  <label className="form-label" htmlFor="ninNumber">{form.country || "NIN"} ID Number</label>
                   <input id="ninNumber" className="form-input" type="text"
                          placeholder={idValidation[form.country || "Nigeria"]?.placeholder || "Enter ID"}
                          value={form.idNumber}
@@ -524,7 +546,6 @@ const ConnectedVerifyingPortal: React.FC = () => {
                 <p className="instruction-text">Ensure good lighting</p>
                 <p className="instruction-text">Look straight at the camera</p>
                 <p className="instruction-text">Remove glasses and hats</p>
-                <p className="instruction-text">we'll compare with your government photo</p>
               </div>
 
               <div className="action-buttons-dual">
@@ -570,7 +591,9 @@ const ConnectedVerifyingPortal: React.FC = () => {
                 >
                   Back
                 </button>
-                <button className="next-btn" onClick={captureAndVerify} disabled={loading}>{loading ? "Verifying..." : "Capture & Verify"}</button>
+                <button className="next-btn" onClick={captureAndVerify} disabled={loading || faceVerifying}>
+                  {faceVerifying ? "Verifying..." : "Capture & Verify"}
+                </button>
               </div>
             </>
           )}
@@ -585,7 +608,11 @@ const ConnectedVerifyingPortal: React.FC = () => {
                   <label className="form-label" htmlFor="fullName">Full Name</label>
                   <div className="verified-input-wrapper">
                     <input id="fullName" className="form-input verified-input" value={form.fullName} readOnly />
-                    <span className="verified-icon">{form.fullName ? "✅" : ""}</span>
+                    {form.fullName && (
+                      <span className="verified-icon">
+                        <img src={markIcon} alt="Verified" />
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -593,7 +620,11 @@ const ConnectedVerifyingPortal: React.FC = () => {
                   <label className="form-label" htmlFor="dateOfBirth">Date Of Birth</label>
                   <div className="verified-input-wrapper">
                     <input id="dateOfBirth" className="form-input verified-input" value={form.dateOfBirth} readOnly />
-                    <span className="verified-icon">{form.dateOfBirth ? "✅" : ""}</span>
+                    {form.dateOfBirth && (
+                      <span className="verified-icon">
+                        <img src={markIcon} alt="Verified" />
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -619,17 +650,19 @@ const ConnectedVerifyingPortal: React.FC = () => {
               <h2 className="step-title">Review and consent to your verified information</h2>
 
               <div className="review-container">
-                <div className="review-item"><span className="review-label">Full Name :</span><span className="review-value">{form.fullName || "—"}</span></div>
-                <div className="review-item"><span className="review-label">Date of Birth :</span><span className="review-value">{form.dateOfBirth || "—"}</span></div>
-                <div className="review-item"><span className="review-label">Country :</span><span className="review-value">{form.country || "—"}</span></div>
-                <div className="review-item"><span className="review-label">ID Type :</span><span className="review-value">{form.country === "Nigeria" ? "NIN" : "ID"}</span></div>
+                <div className="Review">
+                  <div className="review-item"><span className="review-label">Full Name :</span><span className="review-value">{form.fullName || "—"}</span></div>
+                  <div className="review-item"><span className="review-label">Date of Birth :</span><span className="review-value">{form.dateOfBirth || "—"}</span></div>
+                  <div className="review-item"><span className="review-label">Country :</span><span className="review-value">{form.country || "—"}</span></div>
+                  <div className="review-item"><span className="review-label">ID Type :</span><span className="review-value">{form.country === "Nigeria" ? "NIN" : "ID"}</span></div>
+                </div>
 
                 <div className="consent-box">
                   <label className="consent-label">
                     <input type="checkbox" checked={!!form.consentGiven} onChange={(e) => onConsentToggle(e.target.checked)} className="consent-checkbox" />
                     <span className="consent-text">
-                      <strong>I consent to mint my SUIlify Attestation .</strong><br />
-                      I understand that my personal data will be permanently deleted after verification , only Crypto-graphic proofs will be stored on- chain , i can delete my attestation anytime.<br />
+                      <strong>I consent to mint my Suirify Attestation .</strong><br />
+                      I understand that my personal data will be permanently deleted after verification , only Crypto-graphic proofs will be stored on-chain , i can delete my attestation anytime.<br />
                       <strong>This attestation is non-transferable and soul-bound to my wallet</strong>
                     </span>
                   </label>
@@ -648,12 +681,7 @@ const ConnectedVerifyingPortal: React.FC = () => {
           {currentStep === 5 && (
             <div className="minting-container">
               <div className="minting-icon-wrapper">
-                <div className="minting-icon">
-                  <svg viewBox="0 0 100 100" className="minting-svg">
-                    <path d="M30 50 L45 65 L45 35 Z" fill="#4a9eff" />
-                    <path d="M55 35 L55 65 L70 50 Z" fill="#4a9eff" />
-                  </svg>
-                </div>
+                <SquareLoader />
               </div>
               <p className="minting-text">
                 {form.mintDigest ? "Mint complete! Redirecting..." : "This may take a few moments . Please dont close this window ."}

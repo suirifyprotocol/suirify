@@ -249,6 +249,7 @@ const Compliance = () => {
           <div className="footer-column">
             <h4 className="footer-heading">Resources</h4>
             <ul className="footer-links">
+              <li><a className="footer-link" href="#">Blog</a></li>
               <li><a className="footer-link" href="#">News</a></li>
               <li><a className="footer-link" href="#">Node Setup Guide</a></li>
             </ul>
@@ -257,25 +258,22 @@ const Compliance = () => {
           <div className="footer-column">
             <h4 className="footer-heading">Developers</h4>
             <ul className="footer-links">
-              <li><a className="footer-link" href="#">RPC Node</a></li>
-              <li><a className="footer-link" href="#">RPC Metrics</a></li>
-              <li><a className="footer-link" href="#">Websocket</a></li>
-              <li><a className="footer-link" href="#">API</a></li>
+              <li><a className="footer-link" href="#">Open Source Repos</a></li>
+              <li><a className="footer-link" href="#">Suirify Governance</a></li>
+              <li><a className="footer-link" href="#">Suirify Developer Portal</a></li>
+              <li><a className="footer-link" href="#">SuirifyTechnical & API Docs</a></li>
             </ul>
           </div>
-
           <div className="footer-column">
             <h4 className="footer-heading">Explorer</h4>
             <ul className="footer-links">
-              <li><a className="footer-link" href="#">Get Listed</a></li>
-              <li><a className="footer-link" href="#">Partner Referrals</a></li>
-              <li><a className="footer-link" href="#">Bug Report</a></li>
-              <li><a className="footer-link" href="#">Branding Assets</a></li>
-              <li><a className="footer-link" href="#">Terms of Service</a></li>
+              <li><a className="footer-link" href="#">Contact Us</a></li>
               <li><a className="footer-link" href="#">Privacy Policy</a></li>
+              <li><a className="footer-link" href="#">Support Center</a></li>
+              <li><a className="footer-link" href="#">Partner Referrals</a></li>
+              <li><a className="footer-link" href="#">Terms of Service</a></li>
             </ul>
           </div>
-
           <div className="footer-column footer-social-column">
             <h4 className="footer-heading">Social</h4>
             <ul className="footer-links footer-social-links">
