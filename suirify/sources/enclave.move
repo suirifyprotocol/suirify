@@ -1,15 +1,14 @@
 module suirify::enclave {
     use sui::bcs;
+    use sui::clock::{Self, Clock};
     use sui::ed25519;
     use sui::event;
     use std::string::String;
-
     use suirify::auth::VerifierAdminCap;
 
     const EINVALID_PCR_LENGTH: u64 = 0;
     const EINVALID_SIGNATURE: u64 = 1;
     const EVERSION_MISMATCH: u64 = 2;
-
     const PCR_LENGTH_BYTES: u64 = 48;
 
     public struct EnclaveConfig has key, store {
@@ -106,7 +105,7 @@ module suirify::enclave {
         event::emit(PcrsUpdated {
             config_id: object::id(config),
             config_version: config.config_version,
-            pcr0: config.pcr0,  // Vectors can be copied directly
+            pcr0: config.pcr0, // Vectors can be copied directly
             pcr1: config.pcr1,
             pcr2: config.pcr2,
         });
@@ -120,32 +119,39 @@ module suirify::enclave {
         config.name = new_name;
     }
 
+    #[allow(lint(self_transfer))]
     public fun register_enclave(
         config: &EnclaveConfig,
         public_key: vector<u8>,
         config_version: u64,
-        attestation_time_ms: u64,
+        clock: &Clock,
         ctx: &mut TxContext,
-    ): Enclave {
-        // Uses the public getter
+    ) {
+        // Assert that the provided config_version matches the current one
         assert!(config_version == get_config_version_from_config(config), EVERSION_MISMATCH);
 
+        let current_timestamp_ms = clock::timestamp_ms(clock);
+
+        // Create the new Enclave object
         let enclave = Enclave {
             id: object::new(ctx),
             config_id: object::id(config),
-            public_key,
-            config_version,
-            attestation_time_ms,
+            public_key: public_key,
+            config_version: config_version,
+            attestation_time_ms: current_timestamp_ms,
         };
 
+        // Emit an event to log the registration
         event::emit(EnclaveRegistered {
             config_id: object::id(config),
             enclave_id: object::id(&enclave),
-            config_version,
-            attestation_time_ms,
+            config_version: config_version,
+            attestation_time_ms: current_timestamp_ms,
         });
 
-        enclave
+        // Transfer the newly created Enclave object to the transaction sender
+        transfer::public_transfer(enclave, tx_context::sender(ctx));
+        //enclave
     }
 
     public fun destroy_enclave(
@@ -163,7 +169,7 @@ module suirify::enclave {
     ): SignedMintData {
         let is_valid = ed25519::ed25519_verify(signature, &enclave.public_key, payload);
         assert!(is_valid, EINVALID_SIGNATURE);
-        
+
         // bcs::peel_* functions to deserialize
         let mut bcs_bytes = bcs::new(*payload);
         let request_id = bcs::peel_address(&mut bcs_bytes).to_id();
