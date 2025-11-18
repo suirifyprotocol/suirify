@@ -1,4 +1,4 @@
-export const PACKAGE_ID = import.meta.env.VITE_SUIRIFY_PACKAGE_ID || "0x49a5f126fac9c15657720c301d39670a4b1d679f0efead83260f2a5ccf7c726d";
+export const PACKAGE_ID = import.meta.env.VITE_SUIRIFY_PACKAGE_ID || "0xfaad95533f8c546fbf0d35c5a0816b5d2a86cd8a3d27d5af1a25c63bb652cb7d";
 
 export const STRUCT_ATTESTATION = `${PACKAGE_ID}::protocol::Suirify_Attestation`;
 

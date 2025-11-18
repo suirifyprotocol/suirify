@@ -1,0 +1,23 @@
+[Unit]
+Description=Suirify Parent Application
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/suirify/parent.env
+ExecStartPre=-/usr/bin/docker rm -f suirify-parent
+ExecStart=/usr/bin/docker run \
+  --name suirify-parent \
+  --network host \
+  --env-file /etc/suirify/parent.env \
+  --log-driver json-file \
+  --log-opt max-size=10m \
+  --log-opt max-file=5 \
+  {{IMAGE_URI}}
+ExecStop=/usr/bin/docker stop -t 15 suirify-parent
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

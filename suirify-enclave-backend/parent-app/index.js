@@ -101,15 +101,46 @@ TransactionBlock = normalizeTransactionBlockModule(TransactionBlock);
 
 const app = express();
 const BODY_LIMIT = process.env.REQUEST_BODY_LIMIT || '25mb';
+
+const parsedOrigins = (process.env.ALLOWED_ORIGINS ?? '*')
+  .split(',')
+  .map((value) => value.trim())
+  .filter(Boolean);
+const ALLOWED_ORIGINS = parsedOrigins.length ? parsedOrigins : ['*'];
+const ALLOW_WILDCARD_ORIGINS = ALLOWED_ORIGINS.includes('*');
+const allowedOriginSet = new Set(ALLOWED_ORIGINS.filter((origin) => origin !== '*'));
+
+const isOriginAllowed = (origin) => {
+  if (!origin) return true; // allow server-to-server/health checks without Origin header
+  if (ALLOW_WILDCARD_ORIGINS) return true;
+  return allowedOriginSet.has(origin);
+};
+
 app.use(bodyParser.json({ limit: BODY_LIMIT }));
 app.use(bodyParser.urlencoded({ extended: true, limit: BODY_LIMIT }));
 app.use((req, res, next) => {
-  const origin = req.headers.origin || '*';
-  res.setHeader('Access-Control-Allow-Origin', origin);
+  const origin = req.headers.origin;
+  const originAllowed = isOriginAllowed(origin);
+
+  if (originAllowed && origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else if (ALLOW_WILDCARD_ORIGINS) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+
+  res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
-  if (req.method === 'OPTIONS') return res.sendStatus(200);
+
+  if (req.method === 'OPTIONS') {
+    return originAllowed ? res.sendStatus(200) : res.status(403).json({ error: 'Origin not allowed.' });
+  }
+
+  if (!originAllowed && origin) {
+    return res.status(403).json({ error: 'Origin not allowed.' });
+  }
+
   next();
 });
 

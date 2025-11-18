@@ -1,0 +1,116 @@
+name: Enclave AWS Pipeline Bridge
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+      - "LICENSE"
+  workflow_dispatch:
+    inputs:
+      pipeline:
+        description: "Override CodePipeline name"
+        required: false
+        default: ""
+
+concurrency:
+  group: enclave-aws-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  CODEPIPELINE_NAME: suirify-enclave-prod
+  CODEPIPELINE_SOURCE_BUCKET: suirify-enclave-artifacts
+  CODEPIPELINE_SOURCE_PREFIX: uploads
+
+jobs:
+  validate:
+    name: Lint & smoke tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            suirify-enclave-backend/parent-app/package-lock.json
+            suirify-enclave-backend/enclave-app/package-lock.json
+
+      - name: Install parent-app deps
+        working-directory: suirify-enclave-backend/parent-app
+        run: npm ci
+
+      - name: Parent-app lint
+        working-directory: suirify-enclave-backend/parent-app
+        run: npm run lint --if-present
+
+      - name: Parent-app unit tests
+        working-directory: suirify-enclave-backend/parent-app
+        run: npm test --if-present
+
+      - name: Install enclave-app deps
+        working-directory: suirify-enclave-backend/enclave-app
+        run: npm ci
+
+      - name: Enclave-app smoke test
+        working-directory: suirify-enclave-backend/enclave-app
+        run: npm run test --if-present
+
+  trigger-pipeline:
+    name: Start AWS CodePipeline
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve pipeline name
+        id: pipeline-name
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.pipeline || '' }}" ]; then
+            PIPELINE_NAME="${{ github.event.inputs.pipeline }}"
+          else
+            PIPELINE_NAME="${CODEPIPELINE_NAME}"
+          fi
+          echo "value=${PIPELINE_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_CODEPIPELINE_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Archive source bundle
+        run: |
+          git archive --quiet --format=zip --output release-${GITHUB_SHA}.zip ${GITHUB_SHA}
+
+      - name: Upload source bundle to S3
+        run: |
+          aws s3 cp \
+            release-${GITHUB_SHA}.zip \
+            s3://${CODEPIPELINE_SOURCE_BUCKET}/${CODEPIPELINE_SOURCE_PREFIX}/release-${GITHUB_SHA}.zip
+
+      - name: Trigger pipeline execution
+        id: trigger
+        run: |
+          PIPELINE_NAME="${{ steps.pipeline-name.outputs.value }}"
+          EXECUTION_ID=$(aws codepipeline start-pipeline-execution \
+            --name "${PIPELINE_NAME}" \
+            --client-request-token "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --output text)
+          echo "execution_id=${EXECUTION_ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Emit execution link
+        run: |
+          PIPELINE_NAME="${{ steps.pipeline-name.outputs.value }}"
+          echo "Pipeline execution started: ${{ steps.trigger.outputs.execution_id }}"
+          echo "Navigate to https://${AWS_REGION}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${PIPELINE_NAME}/view?region=${AWS_REGION}"
