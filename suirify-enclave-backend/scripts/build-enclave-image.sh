@@ -64,11 +64,27 @@ echo "Building enclave container image: $IMAGE_TAG"
 DOCKER_BUILDKIT=1 docker build "${BUILD_ARGS[@]}" -t "$IMAGE_TAG" "$APP_DIR"
 
 echo "Building EIF -> $EIF_FILE"
-build_cmd=(nitro-cli build-enclave --docker-uri "$IMAGE_TAG" --output-file "$EIF_FILE" --measurements "$MEASUREMENTS_FILE")
+build_cmd=(nitro-cli build-enclave --docker-uri "$IMAGE_TAG" --output-file "$EIF_FILE")
+
+MEASUREMENTS_FLAG_SUPPORTED=false
+if command -v nitro-cli >/dev/null 2>&1 && nitro-cli build-enclave --help 2>&1 | grep -q -- '--measurements'; then
+  MEASUREMENTS_FLAG_SUPPORTED=true
+fi
+
+if [[ "$MEASUREMENTS_FLAG_SUPPORTED" == "true" ]]; then
+  build_cmd+=(--measurements "$MEASUREMENTS_FILE")
+fi
+
 if [[ "$DEBUG_MODE" == "true" ]]; then
   build_cmd+=(--debug-mode)
 fi
+
 "${build_cmd[@]}"
+
+if [[ "$MEASUREMENTS_FLAG_SUPPORTED" != "true" ]]; then
+  echo "nitro-cli does not support --measurements; running describe-eif to capture PCRs"
+  nitro-cli describe-eif --eif-path "$EIF_FILE" > "$MEASUREMENTS_FILE"
+fi
 
 echo "EIF ready: $EIF_FILE"
 if [[ -f "$MEASUREMENTS_FILE" ]]; then
