@@ -3,6 +3,26 @@ const path = require('path');
 
 const govMockDB = {
     Nigeria: {
+    'NGA-00000000000': {
+      country: 'Nigeria',
+      documentType: 'national_id',
+      idNumber: 'NGA-00000000000',
+      fullName: 'Suirify Devnet Test',
+      givenName: 'Suirify Devnet',
+      familyName: 'Test',
+      dateOfBirth: '2010-01-01',
+      gender: 'unspecified',
+      nationality: 'Nigerian',
+      address: 'Suirify Lab, Devnet',
+      issuingAuthority: 'Suirify Test Authority',
+      issuanceDate: '2024-01-01',
+      expiryDate: null,
+      photoReference: null,
+      biometricHash: 'hash_suirify_devnet',
+      mrz: null,
+      barcodeData: 'barcode_suirify_devnet',
+      additionalNotes: 'Internal record for automated testing'
+    },
         'NGA-12345678901': {
             country: 'Nigeria',
             documentType: 'national_id',
