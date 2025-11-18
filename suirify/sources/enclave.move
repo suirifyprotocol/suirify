@@ -6,10 +6,10 @@ module suirify::enclave {
     use std::string::String;
     use suirify::auth::VerifierAdminCap;
 
-    const EINVALID_PCR_LENGTH: u64 = 0;
-    const EINVALID_SIGNATURE: u64 = 1;
-    const EVERSION_MISMATCH: u64 = 2;
-    const PCR_LENGTH_BYTES: u64 = 48;
+    const EInvalidPCRLength: u64 = 0;
+    const EInvalidSignature: u64 = 1;
+    const EVersionMismatch: u64 = 2;
+    const PCRLengthBytes: u64 = 48;
 
     public struct EnclaveConfig has key, store {
         id: UID,
@@ -128,7 +128,7 @@ module suirify::enclave {
         ctx: &mut TxContext,
     ) {
         // Assert that the provided config_version matches the current one
-        assert!(config_version == get_config_version_from_config(config), EVERSION_MISMATCH);
+        assert!(config_version == get_config_version_from_config(config), EVersionMismatch);
 
         let current_timestamp_ms = clock::timestamp_ms(clock);
 
@@ -168,7 +168,7 @@ module suirify::enclave {
         signature: &vector<u8>,
     ): SignedMintData {
         let is_valid = ed25519::ed25519_verify(signature, &enclave.public_key, payload);
-        assert!(is_valid, EINVALID_SIGNATURE);
+        assert!(is_valid, EInvalidSignature);
 
         // bcs::peel_* functions to deserialize
         let mut bcs_bytes = bcs::new(*payload);
@@ -247,6 +247,6 @@ module suirify::enclave {
     }
 
     fun assert_valid_pcr(pcr: &vector<u8>) {
-        assert!(vector::length(pcr) as u64 == PCR_LENGTH_BYTES, EINVALID_PCR_LENGTH);
+        assert!(vector::length(pcr) as u64 == PCRLengthBytes, EInvalidPCRLength);
     }
 }

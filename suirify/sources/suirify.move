@@ -16,21 +16,21 @@ module suirify::protocol {
     use sui::sui::SUI;
 
     // Custom Errors
-    const EUNAUTHORIZED: u64 = 0;
-    const EPROTOCOL_PAUSED: u64 = 1;
-    const EONLY_OWNER_CAN_BURN: u64 = 2;
-    const EJURISDICTION_MISMATCH: u64 = 3;
-    const EINVALID_VERIFIER_SOURCE: u64 = 4;
-    const EATTESTATION_ALREADY_EXISTS: u64 = 5;
-    const EINVALID_MINT_REQUEST_AMOUNT: u64 = 7;
-    const EREQUEST_RECIPIENT_MISMATCH: u64 = 8;
-    const EENCLAVE_DATA_MISMATCH: u64 = 9;
-    const EENCLAVE_CONFIG_MISMATCH: u64 = 10;
+    const EUnauthorized: u64 = 0;
+    const EProtocolPaused: u64 = 1;
+    const EOnlyOwnerCanBurn: u64 = 2;
+    const EJurisdictionMismatch: u64 = 3;
+    const EInvalidVerifierSource: u64 = 4;
+    const EAttestationAlreadyExists: u64 = 5;
+    const EInvalidMintRequestAmount: u64 = 7;
+    const ERequestRecipientMismatch: u64 = 8;
+    const EEnclaveDataMismatch: u64 = 9;
+    const EEnclaveConfigMismatch: u64 = 10;
 
     // Constants
-    const STATUS_ACTIVE: u8 = 1;
-    const STATUS_EXPIRED: u8 = 2;
-    const STATUS_REVOKED: u8 = 3;
+    const StatusActive: u8 = 1;
+    const StatusExpired: u8 = 2;
+    const StatusRevoked: u8 = 3;
 
     // Structs
     public struct Suirify_Attestation has key, store {
@@ -215,9 +215,9 @@ module suirify::protocol {
     ) {
         {
             let request_ref = table::borrow_mut(&mut registry.pending_mint_requests, request_id);
-            assert!(request_ref.requester == recipient, EREQUEST_RECIPIENT_MISMATCH);
+            assert!(request_ref.requester == recipient, ERequestRecipientMismatch);
             let locked_amount = sui::balance::value(&request_ref.payment);
-            assert!(locked_amount == config.mint_fee, EINVALID_MINT_REQUEST_AMOUNT);
+            assert!(locked_amount == config.mint_fee, EInvalidMintRequestAmount);
         };
 
         let MintRequest { payment, requester: _ } =
@@ -227,21 +227,21 @@ module suirify::protocol {
 
         let now = tx_context::epoch_timestamp_ms(ctx);
 
-        assert!(!table::contains(&registry.user_attestations, recipient), EATTESTATION_ALREADY_EXISTS);
+        assert!(!table::contains(&registry.user_attestations, recipient), EAttestationAlreadyExists);
 
-        assert!(!config.paused, EPROTOCOL_PAUSED);
-        assert!(verifier_version >= config.min_verifier_version, EUNAUTHORIZED);
+        assert!(!config.paused, EProtocolPaused);
+        assert!(verifier_version >= config.min_verifier_version, EUnauthorized);
 
-        // assert!(policy.iso_num == jurisdiction_code, EJURISDICTION_MISMATCH);
-        // assert!(vector::contains(&policy.allowed_sources, &verifier_source), EINVALID_VERIFIER_SOURCE);
-        assert!(jurisdictions::get_iso_num(policy) == jurisdiction_code, EJURISDICTION_MISMATCH);
-        assert!(vector::contains(jurisdictions::get_allowed_sources(policy), &verifier_source), EINVALID_VERIFIER_SOURCE);
+        // assert!(policy.iso_num == jurisdiction_code, EJurisdictionMismatch);
+        // assert!(vector::contains(&policy.allowed_sources, &verifier_source), EInvalidVerifierSource);
+        assert!(jurisdictions::get_iso_num(policy) == jurisdiction_code, EJurisdictionMismatch);
+        assert!(vector::contains(jurisdictions::get_allowed_sources(policy), &verifier_source), EInvalidVerifierSource);
 
 
         // If an allowlist is configured (non-empty), enforce membership
         if (vector::length(&config.allowlists) > 0) {
             // abort if recipient not present in allowlist
-            assert!(vector::contains(&config.allowlists, &recipient), EUNAUTHORIZED);
+            assert!(vector::contains(&config.allowlists, &recipient), EUnauthorized);
         };
 
         // Reset daily counters if needed and enforce global per-day limit
@@ -249,7 +249,7 @@ module suirify::protocol {
 
         // ensure there's room for this mint (use +1 to avoid ordering ambiguity)
         let next_mint_count = config.mints_today + 1;
-        assert!(next_mint_count <= config.global_mint_limit_per_day, EUNAUTHORIZED);
+        assert!(next_mint_count <= config.global_mint_limit_per_day, EUnauthorized);
         config.mints_today = next_mint_count;
 
         let attestation = Suirify_Attestation {
@@ -261,7 +261,7 @@ module suirify::protocol {
             verifier_version,
             issue_time_ms: now,
             expiry_time_ms: now + config.default_expiry_duration_ms,
-            status: STATUS_ACTIVE,
+            status: StatusActive,
             revoked: false,
             revoke_time_ms: 0,
             revoke_reason_code: 0,
@@ -296,8 +296,8 @@ module suirify::protocol {
         ctx: &mut TxContext,
     ) {
     
-        assert!(enclave::get_config_id(enclave_obj) == object::id(enclave_config), EENCLAVE_CONFIG_MISMATCH);
-        assert!(enclave::get_config_version(enclave_obj) == enclave::get_config_version_from_config(enclave_config), EENCLAVE_CONFIG_MISMATCH);
+        assert!(enclave::get_config_id(enclave_obj) == object::id(enclave_config), EEnclaveConfigMismatch);
+        assert!(enclave::get_config_version(enclave_obj) == enclave::get_config_version_from_config(enclave_config), EEnclaveConfigMismatch);
 
         let (
             signed_request_id,
@@ -312,7 +312,7 @@ module suirify::protocol {
             _issued_ms,
         ) = enclave::verify_and_extract_mint_data(enclave_obj, &payload, &signature);
 
-        assert!(signed_request_id == request_id, EENCLAVE_DATA_MISMATCH);
+        assert!(signed_request_id == request_id, EEnclaveDataMismatch);
 
         mint_attestation(
             cap,
@@ -340,9 +340,9 @@ module suirify::protocol {
         reason_code: u8,
         ctx: &mut TxContext,
     ) {
-        assert!(!config.paused, EPROTOCOL_PAUSED);
+        assert!(!config.paused, EProtocolPaused);
 
-        attestation.status = STATUS_REVOKED;
+        attestation.status = StatusRevoked;
         attestation.revoked = true;
         attestation.revoke_reason_code = reason_code;
         attestation.revoke_time_ms = tx_context::epoch_timestamp_ms(ctx);
@@ -357,7 +357,7 @@ module suirify::protocol {
     /// from the blockchain ("right to be forgotten").
     public fun burn_self(attestation: Suirify_Attestation, registry: &mut AttestationRegistry, ctx: &mut TxContext) {
         let owner = attestation.owner;
-        assert!(owner == tx_context::sender(ctx), EONLY_OWNER_CAN_BURN);
+        assert!(owner == tx_context::sender(ctx), EOnlyOwnerCanBurn);
 
         table::remove(&mut registry.user_attestations, owner);
 
@@ -387,11 +387,11 @@ module suirify::protocol {
     }
 
     public fun is_active(attestation: &Suirify_Attestation): bool {
-        attestation.status == STATUS_ACTIVE
+        attestation.status == StatusActive
     }
 
     public fun is_expired_status(attestation: &Suirify_Attestation): bool {
-        attestation.status == STATUS_EXPIRED
+        attestation.status == StatusExpired
     }
 
     public fun get_mint_fee(config: &ProtocolConfig): u64 {
@@ -400,8 +400,8 @@ module suirify::protocol {
 
     /// Marks the attestation as expired if its expiry time has passed.
     public fun mark_expired_if_needed(attestation: &mut Suirify_Attestation, now_ms: u64) {
-        if (!attestation.revoked && attestation.status == STATUS_ACTIVE && now_ms >= attestation.expiry_time_ms) {
-            attestation.status = STATUS_EXPIRED;
+        if (!attestation.revoked && attestation.status == StatusActive && now_ms >= attestation.expiry_time_ms) {
+            attestation.status = StatusExpired;
         };
     }
     // Admin functions to update protocol configuration
