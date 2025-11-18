@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useCurrentAccount, useSuiClient } from "@mysten/dapp-kit";
 import LoadingSpinner from "./common/LoadingSpinner";
+import ConnectWalletCTA from "./common/ConnectWalletCTA";
 import { STRUCT_ATTESTATION } from "../lib/config";
 import IdentityStatusCard from "./dashboard/IdentityStatusCard.tsx";
 import QuickActionsPanel from "./dashboard/QuickActionsPanel.tsx";
@@ -105,11 +106,14 @@ const Dashboard: React.FC = () => {
     return (
       <div style={{ display: "grid", placeItems: "center", minHeight: "60vh" }}>
         <div style={{ textAlign: "center" }}>
-          <h2>No Attestation Found</h2>
+          <h2 style={{ whiteSpace: "nowrap" }}>No Attestation Found</h2>
           <p>It seems you don't have a Suirify attestation yet.</p>
-          <button onClick={() => (window.location.href = "/verify")} style={{ padding: "10px 14px", borderRadius: 8, background: "#2563eb", color: "white" }}>
-            Get Verified Now
-          </button>
+          <ConnectWalletCTA
+            idleText="Get Verified Now"
+            hoverText="Connect Wallet"
+            onComplete={() => (window.location.href = "/verify")}
+            style={{ padding: "10px 14px", borderRadius: 8, background: "#2563eb", color: "white", fontWeight: 600 }}
+          />
         </div>
       </div>
     );

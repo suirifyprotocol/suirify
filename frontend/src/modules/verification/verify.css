@@ -16,6 +16,15 @@
 .v-row { display: flex; gap: 8px; align-items: center; }
 .v-row-space { display: flex; justify-content: space-between; align-items: center; }
 
+.sd-loading {
+	min-height: 100vh;
+	display: grid;
+	place-items: center;
+	background: radial-gradient(circle at 20% 20%, rgba(41, 114, 198, 0.25), transparent 45%),
+		radial-gradient(circle at 80% 10%, rgba(83, 241, 198, 0.12), transparent 45%),
+		linear-gradient(140deg, #030a18 0%, #050d1f 45%, #01050d 100%);
+}
+
 /* Inputs and text */
 .v-input { width: 100%; padding: 8px; border-radius: 8px; margin-top: 6px; border: 1px solid #1f2937; background: #0f172a; color: #e5e7eb; }
 .v-muted { color: #9ca3af; }
