@@ -6,6 +6,7 @@ import ConnectedVerifyingPortal from "@/modules/VerifyingPortal/ConnectedVerifyi
 import Dashboard from "./dashboard/Dashboard";
 import { ConnectButton } from "@mysten/dapp-kit";
 import { useNavigate } from "react-router-dom";
+import "./verify.css";
 
 /**
  * Verification Router (entry for /verify)
@@ -68,7 +69,7 @@ const Router: React.FC = () => {
 
   if (verificationState === "checking") {
     return (
-      <div className="v-center">
+      <div className="sd-loading">
         <LoadingSpinner message="Checking your verification status..." />
       </div>
     );

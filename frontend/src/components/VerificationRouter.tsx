@@ -5,6 +5,7 @@ import LoadingSpinner from "./common/LoadingSpinner";
 import VerificationPortal from "./VerificationPortal";
 import Dashboard from "./Dashboard.tsx";
 import { ConnectButton } from "@mysten/dapp-kit";
+import "@/modules/verification/verify.css";
 
 const VerificationRouter: React.FC = () => {
   const account = useCurrentAccount();
@@ -47,7 +48,11 @@ const VerificationRouter: React.FC = () => {
   }
 
   if (verificationState === "checking") {
-    return <LoadingSpinner message="Checking your verification status..." />;
+    return (
+      <div className="sd-loading">
+        <LoadingSpinner message="Checking your verification status..." />
+      </div>
+    );
   }
 
   return verificationState === "verified" ? <Dashboard /> : <VerificationPortal />;

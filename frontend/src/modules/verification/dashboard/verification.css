@@ -1,0 +1,214 @@
+:root {
+  --verification-bg-dark: #030d13;
+  --verification-bg-overlay: rgba(3, 13, 19, 0.85);
+  --verification-text-primary: #e0f5f5;
+  --verification-text-secondary: #a8d5d5;
+  --verification-accent: #4fd1c5;
+  --verification-accent-dark: #0a4a45;
+  --verification-cta-bg: #d5f5f0;
+  --verification-cta-text: #0a2f2a;
+  --verification-cta-hover: #b8ebe0;
+  --verification-shadow: rgba(79, 209, 197, 0.2);
+  --verification-radius: 24px;
+  --verification-radius-button: 50px;
+}
+
+.verification-container {
+  min-height: 100vh;
+  height: 100vh;
+  width: 100%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--verification-bg-dark);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  overflow: hidden;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.verification-overlay {
+  display: none;
+}
+
+.verification-header {
+  position: relative;
+  z-index: 10;
+  padding: 2rem 2.5rem;
+}
+
+.verification-logo {
+  height: 48px;
+  width: auto;
+  filter: brightness(1.1);
+  transition: transform 0.3s ease;
+}
+
+.verification-logo:hover {
+  transform: scale(1.05);
+}
+
+.verification-main {
+  position: relative;
+  z-index: 10;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.verification-card {
+  max-width: 680px;
+  width: 100%;
+  text-align: center;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-radius: var(--verification-radius);
+  padding: 4rem 3rem;
+  animation: cardFadeIn 0.8s ease-out;
+}
+
+@keyframes cardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.verification-title {
+  font-family: "Audiowide", monospace, sans-serif;
+  font-size: clamp(2rem, 4.5vw, 3rem);
+  font-weight: 400;
+  letter-spacing: 0%;
+  line-height: 100%;
+  color: hsla(0, 0%, 100%, 1);
+  margin: 0 0 1.5rem 0;
+  text-transform: uppercase;
+  max-width: 589px;
+  white-space: nowrap;
+}
+
+.verification-subtitle {
+  font-size: clamp(0.9rem, 2.5vw, 1.25rem);
+  font-weight: 400;
+  color: hsla(0, 0%, 100%, 1);
+  margin: 0 0 2.5rem 0;
+  line-height: 140%;
+  font-family: "Poppins";
+  letter-spacing: 0%;
+}
+
+.verification-cta {
+  display: inline-block;
+  padding: 1rem 3rem;
+  font-family: "Urbanist", sans-serif;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: hsla(229, 19%, 22%, 1);
+  background: hsla(166, 100%, 93%, 1);
+  border: none;
+  border-radius: 15px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: 0%;
+  position: relative;
+  overflow: hidden;
+  line-height: 100%;
+}
+
+.verification-cta::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.verification-cta:hover::before {
+  opacity: 1;
+}
+
+.verification-cta:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 2px 8px rgba(79, 209, 197, 0.3), 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+.verification-cta:focus {
+  outline: 2px solid var(--verification-accent);
+  outline-offset: 4px;
+}
+
+.verification-cta:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.verification-cta:focus-visible {
+  outline: 2px solid var(--verification-accent);
+  outline-offset: 4px;
+}
+
+@media (max-width: 768px) {
+  .verification-header {
+    padding: 1.5rem 1.5rem;
+  }
+
+  .verification-logo {
+    height: 40px;
+  }
+
+  .verification-main {
+    padding: 1.5rem;
+  }
+
+  .verification-card {
+    padding: 3rem 2rem;
+  }
+
+  .verification-title {
+    margin-bottom: 1rem;
+  }
+
+  .verification-subtitle {
+    font-size: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .verification-cta {
+    width: 100%;
+    max-width: 100%;
+    padding: 1rem 2rem;
+    font-size: 1rem;
+  }
+
+  .verification-overlay::after {
+    width: 80%;
+    height: 80%;
+  }
+}
+
+@media (max-width: 480px) {
+  .verification-card {
+    padding: 2.5rem 1.5rem;
+  }
+
+  .verification-title {
+    font-size: 1.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .verification-card,
+  .verification-logo,
+  .verification-cta,
+  .verification-cta::before {
+    animation: none;
+    transition: none;
+  }
+}

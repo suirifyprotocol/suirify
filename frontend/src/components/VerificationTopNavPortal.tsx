@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import TopNav from "./TopNav";
 import { useCurrentAccount } from "@mysten/dapp-kit";
+import { useVerificationUI } from "@/modules/verification/context/VerificationUIContext";
 
 /**
  * VerificationTopNavPortal
@@ -15,9 +16,9 @@ const VerificationTopNavPortal: React.FC = () => {
   const navigate = useNavigate();
   const account = useCurrentAccount();
   const wasConnected = useRef<boolean>(!!account?.address);
+  const { immersive } = useVerificationUI();
 
-  const inVerificationRoutes =
-    pathname.startsWith("/verify") || pathname === "/dashboard" || pathname.startsWith("/dashboard/");
+  const inVerificationRoutes = pathname.startsWith("/verify");
 
   // Redirect to home if the wallet disconnects while in verification routes.
   useEffect(() => {
@@ -28,7 +29,9 @@ const VerificationTopNavPortal: React.FC = () => {
     wasConnected.current = nowConnected;
   }, [account?.address, inVerificationRoutes, navigate]);
 
-  if (inVerificationRoutes) return <TopNav />;
+  const legacyOverride = typeof document !== "undefined" && document.body.classList.contains("verification-immersive");
+
+  if (inVerificationRoutes && !immersive && !legacyOverride) return <TopNav />;
   return null;
 };
 

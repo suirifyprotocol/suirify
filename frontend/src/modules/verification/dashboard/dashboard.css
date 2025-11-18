@@ -1,0 +1,384 @@
+:root {
+  --sd-bg-dark: #020814;
+  --sd-bg-panel: rgba(6, 12, 26, 0.92);
+  --sd-bg-sidebar: #4b71a6;
+  --sd-bg-sidebar-dark: #3b5a84;
+  --sd-text-primary: #e5efff;
+  --sd-text-muted: rgba(229, 239, 255, 0.7);
+  --sd-accent: #6fffc4;
+  --sd-border: rgba(255, 255, 255, 0.08);
+  --sd-card-radius: 24px;
+}
+
+.dashboard-body {
+  background: radial-gradient(circle at top, #051329 0%, #020814 55%, #01050d 100%);
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+.sd-shell {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  color: var(--sd-text-primary);
+  font-family: "Space Grotesk", "Inter", "Segoe UI", sans-serif;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  position: relative;
+  overflow-x: hidden;
+  padding-top: clamp(16px, 4vw, 40px);
+}
+
+.sd-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 20% 20%, rgba(41, 114, 198, 0.25), transparent 45%),
+    radial-gradient(circle at 80% 10%, rgba(83, 241, 198, 0.12), transparent 45%),
+    linear-gradient(140deg, rgba(3, 10, 24, 0.95) 0%, rgba(5, 13, 31, 0.92) 45%, rgba(1, 5, 13, 0.95) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+
+
+.sd-sidebar {
+  width: 260px;
+  background: transparent;
+  backdrop-filter: blur(12px);
+  padding: 26px 20px;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(-110%);
+  transition: transform 0.35s ease, box-shadow 0.3s ease;
+  z-index: 40;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.sd-sidebar--open {
+  transform: translateX(0);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+}
+
+@media (min-width: 1024px) {
+  .sd-shell {
+    padding-top: 32px;
+    padding-left: 0;
+  }
+
+  .sd-shell--sidebar-open {
+    padding-left: 260px;
+  }
+}
+
+.sd-sidebar-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  height: 100%;
+}
+
+.sd-sidebar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sd-sidebar-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.sd-sidebar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sd-sidebar-list--home {
+  margin-bottom: 32px;
+}
+
+.sd-sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: none;
+  background: rgba(0, 0, 0, 0.18);
+  color: var(--sd-text-primary);
+  padding: 12px 16px;
+  border-radius: 16px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.sd-sidebar-link:hover {
+  background: rgba(0, 0, 0, 0.32);
+  transform: translateX(4px);
+}
+
+.sd-sidebar-bullet {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--sd-accent);
+  flex-shrink: 0;
+}
+
+.sd-sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(1, 5, 13, 0.7);
+  z-index: 30;
+}
+
+.sd-main {
+  flex: 1;
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  padding: 0 clamp(16px, 5vw, 48px) 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  position: relative;
+  z-index: 10;
+}
+
+.sd-top-bar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 16px;
+  margin: 0 auto;
+  width: 100%;
+  max-width: min(1180px, 100%);
+  padding: 12px;
+  border-radius: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  background: rgba(3, 8, 20, 0.65);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.sd-top-bar > :first-child {
+  justify-self: start;
+}
+
+.sd-top-bar > :last-child {
+  justify-self: end;
+}
+
+.sd-top-bar .sd-logo {
+  justify-self: center;
+}
+
+.sd-logo {
+  height: 42px;
+  width: auto;
+}
+
+.sd-hamburger {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  flex-shrink: 0;
+}
+
+.sd-hamburger span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  margin: 0 auto;
+  background: var(--sd-text-primary);
+  border-radius: 999px;
+  transition: transform 0.2s ease;
+}
+
+.sd-connect-btn {
+  border-radius: 999px !important;
+  font-weight: 700 !important;
+  padding: 0 18px !important;
+  min-height: 48px;
+  box-shadow: 0 10px 30px rgba(14, 165, 233, 0.25);
+  flex-shrink: 0;
+}
+
+.sd-status-banner {
+  background: linear-gradient(135deg, rgba(110, 168, 255, 0.18), rgba(33, 212, 253, 0.06));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 30px;
+  padding: clamp(20px, 4vw, 36px);
+  box-shadow: inset 0 0 40px rgba(78, 112, 196, 0.15);
+}
+
+.sd-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.4em;
+  font-size: 0.8rem;
+  color: var(--sd-text-muted);
+  margin-bottom: 12px;
+}
+
+.sd-status-banner h1 {
+  font-size: clamp(2rem, 4vw, 3rem);
+  margin: 0;
+  letter-spacing: 0.08em;
+}
+
+.sd-status-label {
+  color: var(--sd-accent);
+}
+
+.sd-address {
+  margin-top: 10px;
+  font-size: 0.95rem;
+  color: var(--sd-text-muted);
+}
+
+.sd-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.sd-card {
+  padding: clamp(18px, 3vw, 28px);
+  background: var(--sd-bg-panel);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-card-radius);
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 20px 35px rgba(0, 0, 0, 0.35);
+}
+
+.sd-card-label {
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  color: var(--sd-text-muted);
+}
+
+.sd-card-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--sd-text-primary);
+}
+
+.sd-card-value--xl {
+  font-size: 2.75rem;
+}
+
+.sd-card--expires {
+  align-items: center;
+  text-align: center;
+}
+
+.sd-exp-circle {
+  width: clamp(120px, 22vw, 150px);
+  height: clamp(120px, 22vw, 150px);
+  border-radius: 50%;
+  border: 6px solid rgba(255, 255, 255, 0.18);
+  display: grid;
+  place-items: center;
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 12px auto 0;
+}
+
+.sd-card--badge {
+  align-items: center;
+  text-align: center;
+}
+
+.sd-badge {
+  width: clamp(72px, 16vw, 96px);
+  height: clamp(72px, 16vw, 96px);
+  border-radius: 24px;
+  display: grid;
+  place-items: center;
+  font-size: 2.25rem;
+  font-weight: 700;
+  margin-top: 16px;
+  border: 2px solid transparent;
+}
+
+.sd-badge--success {
+  background: rgba(53, 239, 173, 0.15);
+  border-color: rgba(53, 239, 173, 0.5);
+  color: var(--sd-accent);
+}
+
+.sd-badge--danger {
+  background: rgba(239, 83, 80, 0.18);
+  border-color: rgba(239, 83, 80, 0.5);
+  color: #ff9d9a;
+}
+
+@media (min-width: 1024px) {
+  .sd-card-grid {
+    grid-template-columns: repeat(3, minmax(220px, 1fr));
+  }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .sd-card-grid {
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .sd-main {
+    width: 100%;
+    padding: 0 20px 40px;
+  }
+
+  .sd-status-banner {
+    text-align: center;
+  }
+
+  .sd-top-bar {
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 520px) {
+  .sd-top-bar {
+    gap: 12px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .sd-connect-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .sd-top-left {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .sd-card-grid {
+    grid-template-columns: 1fr;
+  }
+}
