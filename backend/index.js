@@ -2,11 +2,18 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const crypto = require('crypto');
 const os = require('os');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 const { govLookup, normalizeCountryKey } = require('./mockDB');
 const { getIsoCode, getCountryList } = require('./countryCodes');
 const { getPolicyId } = require('./jurisdictionPolicies');
 const db = require('./persistentDB');
+
+// Nautilus Enclave integration
+const vsock = require('vsock');
+const { BCS, getSuiMoveConfig } = require('@mysten/bcs');
+
 let Jimp;
 try {
   // Support both CommonJS and ESM default export shapes
@@ -134,6 +141,12 @@ const ADMIN_API_KEY = process.env.ADMIN_API_KEY || null;
 const HOST = process.env.HOST || '0.0.0.0';
 const MIST_PER_SUI = BigInt(1_000_000_000);
 
+// Nautilus Enclave configuration
+const ENCLAVE_CID = parseInt(process.env.ENCLAVE_CID, 10) || 3; // Default Context ID for the first enclave
+const ENCLAVE_PORT = parseInt(process.env.ENCLAVE_PORT, 10) || 5000;
+const ENCLAVE_CONFIG_ID = process.env.ENCLAVE_CONFIG_ID;
+const ENCLAVE_OBJECT_ID = process.env.ENCLAVE_OBJECT_ID;
+
 const STATUS_CODE_ACTIVE = 1;
 const STATUS_CODE_EXPIRED = 2;
 const STATUS_CODE_REVOKED = 3;
@@ -181,7 +194,7 @@ if (BYPASS_FACE_MATCH) {
 console.log(`Sui network configured: ${SUI_NETWORK} (rpc: ${SUI_RPC})`);
 
 let suiClient;
-let adminKeypair;
+let adminKeypair; // This is the SPONSOR/ADMIN keypair, NOT the enclave's keypair.
 
 // Instantiate Sui client when available; load admin signer only if provided.
 try {
@@ -558,6 +571,60 @@ async function signTransactionWithKeypair(keypair, txBytes) {
   }
 
   throw new Error('Admin keypair does not support transaction signing with the available methods.');
+}
+
+/// NAUTILUS ENCLAVE INTEGRATION FUNCTIONS
+
+/**
+ * Sends a JSON payload to the Nitro Enclave over a secure VSOCK channel.
+ * @param {object} payload The JSON object to send.
+ * @returns {Promise<object>} The JSON response from the enclave.
+ */
+async function sendToEnclave(payload) {
+  return new Promise((resolve, reject) => {
+    const socket = vsock.connect(ENCLAVE_CID, ENCLAVE_PORT);
+    socket.on('connect', () => {
+      socket.write(JSON.stringify(payload));
+    });
+    socket.on('data', (buffer) => {
+      try {
+        const response = JSON.parse(buffer.toString());
+        resolve(response);
+      } catch (e) {
+        reject(new Error("Invalid JSON response from enclave"));
+      } finally {
+        socket.end();
+      }
+    });
+    socket.on('error', (err) => {
+      console.error("VSOCK connection error:", err);
+      reject(new Error("Failed to communicate with the secure enclave."));
+    });
+  });
+}
+
+/**
+ * Serializes the minting data into the exact binary format the smart contract expects.
+ * This MUST perfectly match the deserialization order in suirify::enclave::verify_response.
+ * @param {object} data The data to serialize.
+ * @returns {string} The hex-encoded string of the serialized data.
+ */
+function serializeMintPayload(data) {
+  const bcs = new BCS(getSuiMoveConfig());
+  const writer = bcs.writer();
+
+  writer.write(bcs.ser('address', data.requestId).toBytes());
+  writer.write(bcs.ser('address', data.recipient).toBytes());
+  writer.write16(data.jurisdictionCode);
+  writer.write8(data.verificationLevel);
+  writer.write8(data.verifierSource);
+  writer.writeVec(data.nameHash, (w, el) => w.write8(el)); // Serialize vector<u8>
+  writer.write8(data.isHumanVerified ? 1 : 0); // Serialize bool as u8
+  writer.write8(data.isOver18 ? 1 : 0); // Serialize bool as u8
+  writer.write8(data.verifierVersion);
+  writer.write64(BigInt(data.issuedMs)); // Serialize u64
+
+  return Buffer.from(writer.getBytes()).toString('hex');
 }
 
 /**
@@ -939,6 +1006,7 @@ app.post('/admin/mint-request/consume', requireAdmin, (req, res) => {
 
 /**
  * Finalize attestation minting after a user has created a mint request on-chain.
+ * This version delegates the critical signing operation to the secure Nautilus enclave.
  */
 app.post('/finalize-mint', async (req, res) => {
   const { sessionId, requestId: rawRequestId, requestTxDigest } = req.body || {};
@@ -964,6 +1032,11 @@ app.post('/finalize-mint', async (req, res) => {
 
   if (!ADMIN_CAP_ID || !PROTOCOL_CONFIG_ID || !ATTESTATION_REGISTRY_ID) {
     return res.status(500).json({ error: 'Protocol objects (admin cap, config, registry) are not fully configured.' });
+  }
+
+  if (!ENCLAVE_CONFIG_ID || !ENCLAVE_OBJECT_ID) {
+    console.warn('ENCLAVE_CONFIG_ID or ENCLAVE_OBJECT_ID is not set. Falling back to non-enclave minting.');
+    // Continue without enclave - will use old minting flow
   }
 
   const sessionData = verificationSessionStore.get(sessionId);
@@ -1071,124 +1144,273 @@ app.post('/finalize-mint', async (req, res) => {
   }
 
   try {
-    const txb = new TransactionBlock();
-    const adminAddress = adminKeypair.getPublicKey().toSuiAddress();
+    // Check if we should use enclave-based minting
+    const useEnclave = !!(ENCLAVE_CONFIG_ID && ENCLAVE_OBJECT_ID);
+    
+    if (useEnclave) {
+      // NAUTILUS ENCLAVE MINTING PATH
+      console.log('Using Nautilus enclave for secure minting...');
+      
+      // 1. Prepare the data payload for the enclave
+      const payloadData = {
+        requestId,
+        recipient: userWalletAddress,
+        jurisdictionCode,
+        verificationLevel,
+        verifierSource,
+        nameHash: Array.from(nameHash), // Convert Uint8Array to plain array for BCS
+        isHumanVerified,
+        isOver18,
+        verifierVersion,
+        issuedMs: Date.now(),
+      };
 
-    const nameHashVector = typeof txb.pure.vector === 'function'
-      ? txb.pure.vector('u8', Array.from(nameHash))
-      : txb.pure(Array.from(nameHash));
+      // 2. Serialize this data into a hex string using BCS
+      const payloadHex = serializeMintPayload(payloadData);
 
-    txb.moveCall({
-      target: `${PACKAGE_ID}::protocol::mint_attestation`,
-      arguments: [
-        txb.object(ADMIN_CAP_ID),
-        txb.object(PROTOCOL_CONFIG_ID),
-        txb.object(ATTESTATION_REGISTRY_ID),
-        txb.pure.address(requestId),
-        txb.object(policyObjectId),
-        txb.pure.address(userWalletAddress),
-        txb.pure.u16(Number(jurisdictionCode)),
-        txb.pure.u8(Number(verifierSource)),
-        txb.pure.u8(Number(verificationLevel)),
-        nameHashVector,
-        txb.pure.bool(Boolean(isHumanVerified)),
-        txb.pure.bool(Boolean(isOver18)),
-        txb.pure.u8(Number(verifierVersion)),
-      ],
-    });
-
-    txb.setSender(adminAddress);
-    txb.setGasBudget(50_000_000);
-
-    const txBytes = await txb.build({ client: suiClient });
-    const signature = await signTransactionWithKeypair(adminKeypair, txBytes);
-    const txBase64 = Buffer.from(txBytes).toString('base64');
-
-    const executionResult = await suiClient.executeTransactionBlock({
-      transactionBlock: txBase64,
-      signature,
-      options: { showEffects: true, showEvents: true, showObjectChanges: true },
-      requestType: 'WaitForLocalExecution',
-    });
-
-    const digest = executionResult?.digest || executionResult?.effects?.transactionDigest || null;
-    const attestationSummary = extractAttestationFromChanges(executionResult?.objectChanges);
-    const attestationObjectId = attestationSummary?.objectId || null;
-
-    if (requestId && typeof requestId === 'string') {
-      markRequestConsumed(requestId, {
-        finalizedAt: new Date().toISOString(),
-        finalizeDigest: digest,
-        walletAddress: userWalletAddress,
-        eventType: 'mint-finalized',
-        source: 'finalize-handler',
-        requestTxDigest: requestDigestInput || null,
-        requestedRequestId: rawRequestId || null,
-        attestationId: attestationObjectId,
-        status: attestationSummary?.status || null,
-        statusCode: attestationSummary?.statusCode ?? null,
-        statusLabel: attestationSummary?.statusLabel || null,
-        jurisdictionCode: attestationSummary?.jurisdictionCode ?? null,
-        verificationLevel: attestationSummary?.verificationLevel ?? null,
-        issueDateMs: attestationSummary?.issueDateMs ?? null,
-        expiryDateMs: attestationSummary?.expiryDateMs ?? null,
+      // 3. Send the serialized payload to the enclave to be securely signed
+      const enclaveResponse = await sendToEnclave({
+        command: 'SIGN_MINT_PAYLOAD',
+        data: { payloadHex }
       });
-    }
 
-    pendingMints.set(
-      userWalletAddress,
-      Object.assign(
-        {
-          country,
-          idNumber,
-          requestId,
+      if (!enclaveResponse || !enclaveResponse.success) {
+        console.error("Enclave signing failed:", enclaveResponse?.error);
+        return res.status(500).json({ 
+          success: false, 
+          error: 'Enclave failed to sign payload.', 
+          details: enclaveResponse?.error 
+        });
+      }
+
+      // 4. Build the Sui transaction using the signature from the enclave
+      const txb = new TransactionBlock();
+      txb.moveCall({
+        target: `${PACKAGE_ID}::protocol::mint_attestation_with_enclave`,
+        arguments: [
+          txb.object(ADMIN_CAP_ID),
+          txb.object(PROTOCOL_CONFIG_ID),
+          txb.object(ATTESTATION_REGISTRY_ID),
+          txb.pure.id(requestId), // The mint request ID
+          txb.object(policyObjectId), // The jurisdiction policy object
+          txb.object(ENCLAVE_CONFIG_ID), // The on-chain enclave configuration
+          txb.object(ENCLAVE_OBJECT_ID), // The on-chain registered enclave object
+          txb.pure.vector('u8', Array.from(Buffer.from(payloadHex, 'hex'))), // The payload
+          txb.pure.vector('u8', Array.from(Buffer.from(enclaveResponse.signature, 'base64'))), // The enclave signature
+        ],
+      });
+
+      // 5. The parent application's admin/sponsor signs and executes the transaction
+      const executionResult = await suiClient.signAndExecuteTransactionBlock({
+        signer: adminKeypair,
+        transactionBlock: txb,
+        options: { showEffects: true, showEvents: true, showObjectChanges: true },
+        requestType: 'WaitForLocalExecution',
+      });
+
+      const digest = executionResult?.digest;
+      const attestationSummary = extractAttestationFromChanges(executionResult?.objectChanges);
+      const attestationObjectId = attestationSummary?.objectId || null;
+
+      if (requestId && typeof requestId === 'string') {
+        markRequestConsumed(requestId, {
+          finalizedAt: new Date().toISOString(),
+          finalizeDigest: digest,
+          walletAddress: userWalletAddress,
+          eventType: 'mint-finalized',
+          source: 'finalize-handler-enclave',
+          requestTxDigest: requestDigestInput || null,
           requestedRequestId: rawRequestId || null,
           attestationId: attestationObjectId,
-          attestationSummary,
-        },
-        auditNameHash ? { fullNameHash: auditNameHash } : {}
-      )
-    );
-    try {
-      db.markUsedGovId(
-        country,
-        idNumber,
+          status: attestationSummary?.status || null,
+          statusCode: attestationSummary?.statusCode ?? null,
+          statusLabel: attestationSummary?.statusLabel || null,
+          jurisdictionCode: attestationSummary?.jurisdictionCode ?? null,
+          verificationLevel: attestationSummary?.verificationLevel ?? null,
+          issueDateMs: attestationSummary?.issueDateMs ?? null,
+          expiryDateMs: attestationSummary?.expiryDateMs ?? null,
+        });
+      }
+
+      pendingMints.set(
+        userWalletAddress,
         Object.assign(
           {
-            walletAddress: userWalletAddress,
+            country,
+            idNumber,
             requestId,
-            finalizeDigest: digest,
-            recordedAt: new Date().toISOString(),
-            eventType: 'mint-finalized',
-            source: 'finalize-handler',
-            requestTxDigest: requestDigestInput || null,
             requestedRequestId: rawRequestId || null,
             attestationId: attestationObjectId,
-            status: attestationSummary?.status || null,
-            statusCode: attestationSummary?.statusCode ?? null,
-            statusLabel: attestationSummary?.statusLabel || null,
-            jurisdictionCode: attestationSummary?.jurisdictionCode ?? null,
-            verificationLevel: attestationSummary?.verificationLevel ?? null,
-            issueDateMs: attestationSummary?.issueDateMs ?? null,
-            expiryDateMs: attestationSummary?.expiryDateMs ?? null,
+            attestationSummary,
           },
           auditNameHash ? { fullNameHash: auditNameHash } : {}
         )
       );
-    } catch (markErr) {
-      console.error('Failed to persist mint completion metadata:', markErr);
-    }
-    verificationSessionStore.delete(sessionId);
+      try {
+        db.markUsedGovId(
+          country,
+          idNumber,
+          Object.assign(
+            {
+              walletAddress: userWalletAddress,
+              requestId,
+              finalizeDigest: digest,
+              recordedAt: new Date().toISOString(),
+              eventType: 'mint-finalized',
+              source: 'finalize-handler-enclave',
+              requestTxDigest: requestDigestInput || null,
+              requestedRequestId: rawRequestId || null,
+              attestationId: attestationObjectId,
+              status: attestationSummary?.status || null,
+              statusCode: attestationSummary?.statusCode ?? null,
+              statusLabel: attestationSummary?.statusLabel || null,
+              jurisdictionCode: attestationSummary?.jurisdictionCode ?? null,
+              verificationLevel: attestationSummary?.verificationLevel ?? null,
+              issueDateMs: attestationSummary?.issueDateMs ?? null,
+              expiryDateMs: attestationSummary?.expiryDateMs ?? null,
+            },
+            auditNameHash ? { fullNameHash: auditNameHash } : {}
+          )
+        );
+      } catch (markErr) {
+        console.error('Failed to persist mint completion metadata:', markErr);
+      }
+      verificationSessionStore.delete(sessionId);
 
-    res.json({
-      success: true,
-      digest,
-      finalizeTxDigest: digest,
-      requestTxDigest: requestDigestInput || null,
-      attestationId: attestationObjectId,
-      effects: executionResult?.effects ?? null,
-      objectChanges: executionResult?.objectChanges ?? null,
-    });
+      res.json({
+        success: true,
+        digest,
+        finalizeTxDigest: digest,
+        requestTxDigest: requestDigestInput || null,
+        attestationId: attestationObjectId,
+        effects: executionResult?.effects ?? null,
+        objectChanges: executionResult?.objectChanges ?? null,
+        enclaveUsed: true,
+      });
+    } else {
+      // FALLBACK: LEGACY NON-ENCLAVE MINTING PATH
+      console.log('Using legacy non-enclave minting (enclave not configured)...');
+      
+      const txb = new TransactionBlock();
+      const adminAddress = adminKeypair.getPublicKey().toSuiAddress();
+
+      const nameHashVector = typeof txb.pure.vector === 'function'
+        ? txb.pure.vector('u8', Array.from(nameHash))
+        : txb.pure(Array.from(nameHash));
+
+      txb.moveCall({
+        target: `${PACKAGE_ID}::protocol::mint_attestation`,
+        arguments: [
+          txb.object(ADMIN_CAP_ID),
+          txb.object(PROTOCOL_CONFIG_ID),
+          txb.object(ATTESTATION_REGISTRY_ID),
+          txb.pure.address(requestId),
+          txb.object(policyObjectId),
+          txb.pure.address(userWalletAddress),
+          txb.pure.u16(Number(jurisdictionCode)),
+          txb.pure.u8(Number(verifierSource)),
+          txb.pure.u8(Number(verificationLevel)),
+          nameHashVector,
+          txb.pure.bool(Boolean(isHumanVerified)),
+          txb.pure.bool(Boolean(isOver18)),
+          txb.pure.u8(Number(verifierVersion)),
+        ],
+      });
+
+      txb.setSender(adminAddress);
+      txb.setGasBudget(50_000_000);
+
+      const txBytes = await txb.build({ client: suiClient });
+      const signature = await signTransactionWithKeypair(adminKeypair, txBytes);
+      const txBase64 = Buffer.from(txBytes).toString('base64');
+
+      const executionResult = await suiClient.executeTransactionBlock({
+        transactionBlock: txBase64,
+        signature,
+        options: { showEffects: true, showEvents: true, showObjectChanges: true },
+        requestType: 'WaitForLocalExecution',
+      });
+
+      const digest = executionResult?.digest || executionResult?.effects?.transactionDigest || null;
+      const attestationSummary = extractAttestationFromChanges(executionResult?.objectChanges);
+      const attestationObjectId = attestationSummary?.objectId || null;
+
+      if (requestId && typeof requestId === 'string') {
+        markRequestConsumed(requestId, {
+          finalizedAt: new Date().toISOString(),
+          finalizeDigest: digest,
+          walletAddress: userWalletAddress,
+          eventType: 'mint-finalized',
+          source: 'finalize-handler',
+          requestTxDigest: requestDigestInput || null,
+          requestedRequestId: rawRequestId || null,
+          attestationId: attestationObjectId,
+          status: attestationSummary?.status || null,
+          statusCode: attestationSummary?.statusCode ?? null,
+          statusLabel: attestationSummary?.statusLabel || null,
+          jurisdictionCode: attestationSummary?.jurisdictionCode ?? null,
+          verificationLevel: attestationSummary?.verificationLevel ?? null,
+          issueDateMs: attestationSummary?.issueDateMs ?? null,
+          expiryDateMs: attestationSummary?.expiryDateMs ?? null,
+        });
+      }
+
+      pendingMints.set(
+        userWalletAddress,
+        Object.assign(
+          {
+            country,
+            idNumber,
+            requestId,
+            requestedRequestId: rawRequestId || null,
+            attestationId: attestationObjectId,
+            attestationSummary,
+          },
+          auditNameHash ? { fullNameHash: auditNameHash } : {}
+        )
+      );
+      try {
+        db.markUsedGovId(
+          country,
+          idNumber,
+          Object.assign(
+            {
+              walletAddress: userWalletAddress,
+              requestId,
+              finalizeDigest: digest,
+              recordedAt: new Date().toISOString(),
+              eventType: 'mint-finalized',
+              source: 'finalize-handler',
+              requestTxDigest: requestDigestInput || null,
+              requestedRequestId: rawRequestId || null,
+              attestationId: attestationObjectId,
+              status: attestationSummary?.status || null,
+              statusCode: attestationSummary?.statusCode ?? null,
+              statusLabel: attestationSummary?.statusLabel || null,
+              jurisdictionCode: attestationSummary?.jurisdictionCode ?? null,
+              verificationLevel: attestationSummary?.verificationLevel ?? null,
+              issueDateMs: attestationSummary?.issueDateMs ?? null,
+              expiryDateMs: attestationSummary?.expiryDateMs ?? null,
+            },
+            auditNameHash ? { fullNameHash: auditNameHash } : {}
+          )
+        );
+      } catch (markErr) {
+        console.error('Failed to persist mint completion metadata:', markErr);
+      }
+      verificationSessionStore.delete(sessionId);
+
+      res.json({
+        success: true,
+        digest,
+        finalizeTxDigest: digest,
+        requestTxDigest: requestDigestInput || null,
+        attestationId: attestationObjectId,
+        effects: executionResult?.effects ?? null,
+        objectChanges: executionResult?.objectChanges ?? null,
+        enclaveUsed: false,
+      });
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error('Failed to finalize mint:', message);
@@ -1408,10 +1630,6 @@ async function resolvePhotoReference(photoRef) {
 
   return null;
 }
-
-// add missing core requires used later
-const fs = require('fs');
-const path = require('path');
 
 // POST /face-verify
 app.post('/face-verify', async (req, res) => {

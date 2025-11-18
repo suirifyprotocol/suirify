@@ -1,6 +1,7 @@
 {
   "name": "suirify-backend",
   "version": "1.0.0",
+  "description": "Core backend for the Suirify Protocol with Nautilus Enclave support",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -8,15 +9,27 @@
     "health": "node scripts/health_check.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/suirifyprotocol/"
+  },
+  "keywords": [
+    "Sui",
+    "Backend",
+    "Nautilus",
+    "Enclave"
+  ],
+  "author": "Suirify Team",
+  "license": "GPL-3.0",
   "dependencies": {
-    "@mysten/sui": "^1.44.0",
-    "body-parser": "^1.20.2",
-    "dotenv": "^16.3.1",
+    "@mysten/bcs": "^1.9.2",
+    "@mysten/sui": "^1.45.0",
+    "body-parser": "^2.2.0",
+    "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "jimp": "^1.6.0",
-    "jimp-compact": "^0.16.1-2"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.10"
+    "jimp-compact": "^0.16.1-2",
+    "nodemon": "^3.1.11",
+    "vsock": "^1.0.6"
   }
 }
