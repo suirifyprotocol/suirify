@@ -482,9 +482,7 @@ const ConnectedVerifyingPortal: React.FC = () => {
                 className={`step-item ${currentStep === s.id || (currentStep === 2.5 && s.id === 2) ? "active" : ""} ${
                   s.completed ? "completed" : ""
                 }`}
-                onClick={() => {
-                  if (currentStep < 5) setCurrentStep(s.id);
-                }}
+                aria-current={currentStep === s.id ? "step" : undefined}
               >
                 <span className="step-label">
                   <span className="step-label-text">{s.label}</span>

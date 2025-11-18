@@ -114,7 +114,7 @@ body.vp-theme .header {
   padding: 14px 20px;
   border-radius: 14px;
   transition: background-color 0.2s ease, color 0.2s ease;
-  cursor: pointer;
+  cursor: default;
 }
 /* .vp-root .step-item:hover,
 .vp-root .step-item.active {

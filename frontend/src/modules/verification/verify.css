@@ -8,8 +8,8 @@
 .v-title { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
 .v-card { background: #0b1220; color: #e5e7eb; padding: 16px; border-radius: 12px; }
 .v-card-title { font-size: 18px; font-weight: 600; }
-.v-center { display: grid; place-items: center; min-height: 60vh; }
-.v-center-col { text-align: center; }
+.v-center { display: grid; place-items: center; min-height: 60vh; margin-top: 50%;}
+.v-center-col { text-align: center; margin-top: 50%}
 .v-grid { display: grid; gap: 12px; }
 .v-grid-lg { display: grid; gap: 16px; }
 .v-grid-narrow { display: grid; gap: 6px; }

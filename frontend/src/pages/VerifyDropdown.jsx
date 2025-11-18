@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ConnectButton, useCurrentAccount } from "@mysten/dapp-kit";
 import "@mysten/dapp-kit/dist/index.css";
 import { useNavigate } from "react-router-dom";
@@ -9,9 +9,10 @@ import { useNavigate } from "react-router-dom";
   once the user activates verification. Comments explain behavior at the component level.
 */
 const VerifyDropdown = () => {
-  const [activated, setActivated] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
   const account = useCurrentAccount();
   const navigate = useNavigate();
+  const connectButtonRef = useRef(null);
 
   useEffect(() => {
     if (account?.address) {
@@ -19,17 +20,38 @@ const VerifyDropdown = () => {
     }
   }, [account?.address, navigate]);
 
+  const triggerConnect = () => {
+    const button = connectButtonRef.current?.querySelector("button");
+    if (button) {
+      button.click();
+    }
+  };
+
   return (
     <div style={{ position: "relative", display: "inline-block", textAlign: "left" }}>
-      {!activated ? (
-        <button className="verify-button" onClick={() => setActivated(true)}>
-          Get Verified
-        </button>
-      ) : (
-        <div style={{ display: "inline-block" }}>
-          <ConnectButton />
-        </div>
-      )}
+      <button
+        className="verify-button"
+        onMouseEnter={() => setIsHovering(true)}
+        onMouseLeave={() => setIsHovering(false)}
+        onClick={triggerConnect}
+      >
+        {isHovering ? "Connect Wallet" : "Get Verified"}
+      </button>
+
+      <div
+        ref={connectButtonRef}
+        style={{
+          position: "absolute",
+          opacity: 0,
+          pointerEvents: "none",
+          width: 0,
+          height: 0,
+          overflow: "hidden",
+        }}
+        aria-hidden="true"
+      >
+        <ConnectButton />
+      </div>
     </div>
   );
 };
