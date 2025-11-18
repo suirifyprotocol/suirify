@@ -9,4 +9,5 @@ RUN npm install --omit=dev
 COPY . .
 
 # Command to run when the enclave starts
-CMD ["node", "enclave.js"]
+# CMD ["node", "enclave.js"]
+CMD ["/usr/local/bin/node", "enclave.js"]
