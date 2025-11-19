@@ -1,5 +1,6 @@
 import React from "react";
 import { calculateDaysUntilExpiry } from "@/lib/identityUtils";
+import { explorer } from "@/lib/config";
 
 /**
  * IdentityStatusCard
@@ -17,6 +18,7 @@ const IdentityStatusCard: React.FC<{ attestation: any }> = ({ attestation }) => 
   const statusInfo = statusMap[status] || statusMap.ACTIVE;
 
   const objectId = attestation?.data?.objectId || attestation?.objectId || "";
+  const attestationUrl = objectId ? explorer.object(objectId) : null;
 
   return (
     <div className="v-card">
@@ -33,7 +35,19 @@ const IdentityStatusCard: React.FC<{ attestation: any }> = ({ attestation }) => 
 
         <div className="v-row-space">
           <label>Attestation ID</label>
-          <div>{objectId ? `${objectId.slice(0, 8)}...${objectId.slice(-8)}` : "Unknown"}</div>
+          {attestationUrl ? (
+            <a
+              href={attestationUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="v-link"
+              title="View attestation on Sui Explorer"
+            >
+              {`${objectId.slice(0, 8)}...${objectId.slice(-8)}`}
+            </a>
+          ) : (
+            <div>Unknown</div>
+          )}
         </div>
 
         <div className="v-row-space">

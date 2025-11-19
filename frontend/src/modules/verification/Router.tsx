@@ -3,7 +3,6 @@ import { useCurrentAccount } from "@mysten/dapp-kit";
 import { useVerificationStatus } from "@/hooks/useVerificationStatus";
 import LoadingSpinner from "./ui/LoadingSpinner";
 import ConnectedVerifyingPortal from "@/modules/VerifyingPortal/ConnectedVerifyingPortal";
-import Dashboard from "./dashboard/Dashboard";
 import { ConnectButton } from "@mysten/dapp-kit";
 import { useNavigate } from "react-router-dom";
 import "./verify.css";
@@ -48,6 +47,12 @@ const Router: React.FC = () => {
   }, [account?.address, checkAttestation]);
 
   useEffect(() => {
+    if (verificationState === "verified") {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [navigate, verificationState]);
+
+  useEffect(() => {
     if (typeof document === "undefined") return undefined;
     const className = "verification-checking";
     if (verificationState === "checking") {
@@ -88,7 +93,15 @@ const Router: React.FC = () => {
     );
   }
 
-  return verificationState === "verified" ? <Dashboard /> : <ConnectedVerifyingPortal />;
+  if (verificationState === "verified") {
+    return (
+      <div className="sd-loading">
+        <LoadingSpinner message="Opening your dashboard..." />
+      </div>
+    );
+  }
+
+  return <ConnectedVerifyingPortal />;
 };
 
 export default Router;

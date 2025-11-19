@@ -1,8 +1,7 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ConnectButton, useCurrentAccount, useSuiClient } from "@mysten/dapp-kit";
 import LoadingSpinner from "../ui/LoadingSpinner";
-import NoAttestation from "./NoAttestation";
-import { STRUCT_ATTESTATION } from "@/lib/config";
+import { STRUCT_ATTESTATION, explorer } from "@/lib/config";
 import { fetchAttestation, type AttestationSummary } from "@/lib/apiService";
 import type { AttestationLike } from "@/types/attestation";
 import { calculateDaysUntilExpiry } from "@/lib/identityUtils";
@@ -10,7 +9,12 @@ import { useVerificationUI } from "@/modules/verification/context/VerificationUI
 import suiLogo from "@/assets/suilogo.png";
 import "./dashboard.css";
 import backgroundImage from "@/assets/attestationbg.png";
-import { Bold } from "lucide-react";
+import homeIcon from "@/assets/home.png";
+import upgradeIcon from "@/assets/upgrade.png";
+import renewIcon from "@/assets/renew.png";
+import consentIcon from "@/assets/manage.png";
+import NoAttestation from "@/modules/verification/dashboard/NoAttestation";
+import { useNavigate } from "react-router-dom";
 
 const getInitialWidth = () => (typeof window !== "undefined" ? window.innerWidth : 1440);
 
@@ -56,15 +60,16 @@ const Dashboard: React.FC = () => {
   const account = useCurrentAccount();
   const client = useSuiClient();
   const { setImmersive } = useVerificationUI();
+  const navigate = useNavigate();
   const [attestation, setAttestation] = useState<AttestationLike | null>(null);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(getInitialWidth);
 
   const sidebarActions = [
-    { label: "Upgrade to L2", action: () => (window.location.href = "/upgrade") },
-    { label: "Renew Verification", action: () => (window.location.href = "/renew") },
-    { label: "Manage Consent", action: () => (window.location.href = "/consent") },
+    { label: "Upgrade to L2", action: () => (window.location.href = "/upgrade"), icon: upgradeIcon },
+    { label: "Renew Verification", action: () => (window.location.href = "/renew"), icon: renewIcon },
+    { label: "Manage Consent", action: () => (window.location.href = "/consent"), icon: consentIcon },
   ];
 
   const isDesktop = viewportWidth >= 1024;
@@ -75,19 +80,24 @@ const Dashboard: React.FC = () => {
     }
   }, [sidebarOpen]);
 
+  const shouldShowNoAttestation = useMemo(() => !account?.address || !attestation, [account?.address, attestation]);
+
   useEffect(() => {
-    const body = typeof document !== "undefined" ? document.body : null;
-    if (body) {
-      body.classList.add("dashboard-body");
+    if (shouldShowNoAttestation) {
+      return () => undefined;
     }
+
+    const body = typeof document !== "undefined" ? document.body : null;
+    if (!body) return;
+
+    body.classList.add("dashboard-body");
     setImmersive(true);
+
     return () => {
-      if (body) {
-        body.classList.remove("dashboard-body");
-      }
+      body.classList.remove("dashboard-body");
       setImmersive(false);
     };
-  }, [setImmersive]);
+  }, [setImmersive, shouldShowNoAttestation]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -211,8 +221,8 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  if (!attestation) {
-    return <NoAttestation onVerify={() => (window.location.href = "/verify")} />;
+  if (shouldShowNoAttestation) {
+    return <NoAttestation onVerify={() => navigate("/verify")} />;
   }
 
   const fields = attestation?.data?.content?.fields || attestation?.content?.fields || {};
@@ -222,6 +232,7 @@ const Dashboard: React.FC = () => {
   const expiryDays = fields.expiry_time_ms ? calculateDaysUntilExpiry(fields.expiry_time_ms) : null;
   const expiryText = typeof expiryDays === "number" ? `${expiryDays} Days` : "—";
   const objectId = attestation?.data?.objectId || attestation?.objectId || "";
+  const attestationLink = objectId ? explorer.object(objectId) : null;
   const isHuman = fields.is_human_verified !== false;
   const isAdult = fields.is_over_18 === true;
 
@@ -238,12 +249,14 @@ const Dashboard: React.FC = () => {
               className="sd-sidebar-link"
               onClick={() => {
                 setSidebarOpen(false);
-                window.location.href = "/dashboard";
+                window.location.href = "/";
               }}
               aria-label="Return to dashboard home"
             >
-              <span className="sd-sidebar-bullet" aria-hidden="true" />
-              Home
+              <span className="sd-sidebar-link__content">
+                <img src={homeIcon} alt="" aria-hidden="true" className="sd-sidebar-icon" />
+                <span>Home</span>
+              </span>
             </button>
           </nav>
 
@@ -259,8 +272,10 @@ const Dashboard: React.FC = () => {
                     item.action();
                   }}
                 >
-                  <span className="sd-sidebar-bullet" aria-hidden="true" />
-                  {item.label}
+                  <span className="sd-sidebar-link__content">
+                    <img src={item.icon} alt="" aria-hidden="true" className="sd-sidebar-icon" />
+                    <span>{item.label}</span>
+                  </span>
                 </button>
               ))}
             </nav>
@@ -333,7 +348,24 @@ const Dashboard: React.FC = () => {
 
           <article className="sd-card">
             <p className="sd-card-label">Attestation ID</p>
-            <h3 className="sd-card-value">{truncate(objectId, 6, 6)}</h3>
+            <h3 className="sd-card-value">
+              {attestationLink ? (
+                <a
+                  href={attestationLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="sd-card-link"
+                  title="View attestation on Sui Explorer"
+                >
+                  {truncate(objectId, 6, 6)}
+                  <span aria-hidden="true" className="sd-card-link__icon">
+                    ↗
+                  </span>
+                </a>
+              ) : (
+                truncate(objectId, 6, 6)
+              )}
+            </h3>
           </article>
 
           <article className="sd-card sd-card--badge">

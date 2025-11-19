@@ -1,5 +1,6 @@
 import React, { type CSSProperties } from "react";
 import { calculateDaysUntilExpiry } from "../../lib/identityUtils";
+import { explorer } from "../../lib/config";
 import type { AttestationFields, AttestationLike } from "../../types/attestation";
 
 const statusStyles: Record<string, { label: string; className: CSSProperties }> = {
@@ -17,6 +18,7 @@ const IdentityStatusCard: React.FC<{ attestation: AttestationLike }> = ({ attest
   const statusInfo = statusStyles[status] || statusStyles.ACTIVE;
 
   const objectId = attestation?.data?.objectId || attestation?.objectId || "";
+  const attestationUrl = objectId ? explorer.object(objectId) : null;
 
   return (
     <div style={{ background: "#0b1220", color: "#e5e7eb", padding: 16, borderRadius: 12 }}>
@@ -33,11 +35,20 @@ const IdentityStatusCard: React.FC<{ attestation: AttestationLike }> = ({ attest
           </span>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
           <label>Attestation ID</label>
-          <div>
-            {objectId ? `${objectId.slice(0, 8)}...${objectId.slice(-8)}` : "Unknown"}
-          </div>
+          {attestationUrl ? (
+            <a
+              href={attestationUrl}
+              target="_blank"
+              rel="noreferrer"
+              style={{ color: "#60a5fa", textDecoration: "none", fontWeight: 600 }}
+            >
+              {`${objectId.slice(0, 8)}...${objectId.slice(-8)}`}
+            </a>
+          ) : (
+            <div>Unknown</div>
+          )}
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between" }}>

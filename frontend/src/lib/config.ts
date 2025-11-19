@@ -2,7 +2,7 @@ export const PACKAGE_ID = import.meta.env.VITE_SUIRIFY_PACKAGE_ID || "0xfaad9553
 
 export const STRUCT_ATTESTATION = `${PACKAGE_ID}::protocol::Suirify_Attestation`;
 
-export const DEFAULT_EXPLORER_BASE = "https://suiscan.xyz/devnet/"; // Sui explorer
+export const DEFAULT_EXPLORER_BASE = "https://suiscan.xyz/devnet"; // Sui explorer
 
 export const explorer = {
   tx: (digest: string) => `${DEFAULT_EXPLORER_BASE}/tx/${digest}`,
