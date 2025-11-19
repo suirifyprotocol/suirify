@@ -517,11 +517,12 @@ main, section { max-width: 100vw; overflow-x: clip; }
   transition: transform 0.25s ease;
 }
 .hero-title {
-  font-size: 88px;
+  font-size: 95px;
   font-weight: 700;
   line-height: 1.1;
   margin-bottom: 30px;
   position: relative;
+  line-height: 90%;
 }
 
 .title-white {
@@ -552,7 +553,7 @@ main, section { max-width: 100vw; overflow-x: clip; }
   font-size: 18px;
   line-height: 100%;
   color: hsla(166, 100%, 93%, 1);
-  margin-bottom: 50px;
+  margin-bottom: 25px;
   font-weight: 500;
   letter-spacing: -1%;
   font-family: poppins;
