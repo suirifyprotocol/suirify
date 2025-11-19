@@ -3,6 +3,7 @@ import type { VerificationForm } from "../VerificationPortal";
 import LoadingSpinner from "../common/LoadingSpinner";
 import WebcamFeed from "../common/WebcamFeed";
 import { verifyFace } from "../../lib/apiService";
+import { requestCameraStream } from "../../lib/camera";
 
 type CaptureState = "idle" | "preparing" | "capturing" | "verifying" | "success" | "error";
 
@@ -34,19 +35,8 @@ const FaceVerificationStep: React.FC<{
   useEffect(() => () => cleanupStream(), [cleanupStream]);
 
   const ensureCamera = useCallback(async () => {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      throw new Error("Camera access is not supported in this browser.");
-    }
-
     if (!streamRef.current) {
-      streamRef.current = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "user",
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-        audio: false,
-      });
+      streamRef.current = await requestCameraStream();
     }
 
     const video = videoRef.current;

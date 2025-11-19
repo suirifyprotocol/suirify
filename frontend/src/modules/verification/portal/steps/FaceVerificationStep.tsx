@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { StepComponentProps } from "../VerificationPortal";
 import LoadingSpinner from "@/modules/verification/ui/LoadingSpinner";
 import { verifyFace } from "@/lib/apiService";
+import { requestCameraStream } from "@/lib/camera";
 
 type CaptureState = "idle" | "initializing" | "ready" | "capturing" | "verifying" | "success" | "error";
 
@@ -59,26 +60,11 @@ const FaceVerificationStep: React.FC<StepComponentProps> = ({ formData, setFormD
 
   const startCamera = useCallback(async () => {
     if (!sessionId) return;
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setError("Camera access is not supported in this browser.");
-      setHint(null);
-      setStatus("error");
-      return;
-    }
-
     try {
       setStatus("initializing");
       setHint("Requesting camera access...");
       setError(null);
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "user",
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-        audio: false,
-      });
+      const stream = await requestCameraStream();
 
       streamRef.current = stream;
       if (videoRef.current) {
