@@ -20,6 +20,7 @@ RUN useradd --create-home --uid 10001 nodeapp
 
 # Copy application files and pre-built node_modules from the deps stage
 COPY --from=deps /app /app
+RUN chown -R nodeapp:nodeapp /app
 
 USER nodeapp
 EXPOSE 4000
