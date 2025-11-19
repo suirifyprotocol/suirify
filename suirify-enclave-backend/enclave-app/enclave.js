@@ -5,14 +5,14 @@ const { Ed25519Keypair } = require('@mysten/sui/keypairs/ed25519');
 // --- Load the Enclave's Private Key ---
 // This key corresponds to the public key registered in the on-chain `Enclave` object.
 // It should be provided as a base64-encoded 32-byte secret.
-const ENCLAVE_PRIVATE_KEY_B64 = process.env.ENCLAVE_PRIVATE_KEY_B64;
+const ENCLAVE_PRIVATE_KEY = process.env.ENCLAVE_PRIVATE_KEY;
 
-if (!ENCLAVE_PRIVATE_KEY_B64) {
-  throw new Error("Critical secret ENCLAVE_PRIVATE_KEY_B64 is not set in the enclave environment.");
+if (!ENCLAVE_PRIVATE_KEY) {
+  throw new Error("Critical secret ENCLAVE_PRIVATE_KEY is not set in the enclave environment.");
 }
 
 const enclaveKeypair = Ed25519Keypair.fromSecretKey(
-  Buffer.from(ENCLAVE_PRIVATE_KEY_B64, 'base64')
+  Buffer.from(ENCLAVE_PRIVATE_KEY, 'base64')
 );
 
 /// Enclave Logic
