@@ -18,6 +18,7 @@ SERVICE_NAME="$DEFAULT_SERVICE_NAME"
 DRY_RUN="false"
 DECLARE_VARS=()
 SKIP_ECR_LOGIN="false"
+DOCKER_VOLUMES=()
 
 usage() {
   cat <<'USE'
@@ -34,6 +35,7 @@ Optional:
   --service-output <path>   Systemd service file path (default: /etc/systemd/system/suirify-parent.service)
   --service-name <name>     Systemd unit name (default: suirify-parent)
   --set-env KEY=VALUE       Override/add env entries (repeatable)
+  --volume host:container   Bind mount passed to docker run (repeatable)
   --skip-ecr-login          Assume docker already authenticated to registry
   --dry-run                 Print actions without mutating the host
   -h | --help               Show this help
@@ -90,6 +92,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --set-env)
       DECLARE_VARS+=("$2")
+      shift 2
+      ;;
+    --volume)
+      DOCKER_VOLUMES+=("$2")
       shift 2
       ;;
     --skip-ecr-login)
@@ -151,6 +157,15 @@ for pair in "${DECLARE_VARS[@]}"; do
 
 done
 
+DOCKER_EXTRA_ARGS=""
+if [[ ${#DOCKER_VOLUMES[@]} -gt 0 ]]; then
+  while IFS= read -r vol; do
+    [[ -z "$vol" ]] && continue
+    DOCKER_EXTRA_ARGS+="  -v ${vol} \\\n"
+  done < <(printf '%s\n' "${DOCKER_VOLUMES[@]}")
+fi
+export DOCKER_EXTRA_ARGS
+
 if [[ "$SKIP_ECR_LOGIN" != "true" ]]; then
   if [[ "$DRY_RUN" == "false" ]]; then
     aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$REGISTRY_HOST"
@@ -166,7 +181,18 @@ else
 fi
 
 SERVICE_TMP="$(mktemp)"
-sed "s|{{IMAGE_URI}}|${IMAGE_URI}|g" "$SERVICE_TEMPLATE" > "$SERVICE_TMP"
+python3 - "$SERVICE_TEMPLATE" "$SERVICE_TMP" "$IMAGE_URI" <<'PY'
+import os
+import sys
+from pathlib import Path
+
+tmpl_path, out_path, image_uri = sys.argv[1:4]
+extra = os.environ.get('DOCKER_EXTRA_ARGS', '')
+text = Path(tmpl_path).read_text()
+text = text.replace('{{IMAGE_URI}}', image_uri)
+text = text.replace('{{DOCKER_EXTRA_ARGS}}', extra)
+Path(out_path).write_text(text)
+PY
 
 if [[ "$DRY_RUN" == "false" ]]; then
   mv "$SERVICE_TMP" "$SERVICE_OUTPUT"
