@@ -47,6 +47,19 @@ const Router: React.FC = () => {
     run();
   }, [account?.address, checkAttestation]);
 
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    const className = "verification-checking";
+    if (verificationState === "checking") {
+      document.body.classList.add(className);
+    } else {
+      document.body.classList.remove(className);
+    }
+    return () => {
+      document.body.classList.remove(className);
+    };
+  }, [verificationState]);
+
   if (!account) {
     return (
       <div className="v-center">

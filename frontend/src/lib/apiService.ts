@@ -1,3 +1,5 @@
+import { createFriendlyError } from "./errorMessages";
+
 const resolveCandidateUrls = () => {
   const candidates = [
     import.meta.env.VITE_API_URL,
@@ -76,7 +78,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const aggregated = attemptErrors.join("; ");
   const fallbackMessage =
     aggregated || (lastNetworkError instanceof Error ? lastNetworkError.message : "Unable to reach verification service.");
-  throw new Error(`Unable to reach verification service. Attempts: ${aggregated || fallbackMessage}`);
+  const detailedMessage = `Unable to reach verification service. Attempts: ${aggregated || fallbackMessage}`;
+  console.error("[api] Verification service unreachable:", detailedMessage);
+  throw createFriendlyError(detailedMessage, "We can't reach the verification service right now. Please try again shortly.", detailedMessage);
 }
 
 export type CountryOption = {

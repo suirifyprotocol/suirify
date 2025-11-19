@@ -25,6 +25,27 @@
 		linear-gradient(140deg, #030a18 0%, #050d1f 45%, #01050d 100%);
 }
 
+body.verification-checking,
+body.verification-checking #root {
+	background: radial-gradient(circle at 20% 20%, rgba(41, 114, 198, 0.25), transparent 45%),
+		radial-gradient(circle at 80% 10%, rgba(83, 241, 198, 0.12), transparent 45%),
+		linear-gradient(140deg, #030a18 0%, #050d1f 45%, #01050d 100%);
+	min-height: 100vh;
+}
+
+body.verification-checking .header {
+	background: transparent;
+	box-shadow: none;
+	border-bottom: none;
+}
+
+body.verification-checking .nav-menu {
+	background-color: transparent;
+	border: none;
+	box-shadow: none;
+	backdrop-filter: none;
+}
+
 /* Inputs and text */
 .v-input { width: 100%; padding: 8px; border-radius: 8px; margin-top: 6px; border: 1px solid #1f2937; background: #0f172a; color: #e5e7eb; }
 .v-muted { color: #9ca3af; }

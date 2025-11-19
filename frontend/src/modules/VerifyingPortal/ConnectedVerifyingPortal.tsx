@@ -13,6 +13,7 @@ import {
 } from "@/lib/apiService";
 import { requestCameraStream } from "@/lib/camera";
 import { calculateAge } from "@/lib/identityUtils";
+import { toUserFacingMessage } from "@/lib/errorMessages";
 import "./verifyingportal.css";
 import locationIcon from "@/modules/icons/location.png";
 import faceIcon from "@/modules/icons/face.png";
@@ -225,7 +226,7 @@ const ConnectedVerifyingPortal: React.FC = () => {
       }));
       setCurrentStep(2);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Failed to start verification.";
+      const msg = toUserFacingMessage(e, "We couldn't start your verification. Please try again.");
       setError(msg);
     } finally {
       setLoading(false);
@@ -282,7 +283,7 @@ const ConnectedVerifyingPortal: React.FC = () => {
         setCapturedFrame(null);
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Face verification failed.";
+      const msg = toUserFacingMessage(e, "Face verification failed. Please try again.");
       setError(msg);
       setCapturedFrame(null);
     } finally {
@@ -313,8 +314,9 @@ const ConnectedVerifyingPortal: React.FC = () => {
       } catch (e) {
         if (cancelled) return;
         cleanupStream();
-        const msg = e instanceof Error ? e.message : "Unable to access your camera.";
-        setError(msg.includes("denied") ? "Camera permission was denied. Please allow access to continue." : msg);
+        const raw = e instanceof Error ? e.message : "";
+        const friendly = toUserFacingMessage(e, "Unable to access your camera.");
+        setError(raw.toLowerCase().includes("denied") ? "Camera permission was denied. Please allow access to continue." : friendly);
         setCurrentStep(2);
       }
     })();
@@ -342,7 +344,7 @@ const ConnectedVerifyingPortal: React.FC = () => {
         setError("No verification data returned for this session.");
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Failed to fetch verified data.";
+      const msg = toUserFacingMessage(e, "We couldn't fetch your verified data. Please try again.");
       setError(msg);
     } finally {
       setLoading(false);
@@ -426,7 +428,7 @@ const ConnectedVerifyingPortal: React.FC = () => {
 
       setForm((prev) => ({ ...prev, sessionId: null, mintDigest: digestValue, mintRequestId: null, mintRequestDigest: null }));
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Failed to mint attestation.";
+      const msg = toUserFacingMessage(e, "Failed to mint attestation. Please try again.");
       setError(msg);
     }
   }, [account?.address, form.mintRequestDigest, form.mintRequestId, form.sessionId, setForm, signAndExecute, suiClient]);

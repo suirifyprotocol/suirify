@@ -3,6 +3,7 @@ import type { StepComponentProps } from "../VerificationPortal";
 import LoadingSpinner from "@/modules/verification/ui/LoadingSpinner";
 import { verifyFace } from "@/lib/apiService";
 import { requestCameraStream } from "@/lib/camera";
+import { toUserFacingMessage } from "@/lib/errorMessages";
 
 type CaptureState = "idle" | "initializing" | "ready" | "capturing" | "verifying" | "success" | "error";
 
@@ -78,8 +79,9 @@ const FaceVerificationStep: React.FC<StepComponentProps> = ({ formData, setFormD
       cleanupStream();
       setStatus("error");
       setHint(null);
-      const message = err instanceof Error ? err.message : "Unable to access your camera.";
-      setError(message.includes("denied") ? "Camera permission was denied. Please allow access to continue." : message);
+      const rawMessage = err instanceof Error ? err.message : "";
+      const friendlyMessage = toUserFacingMessage(err, "Unable to access your camera.");
+      setError(rawMessage.toLowerCase().includes("denied") ? "Camera permission was denied. Please allow access to continue." : friendlyMessage);
     }
   }, [cleanupStream, sessionId]);
 
@@ -218,7 +220,7 @@ const FaceVerificationStep: React.FC<StepComponentProps> = ({ formData, setFormD
     } catch (err) {
       setStatus("error");
       setHint(null);
-      const message = err instanceof Error ? err.message : "Face verification failed. Please try again.";
+      const message = toUserFacingMessage(err, "Face verification failed. Please try again.");
       setError(message);
     } finally {
       resetCountdown();
