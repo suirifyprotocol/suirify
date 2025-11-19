@@ -63,6 +63,27 @@ const govMockDB = {
             mrz: null,
             barcodeData: 'barcode_ng_112',
             additionalNotes: ''
+        },
+        'NGA-12345678902': {
+            country: 'Nigeria',
+            documentType: 'national_id',
+            idNumber: 'NGA-12345678902',
+            fullName: 'Jerome',
+            givenName: 'Gozi',
+            familyName: 'Yaro',
+            dateOfBirth: '2006-11-05',
+            gender: 'male',
+            nationality: 'Nigerian',
+            address: 'House 7, Port Harcourt Rd',
+            issuingAuthority: 'National Identity Management Commission',
+            issuanceDate: '2020-03-05',
+            expiryDate: null,
+            // Use a hosted avatar as the reference photo so the backend can fetch it
+            photoReference: '/reference_photos/NGA-11223344556.png',
+            biometricHash: 'hash_example_3',
+            mrz: null,
+            barcodeData: 'barcode_ng_112',
+            additionalNotes: ''
         }
     },
 

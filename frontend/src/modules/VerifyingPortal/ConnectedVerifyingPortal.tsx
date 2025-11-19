@@ -11,6 +11,7 @@ import {
   finalizeMint,
   type CountryOption,
 } from "@/lib/apiService";
+import { requestCameraStream } from "@/lib/camera";
 import { calculateAge } from "@/lib/identityUtils";
 import "./verifyingportal.css";
 import locationIcon from "@/modules/icons/location.png";
@@ -161,9 +162,8 @@ const ConnectedVerifyingPortal: React.FC = () => {
   }, [clearPreviewTimer, currentStep]);
 
   const ensureCamera = useCallback(async () => {
-    if (!navigator.mediaDevices?.getUserMedia) throw new Error("Camera not supported in this browser.");
     if (!streamRef.current) {
-      streamRef.current = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+      streamRef.current = await requestCameraStream();
     }
     const video = videoRef.current;
     if (video) {
