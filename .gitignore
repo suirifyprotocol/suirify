@@ -8,4 +8,4 @@
 /suirify-enclave-backend/parent-app/node_modules/*
 /suirify-enclave-backend/parent-app/reference_photos/*
 /suirify-enclave-backend/parent-app/.env
-/suirify-enclave-backend/parent-app/db.json
+## /suirify-enclave-backend/parent-app/db.json

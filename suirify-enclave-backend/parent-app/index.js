@@ -12,6 +12,17 @@ const path = require('path');
 const vsock = require('vsock');
 const { BCS, getSuiMoveConfig } = require('@mysten/bcs');
 
+// Ensure server-side WebSocket implementation exists for Sui subscriptions
+let WebSocketImpl = null;
+try {
+  WebSocketImpl = require('ws');
+  if (typeof global.WebSocket !== 'function') {
+    global.WebSocket = WebSocketImpl;
+  }
+} catch (err) {
+  console.warn('WebSocket polyfill unavailable; event subscriptions will fail:', err.message || err);
+}
+
 let Jimp;
 try {
   // Support both CommonJS and ESM default export shapes
@@ -38,6 +49,7 @@ let SuiClient = null;
 let getFullnodeUrl = null;
 let TransactionBlock = null;
 let Ed25519Keypair = null;
+let WebsocketClient = null;
 
 function normalizeTransactionBlockModule(mod) {
   if (!mod) return null;
@@ -73,6 +85,7 @@ try {
   const sui = require('@mysten/sui');
   SuiClient = sui.SuiClient || (sui.client && sui.client.SuiClient) || null;
   getFullnodeUrl = sui.getFullnodeUrl || (sui.client && sui.client.getFullnodeUrl) || null;
+  WebsocketClient = sui.WebsocketClient || (sui.client && sui.client.WebsocketClient) || null;
   TransactionBlock =
     sui.TransactionBlock ||
     sui.Transaction ||
@@ -82,7 +95,7 @@ try {
   console.log('Loaded @mysten/sui exports.');
 } catch (e1) {
   try {
-    ({ SuiClient, getFullnodeUrl } = require('@mysten/sui/client'));
+    ({ SuiClient, getFullnodeUrl, WebsocketClient } = require('@mysten/sui/client'));
     const transactionsModule = require('@mysten/sui/transactions');
     TransactionBlock =
       transactionsModule.TransactionBlock ||
@@ -158,6 +171,15 @@ const DEFAULT_RPC_BY_NETWORK = {
 };
 const networkFallbackRpc = DEFAULT_RPC_BY_NETWORK[SUI_NETWORK] || DEFAULT_RPC_BY_NETWORK.devnet;
 const SUI_RPC = process.env.SUI_RPC || (typeof getFullnodeUrl === 'function' ? getFullnodeUrl(SUI_NETWORK) : networkFallbackRpc);
+const deriveWebsocketUrl = (rpcUrl) => {
+  if (!rpcUrl) return null;
+  if (/^wss?:\/\//i.test(rpcUrl)) return rpcUrl;
+  if (/^https?:\/\//i.test(rpcUrl)) {
+    return rpcUrl.replace(/^http/i, 'ws');
+  }
+  return null;
+};
+const SUI_RPC_WS = process.env.SUI_RPC_WS || deriveWebsocketUrl(SUI_RPC);
 const PACKAGE_ID = process.env.PACKAGE_ID;
 const ADMIN_CAP_ID = process.env.ADMIN_CAP_ID;
 const PROTOCOL_CONFIG_ID = process.env.PROTOCOL_CONFIG_ID;
@@ -227,12 +249,29 @@ console.log(`Sui network configured: ${SUI_NETWORK} (rpc: ${SUI_RPC})`);
 let suiClient;
 let adminKeypair; // This is the SPONSOR/ADMIN keypair, NOT the enclave's keypair.
 
+const buildWebsocketClient = () => {
+  if (!WebsocketClient || typeof WebsocketClient !== 'function') return null;
+  if (!WebSocketImpl || typeof WebSocketImpl !== 'function') return null;
+  if (!SUI_RPC_WS) return null;
+  try {
+    return new WebsocketClient(SUI_RPC_WS, { WebSocket: WebSocketImpl });
+  } catch (err) {
+    console.warn('Failed to create Sui WebSocket client:', err && err.message ? err.message : err);
+    return null;
+  }
+};
+
 // Instantiate Sui client when available; load admin signer only if provided.
 try {
 	if (typeof SuiClient === 'function') {
 		try {
-			suiClient = new SuiClient({ url: SUI_RPC });
-			console.log(`Sui client instantiated (rpc=${SUI_RPC}).`);
+      const clientOptions = { url: SUI_RPC };
+      const websocketClientInstance = buildWebsocketClient();
+      if (websocketClientInstance) {
+        clientOptions.websocketClient = websocketClientInstance;
+      }
+      suiClient = new SuiClient(clientOptions);
+      console.log(`Sui client instantiated (rpc=${SUI_RPC}${websocketClientInstance ? `, ws=${SUI_RPC_WS}` : ''}).`);
 		} catch (e) {
 			console.error('Failed to instantiate SuiClient:', e);
 			suiClient = null;
@@ -1233,6 +1272,14 @@ app.post('/finalize-mint', async (req, res) => {
 async function startIndexer() {
   if (!suiClient) {
     console.warn('Cannot start indexer: Sui client not configured.');
+    return;
+  }
+  if (typeof suiClient.subscribeEvent !== 'function') {
+    console.warn('Cannot start indexer: Sui client missing subscribeEvent support.');
+    return;
+  }
+  if (typeof global.WebSocket !== 'function') {
+    console.warn('Cannot start indexer: WebSocket implementation unavailable. Install the "ws" package.');
     return;
   }
   console.log('Starting event indexer...');

@@ -14,7 +14,7 @@ ExecStart=/usr/bin/docker run \
   --log-driver json-file \
   --log-opt max-size=10m \
   --log-opt max-file=5 \
-  {{IMAGE_URI}}
+{{DOCKER_EXTRA_ARGS}}  {{IMAGE_URI}}
 ExecStop=/usr/bin/docker stop -t 15 suirify-parent
 Restart=always
 RestartSec=5s
