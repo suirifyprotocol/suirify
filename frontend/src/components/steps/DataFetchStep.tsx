@@ -61,6 +61,7 @@ const DataFetchStep: React.FC<{
   }, [account, fetchData, formData.faceVerified, formData.fullName, formData.sessionId, loading]);
 
   const age = formData.dateOfBirth ? calculateAge(formData.dateOfBirth) : null;
+  const canContinue = Boolean(formData.fullName && formData.dateOfBirth);
 
   return (
     <div>
@@ -112,13 +113,17 @@ const DataFetchStep: React.FC<{
                 )}
               </div>
 
-              {age !== null && age >= 18 ? (
-                <button onClick={onNext} style={{ padding: "10px 14px", borderRadius: 8, background: "#2563eb", color: "white" }}>
-                  Continue to Face Verification
-                </button>
-              ) : (
-                <div style={{ color: "#ef4444" }}>You must be 18 or older to use Suirify services.</div>
+              {age !== null && age < 18 && (
+                <div style={{ color: "#ef4444" }}>Warning: You are under 18. Your attestation will reflect this status.</div>
               )}
+
+              <button
+                onClick={onNext}
+                style={{ padding: "10px 14px", borderRadius: 8, background: canContinue ? "#2563eb" : "#9ca3af", color: "white" }}
+                disabled={!canContinue}
+              >
+                Continue to Face Verification
+              </button>
             </div>
           ) : (
             <>

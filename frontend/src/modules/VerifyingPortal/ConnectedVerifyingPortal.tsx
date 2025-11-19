@@ -631,10 +631,15 @@ const ConnectedVerifyingPortal: React.FC = () => {
                     {age >= 18 ? `✓ Age verified (${age} years)` : `✗ Must be 18 or older (${age} years)`}
                   </div>
                 )}
+                {age !== null && age < 18 && (
+                  <p style={{ color: "#ef4444", fontWeight: 600 }}>
+                    Under 18? Your attestation will reflect this status, but you can still continue.
+                  </p>
+                )}
 
                 <div className="action-buttons-dual">
                   <button className="back-btn" onClick={() => setCurrentStep(2)}>Back</button>
-                  <button className="next-btn" onClick={() => setCurrentStep(4)} disabled={!form.fullName || !form.dateOfBirth || (age !== null && age < 18)}>
+                  <button className="next-btn" onClick={() => setCurrentStep(4)} disabled={!form.fullName || !form.dateOfBirth}>
                     Continue
                   </button>
                 </div>

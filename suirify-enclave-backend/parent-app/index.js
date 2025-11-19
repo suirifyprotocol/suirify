@@ -566,6 +566,29 @@ const hashFullNameForStorage = (fullName) => {
   return crypto.createHash('sha256').update(Buffer.from(payload, 'utf8')).digest('hex');
 };
 
+function resolveVerificationLevelFromDocument(govRecord) {
+  if (!govRecord || !govRecord.documentType) return 2;
+  const raw = String(govRecord.documentType).trim().toLowerCase();
+  if (!raw) return 2;
+  const normalized = raw.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const compact = normalized.replace(/\s+/g, '');
+  const nationalIdKeywords = [
+    'national id',
+    'national identification',
+    'identity card',
+    'id card',
+    'nin',
+    'nid',
+    'ssn',
+    'bvn',
+  ];
+  const matchesKeyword = nationalIdKeywords.some((kw) => normalized.includes(kw) || compact === kw.replace(/\s+/g, ''));
+  if (matchesKeyword) {
+    return 1;
+  }
+  return 2;
+}
+
 async function signTransactionWithKeypair(keypair, txBytes) {
   if (!keypair) {
     throw new Error('Keypair is not configured.');
@@ -802,15 +825,17 @@ app.post('/complete-verification', async (req, res) => {
 
     const birthDate = new Date(govRecord.dateOfBirth);
     const age = new Date(Date.now() - birthDate.getTime()).getUTCFullYear() - 1970;
+    const isOver18 = age >= 18;
+    const verificationLevel = resolveVerificationLevelFromDocument(govRecord);
 
     sessionData.preparedData = {
       userWalletAddress: walletAddress,
       jurisdictionCode: resolvedIso,
       verifierSource: 1,
-      verificationLevel: 2,
+      verificationLevel,
       nameHash,
       isHumanVerified: true,
-      isOver18: age >= 18,
+      isOver18,
       verifierVersion: 1,
     };
 

@@ -10,6 +10,7 @@ import { useVerificationUI } from "@/modules/verification/context/VerificationUI
 import suiLogo from "@/assets/suilogo.png";
 import "./dashboard.css";
 import backgroundImage from "@/assets/attestationbg.png";
+import { Bold } from "lucide-react";
 
 const getInitialWidth = () => (typeof window !== "undefined" ? window.innerWidth : 1440);
 
@@ -29,6 +30,26 @@ const truncate = (value?: string, lead = 6, tail = 4) => {
   if (!value) return "—";
   if (value.length <= lead + tail + 3) return value;
   return `${value.slice(0, lead)}...${value.slice(-tail)}`;
+};
+
+const STATUS_CODE_TO_LABEL: Record<number, string> = {
+  1: "Active",
+  2: "Expired",
+  3: "Revoked",
+};
+
+const normalizeStatusLabel = (value: unknown): string => {
+  if (value === null || value === undefined) return "Active";
+  if (typeof value === "number") {
+    return STATUS_CODE_TO_LABEL[value] || `Code ${value}`;
+  }
+  const str = String(value).trim();
+  if (!str) return "Active";
+  const upper = str.toUpperCase();
+  if (upper === "ACTIVE") return "Active";
+  if (upper === "EXPIRED") return "Expired";
+  if (upper === "REVOKED") return "Revoked";
+  return str;
 };
 
 const Dashboard: React.FC = () => {
@@ -195,7 +216,7 @@ const Dashboard: React.FC = () => {
   }
 
   const fields = attestation?.data?.content?.fields || attestation?.content?.fields || {};
-  const status = String(fields.status || "ACTIVE").toUpperCase();
+  const status = normalizeStatusLabel(fields.status || "ACTIVE").toUpperCase();
   const level = fields.verification_level ?? 1;
   const issueDate = formatDate(fields.issue_time_ms);
   const expiryDays = fields.expiry_time_ms ? calculateDaysUntilExpiry(fields.expiry_time_ms) : null;
