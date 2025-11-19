@@ -111,7 +111,7 @@ app.use((req, res, next) => {
 app.get('/health', (req, res) => res.json({ ok: true, time: Date.now() }));
 
 // compute SUI_RPC now that getFullnodeUrl may be defined
-const PORT = process.env.PORT || 4000;
+const PORT = Number.parseInt(process.env.PORT, 10) || 4000;
 const SECRET_PEPPER = process.env.SECRET_PEPPER || '';
 const SUI_NETWORK = process.env.SUI_NETWORK || 'devnet';
 const DEFAULT_RPC_BY_NETWORK = {
@@ -1330,8 +1330,9 @@ process.on('unhandledRejection', (reason, promise) => {
 // Replace with resilient start logic that retries on EADDRINUSE
 
 let server = null;
-const START_PORT = parseInt(process.env.PORT, 10) || 4000;
-const MAX_RETRIES = 10;
+const START_PORT = PORT;
+const PORT_LOCKED = Boolean(process.env.PORT);
+const MAX_RETRIES = PORT_LOCKED ? 0 : 10;
 
 function getLanAddresses(port) {
   const result = [];
@@ -1375,6 +1376,10 @@ function startServer(port = START_PORT, attempts = 0) {
 
     server.on('error', (err) => {
       if (err && err.code === 'EADDRINUSE') {
+        if (PORT_LOCKED) {
+          console.error(`Port ${port} is assigned via environment and already in use. Exiting.`);
+          process.exit(1);
+        }
         console.warn(`Port ${port} already in use. Trying port ${port + 1} ...`);
         // give a short delay then try next port
         setTimeout(() => startServer(port + 1, attempts + 1), 200);
@@ -1384,6 +1389,10 @@ function startServer(port = START_PORT, attempts = 0) {
     });
   } catch (err) {
     if (err && err.code === 'EADDRINUSE') {
+      if (PORT_LOCKED) {
+        console.error(`Port ${port} is assigned via environment and already in use. Exiting.`);
+        process.exit(1);
+      }
       console.warn(`Port ${port} already in use. Trying port ${port + 1} ...`);
       setTimeout(() => startServer(port + 1, attempts + 1), 200);
     } else {
