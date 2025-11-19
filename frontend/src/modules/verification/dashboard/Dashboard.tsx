@@ -72,6 +72,17 @@ const Dashboard: React.FC = () => {
     { label: "Manage Consent", action: () => (window.location.href = "/consent"), icon: consentIcon },
   ];
 
+  const mobileNavItems = [
+    {
+      label: "Home",
+      action: () => {
+        setSidebarOpen(false);
+        navigate("/dashboard");
+      },
+    },
+    ...sidebarActions.map((item) => ({ label: item.label, action: item.action })),
+  ];
+
   const isDesktop = viewportWidth >= 1024;
 
   const handleMainInteraction = useCallback(() => {
@@ -287,19 +298,21 @@ const Dashboard: React.FC = () => {
 
       <main className="sd-main" onClickCapture={handleMainInteraction}>
         <div className="sd-top-bar">
-          <button
-            className="sd-hamburger"
-            onClick={(event) => {
-              event.stopPropagation();
-              setSidebarOpen((prev) => !prev);
-            }}
-            aria-label="Toggle quick actions menu"
-            aria-expanded={sidebarOpen}
-          >
-            <span />
-            <span />
-            <span />
-          </button>
+          {isDesktop && (
+            <button
+              className="sd-hamburger"
+              onClick={(event) => {
+                event.stopPropagation();
+                setSidebarOpen((prev) => !prev);
+              }}
+              aria-label="Toggle quick actions menu"
+              aria-expanded={sidebarOpen}
+            >
+              <span />
+              <span />
+              <span />
+            </button>
+          )}
 
           <img src={suiLogo} alt="Suirify" className="sd-logo" />
 
@@ -312,6 +325,14 @@ const Dashboard: React.FC = () => {
             }}
           />
         </div>
+
+        <nav className="sd-mobile-nav" aria-label="Dashboard quick navigation">
+          {mobileNavItems.map((item) => (
+            <button key={item.label} className="sd-mobile-nav__item" onClick={item.action}>
+              {item.label}
+            </button>
+          ))}
+        </nav>
 
         <section className="sd-status-banner">
           <p className="sd-eyebrow">Your digital identity is</p>

@@ -16,19 +16,22 @@
   min-height: 100vh;
 }
 
-.sd-shell {
+ .sd-shell {
   min-height: 100vh;
   width: 100%;
   display: flex;
   flex-direction: column;
+  align-items: center;
   color: var(--sd-text-primary);
   font-family: "Space Grotesk", "Inter", "Segoe UI", sans-serif;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  background-size: var(--attestation-bg-size, cover);
+  background-position: var(--attestation-bg-position, center);
+  background-repeat: var(--attestation-bg-repeat, no-repeat);
+  background-color: #020814;
   position: relative;
   overflow-x: hidden;
-  padding-top: clamp(16px, 4vw, 40px);
+  padding: clamp(12px, 3vw, 32px) clamp(12px, 5vw, 48px) clamp(20px, 4vw, 56px);
+  box-sizing: border-box;
 }
 
 .sd-shell::before {
@@ -150,14 +153,16 @@
 
 .sd-main {
   flex: 1;
-  width: min(1180px, 100%);
+  width: 100%;
+  max-width: 1260px;
   margin: 0 auto;
-  padding: 0 clamp(16px, 5vw, 48px) 48px;
+  padding: 0 clamp(24px, 5vw, 48px) clamp(24px, 4vw, 40px);
   display: flex;
   flex-direction: column;
   gap: 32px;
   position: relative;
   z-index: 10;
+  box-sizing: border-box;
 }
 
 .sd-top-bar {
@@ -176,10 +181,36 @@
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
 }
 
+.sd-mobile-nav {
+  display: none;
+  margin: 12px auto 0;
+  width: min(640px, 100%);
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sd-mobile-nav__item {
+  border: none;
+  background: hsla(0, 0%, 100%, 0.08);
+  color: var(--sd-text-primary);
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-family: "Audiowide", "Inter", sans-serif;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.sd-mobile-nav__item:hover {
+  background: hsla(0, 0%, 100%, 0.18);
+  transform: translateY(-1px);
+}
+
 .sd-top-bar > :first-child {
   justify-self: start;
 }
-
 .sd-top-bar > :last-child {
   justify-self: end;
 }
@@ -219,11 +250,13 @@
 }
 
 .sd-connect-btn {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
   border-radius: 999px !important;
   font-weight: 700 !important;
   padding: 0 18px !important;
   min-height: 48px;
-  box-shadow: 0 10px 30px rgba(14, 165, 233, 0.25);
   flex-shrink: 0;
 }
 
@@ -233,6 +266,8 @@
   border-radius: 30px;
   padding: clamp(20px, 4vw, 36px);
   box-shadow: inset 0 0 40px rgba(78, 112, 196, 0.15);
+  width: 100%;
+  margin: 0 auto;
 }
 
 .sd-eyebrow {
@@ -261,8 +296,10 @@
 
 .sd-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 20px;
+  width: 100%;
+  justify-content: center;
 }
 
 .sd-card {
@@ -279,15 +316,17 @@
 
 .sd-card-label {
   text-transform: uppercase;
-  font-size: 0.75rem;
+  font-size: clamp(0.65rem, 2vw, 0.75rem);
   letter-spacing: 0.2em;
   color: var(--sd-text-muted);
 }
 
 .sd-card-value {
-  font-size: 1.5rem;
+  font-size: clamp(1.2rem, 4vw, 1.6rem);
   font-weight: 600;
   color: var(--sd-text-primary);
+  word-break: break-word;
+  line-height: 1.2;
 }
 
 .sd-card-link {
@@ -309,22 +348,25 @@
 }
 
 .sd-card-value--xl {
-  font-size: 2.75rem;
+  font-size: clamp(2rem, 8vw, 2.75rem);
 }
 
 .sd-card--expires {
   align-items: center;
   text-align: center;
+  justify-content: center;
 }
 
 .sd-exp-circle {
-  width: clamp(120px, 22vw, 150px);
-  height: clamp(120px, 22vw, 150px);
+  width: clamp(110px, 22vw, 160px);
+  height: clamp(110px, 22vw, 160px);
   border-radius: 50%;
   border: 6px solid rgba(255, 255, 255, 0.18);
-  display: grid;
-  place-items: center;
-  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: clamp(1rem, 4vw, 1.4rem);
   font-weight: 600;
   margin: 12px auto 0;
 }
@@ -372,8 +414,7 @@
 
 @media (max-width: 768px) {
   .sd-main {
-    width: 100%;
-    padding: 0 20px 40px;
+    padding: 0 clamp(18px, 6vw, 32px) clamp(28px, 8vw, 56px);
   }
 
   .sd-status-banner {
@@ -381,20 +422,55 @@
   }
 
   .sd-top-bar {
-    justify-content: space-between;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    text-align: center;
+  }
+
+  .sd-logo {
+    height: 38px;
+    margin: 0 auto;
+  }
+
+  .sd-connect-btn {
+    width: auto;
+    min-width: clamp(180px, 70vw, 280px);
+    justify-content: center;
+    max-width: 320px;
+    align-self: center;
+    margin: 0 auto;
+  }
+
+  .sd-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(16px, 4vw, 24px);
+  }
+
+  .sd-mobile-nav {
+    display: flex;
+  }
+
+  .sd-mobile-nav__item {
+    flex: 1 1 calc(50% - 10px);
+    text-align: center;
   }
 }
 
 @media (max-width: 520px) {
   .sd-top-bar {
-    gap: 12px;
+    gap: 14px;
     flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
+    width: 100%;
   }
 
   .sd-connect-btn {
-    width: 100%;
-    justify-content: center;
+    width: auto;
+    min-width: clamp(160px, 80vw, 240px);
+    margin: 0 auto;
+    align-self: center;
   }
 
   .sd-top-left {
@@ -403,6 +479,22 @@
   }
 
   .sd-card-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .sd-card {
+    min-height: 120px;
+    padding: clamp(14px, 6vw, 20px);
+  }
+}
+
+@media (max-width: 360px) {
+  .sd-card-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sd-card-label {
+    letter-spacing: 0.12em;
   }
 }

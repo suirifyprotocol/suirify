@@ -94,15 +94,15 @@ const govMockDB = {
             dateOfBirth: '2006-11-05',
             gender: 'male',
             nationality: 'Nigerian',
-            address: 'House 7, Port Harcourt Rd',
+            address: 'House 9, Abuja Rd',
             issuingAuthority: 'National Identity Management Commission',
-            issuanceDate: '2020-03-05',
+            issuanceDate: '2021-04-06',
             expiryDate: null,
             // Use a hosted avatar as the reference photo so the backend can fetch it
-            photoReference: '/reference_photos/NGA-11223344556.png',
-            biometricHash: 'hash_example_3',
+            photoReference: '/reference_photos/NGA-.png',
+            biometricHash: 'hash_example_4',
             mrz: null,
-            barcodeData: 'barcode_ng_112',
+            barcodeData: 'barcode_ng_113',
             additionalNotes: ''
         }
     },
