@@ -4,6 +4,7 @@ import LoadingSpinner from "../common/LoadingSpinner";
 import { completeVerification } from "../../lib/apiService";
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { calculateAge } from "../../lib/identityUtils";
+import { toUserFacingMessage } from "../../lib/errorMessages";
 
 const DataFetchStep: React.FC<{
   formData: VerificationForm;
@@ -47,7 +48,7 @@ const DataFetchStep: React.FC<{
         setError("No verification data was returned for this session.");
       }
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Network error. Please try again.";
+      const message = toUserFacingMessage(e, "We couldn't retrieve your verified data. Please try again.");
       setError(message);
     } finally {
       setLoading(false);

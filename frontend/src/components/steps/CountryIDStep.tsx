@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import type { VerificationForm } from "../VerificationPortal";
 import type { CountryOption } from "../../lib/apiService";
 import { fetchCountries, startVerification } from "../../lib/apiService";
+import { toUserFacingMessage } from "../../lib/errorMessages";
 
 const countryConfig: Record<string, { idType: string; placeholder: string; pattern: RegExp }> = {
   Nigeria: { idType: "NIN", placeholder: "Enter your 11-digit NIN", pattern: /^\d{11}$/ },
@@ -37,7 +38,7 @@ const CountryIDStep: React.FC<{
       } catch (err) {
         // Prefer a small inline warning; keep flow usable with fallback options.
         if (mounted) {
-          setError((err as Error)?.message || "Failed to load countries. Using defaults.");
+          setError(toUserFacingMessage(err, "Failed to load countries. Using defaults."));
         }
       } finally {
         if (mounted) setLoadingCountries(false);
@@ -118,7 +119,7 @@ const CountryIDStep: React.FC<{
 
       onNext();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to start verification.";
+      const message = toUserFacingMessage(err, "We couldn't start your verification. Please try again.");
       setError(message);
     } finally {
       setSubmitting(false);

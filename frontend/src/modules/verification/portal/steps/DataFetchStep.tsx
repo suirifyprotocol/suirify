@@ -4,6 +4,7 @@ import LoadingSpinner from "@/modules/verification/ui/LoadingSpinner";
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { calculateAge } from "@/lib/identityUtils";
 import { completeVerification } from "@/lib/apiService";
+import { toUserFacingMessage } from "@/lib/errorMessages";
 
 /**
  * Step 3: Fetch verified data once the face match succeeds.
@@ -43,7 +44,7 @@ const DataFetchStep: React.FC<StepComponentProps> = ({ formData, setFormData, on
       }));
       setSuccess("Verified record retrieved successfully.");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to fetch verification data.";
+      const message = toUserFacingMessage(err, "We couldn't fetch your verification data. Please try again.");
       setError(message);
     } finally {
       setLoading(false);

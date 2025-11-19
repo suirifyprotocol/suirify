@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import type { StepComponentProps } from "../VerificationPortal";
 import { fetchCountries, startVerification, type CountryOption } from "@/lib/apiService";
+import { toUserFacingMessage } from "@/lib/errorMessages";
 
 type CountryConfig = {
   idType: string;
@@ -128,7 +129,7 @@ const CountryIDStep: React.FC<StepComponentProps> = ({ formData, setFormData, on
       setSessionMessage("Verification session created. Continue to face capture.");
       onNext();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to start verification.";
+      const message = toUserFacingMessage(err, "We couldn't start your verification. Please try again.");
       setError(message);
     } finally {
       setLoading(false);

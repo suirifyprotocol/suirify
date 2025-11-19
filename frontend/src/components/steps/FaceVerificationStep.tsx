@@ -4,6 +4,7 @@ import LoadingSpinner from "../common/LoadingSpinner";
 import WebcamFeed from "../common/WebcamFeed";
 import { verifyFace } from "../../lib/apiService";
 import { requestCameraStream } from "../../lib/camera";
+import { toUserFacingMessage } from "../../lib/errorMessages";
 
 type CaptureState = "idle" | "preparing" | "capturing" | "verifying" | "success" | "error";
 
@@ -115,8 +116,9 @@ const FaceVerificationStep: React.FC<{
       setStatus("capturing");
     } catch (e) {
       cleanupStream();
-      const message = e instanceof Error ? e.message : "Unable to access your camera.";
-      setError(message.includes("denied") ? "Camera permission was denied. Please allow access to continue." : message);
+      const rawMessage = e instanceof Error ? e.message : "";
+      const friendlyMessage = toUserFacingMessage(e, "Unable to access your camera.");
+      setError(rawMessage.toLowerCase().includes("denied") ? "Camera permission was denied. Please allow access to continue." : friendlyMessage);
       setStatus("error");
     }
   };
@@ -157,7 +159,7 @@ const FaceVerificationStep: React.FC<{
         setError("Face verification failed. Please ensure good lighting and try again.");
       }
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Face verification failed. Please try again.";
+      const message = toUserFacingMessage(e, "Face verification failed. Please try again.");
       setError(message);
       setStatus("error");
     }
@@ -174,7 +176,7 @@ const FaceVerificationStep: React.FC<{
       await ensureCamera();
       setStatus("capturing");
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Unable to access your camera.";
+      const message = toUserFacingMessage(e, "Unable to access your camera.");
       setError(message);
       setStatus("error");
     }

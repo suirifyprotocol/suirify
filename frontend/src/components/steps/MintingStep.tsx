@@ -5,6 +5,7 @@ import { explorer } from "../../lib/config";
 import { fetchMintConfig, finalizeMint, lookupMintRequest } from "../../lib/apiService";
 import { useCurrentAccount, useSignAndExecuteTransaction, useSuiClient } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
+import { toUserFacingMessage } from "../../lib/errorMessages";
 
 const MintingStep: React.FC<{
   formData: VerificationForm;
@@ -172,7 +173,7 @@ const MintingStep: React.FC<{
       if (err instanceof Error && (err as Error & { status?: number }).status === 409) {
         setError(err.message || "Wallet already holds an attestation. Please check your dashboard.");
       } else {
-        const message = err instanceof Error ? err.message : "Failed to mint attestation.";
+        const message = toUserFacingMessage(err, "Failed to mint attestation. Please try again.");
         setError(message);
       }
       setStatus("error");
