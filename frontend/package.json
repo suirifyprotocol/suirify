@@ -2,7 +2,6 @@
   "name": "suirify-frontend",
   "version": "1.0.0",
   "type": "module",
-  "homepage": "https://devnet.suirify.com",
   "scripts": {
     "suirify": "vite dev --host",
     "frontend": "vite dev --host",
