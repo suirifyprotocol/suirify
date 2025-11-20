@@ -39,7 +39,9 @@ async function handleRequest(request) {
 
 /// VSOCK Server
 const port = 5000;
-const server = vsock.createServer(async (conn) => {
+
+
+vsock.listen(port, (conn) => {
   console.log('Enclave: Parent application connected.');
   conn.on('data', async (buffer) => {
     try {
@@ -56,4 +58,3 @@ const server = vsock.createServer(async (conn) => {
 });
 
 console.log(`Enclave: VSOCK server listening on port ${port}...`);
-server.listen(port);
