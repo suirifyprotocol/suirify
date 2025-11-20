@@ -73,14 +73,14 @@ main, section { max-width: 100vw; overflow-x: clip; }
   min-height: 100vh;
   background-color: #0a1419;
   background-image: url('./assets/attestationbg.png');
-  background-size: cover;
-  background-position: center center;
-  background-repeat: no-repeat;
+  background-size: var(--attestation-bg-size, cover);
+  background-position: var(--attestation-bg-position, center top);
+  background-repeat: var(--attestation-bg-repeat, no-repeat);
   color: #ffffff;
   position: relative;
   /* Clip any accidental horizontal overflow from positioned elements */
   overflow-x: clip;
-  overflow-y: hidden;
+  overflow-y: visible;
 }
 
 
@@ -949,6 +949,13 @@ main, section { max-width: 100vw; overflow-x: clip; }
 }
 
 @media (max-width: 768px) {
+  .hero {
+    min-height: auto;
+    padding-bottom: clamp(40px, 12vw, 96px);
+    background-size: cover;
+    background-position: top center;
+  }
+
   .header {
     flex-direction: column;
     gap: 20px;

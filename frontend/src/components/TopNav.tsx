@@ -1,22 +1,41 @@
 import React from "react";
 import { ConnectButton } from "@mysten/dapp-kit";
+import suiLogo from "@/assets/suilogo.png";
 
-/**
- * TopNav
- * - Minimal verification navbar that only shows the ConnectButton centered at
- *   the top of the page so wallet actions stay accessible without extra chrome.
- */
 const TopNav: React.FC = () => {
   return (
-    <header className="verification-connect-nav">
-      <ConnectButton
-        className="suirify-connect-btn"
-        connectText="Connect wallet"
-        style={{
-          backgroundColor: "hsla(166, 100%, 93%, 1)",
-          color: "hsla(229, 19%, 22%, 1)",
-        }}
-      />
+    <header className="header verification-top-nav">
+      <div className="logo">
+        <a href="/" aria-label="Suirify home">
+          <img src={suiLogo} alt="Suirify logo" />
+        </a>
+      </div>
+
+      <nav className="nav-menu" aria-label="Primary">
+        <a href="/#how-it-works" className="nav-link">
+          How It Works
+        </a>
+        <a href="/#developers" className="nav-link">
+          Developers
+        </a>
+        <span className="nav-link resources-dropdown" aria-hidden="true">
+          Resources ▾
+        </span>
+        <a href="/#faqs" className="nav-link">
+          FAQ'S
+        </a>
+      </nav>
+
+      <div className="wallet-connect">
+        <ConnectButton
+          className="suirify-connect-btn"
+          connectText="Connect wallet"
+          style={{
+            backgroundColor: "hsla(166, 100%, 93%, 1)",
+            color: "hsla(229, 19%, 22%, 1)",
+          }}
+        />
+      </div>
     </header>
   );
 };

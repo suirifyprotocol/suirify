@@ -104,6 +104,27 @@ const govMockDB = {
             mrz: null,
             barcodeData: 'barcode_ng_113',
             additionalNotes: ''
+        },
+        'NGA-12345678903': {
+            country: 'Nigeria',
+            documentType: 'national_id',
+            idNumber: 'NGA-12345678903',
+            fullName: 'Suirify',
+            givenName: '',
+            familyName: 'Protocol',
+            dateOfBirth: '2025-11-20',
+            gender: 'male',
+            nationality: 'Nigerian',
+            address: 'House 9, Abuja Rd',
+            issuingAuthority: 'National Identity Management Commission',
+            issuanceDate: '2025-11-20',
+            expiryDate: null,
+            // Use a hosted avatar as the reference photo so the backend can fetch it
+            photoReference: '/reference_photos/NGA-5.png',
+            biometricHash: 'hash_example_5',
+            mrz: null,
+            barcodeData: 'barcode_ng_115',
+            additionalNotes: ''
         }
     },
 

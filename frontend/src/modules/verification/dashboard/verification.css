@@ -74,6 +74,7 @@
   -webkit-backdrop-filter: none;
   border-radius: var(--verification-radius);
   padding: 4rem 3rem;
+  margin: 0 auto;
   animation: cardFadeIn 0.8s ease-out;
 }
 
@@ -98,7 +99,7 @@
   margin: 0 0 1.5rem 0;
   text-transform: uppercase;
   max-width: 589px;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .verification-subtitle {
@@ -112,7 +113,9 @@
 }
 
 .verification-cta {
-  display: inline-block;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
   padding: 1rem 3rem;
   font-family: "Urbanist", sans-serif;
   font-size: 1.125rem;
@@ -127,6 +130,8 @@
   position: relative;
   overflow: hidden;
   line-height: 100%;
+  margin: 0 auto;
+  width: min(320px, 100%);
 }
 
 .verification-cta::before {
@@ -187,8 +192,7 @@
   }
 
   .verification-cta {
-    width: 100%;
-    max-width: 100%;
+    width: min(320px, 100%);
     padding: 1rem 2rem;
     font-size: 1rem;
   }

@@ -603,49 +603,58 @@ const ConnectedVerifyingPortal: React.FC = () => {
               <div className="step-header">Step 3/4</div>
               <h2 className="step-title">Verify Your Identity using {form.country || "ID"}</h2>
 
-              <div className="form-container">
-                <div className="form-group">
-                  <label className="form-label" htmlFor="fullName">Full Name</label>
-                  <div className="verified-input-wrapper">
-                    <input id="fullName" className="form-input verified-input" value={form.fullName} readOnly />
-                    {form.fullName && (
-                      <span className="verified-icon">
-                        <img src={markIcon} alt="Verified" />
-                      </span>
-                    )}
+              {loading && !form.fullName ? (
+                <div className="minting-container data-fetch-loader">
+                  <div className="minting-icon-wrapper">
+                    <SquareLoader />
+                  </div>
+                  <p className="minting-text">Fetching your verified data...</p>
+                </div>
+              ) : (
+                <div className="form-container">
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="fullName">Full Name</label>
+                    <div className="verified-input-wrapper">
+                      <input id="fullName" className="form-input verified-input" value={form.fullName} readOnly />
+                      {form.fullName && (
+                        <span className="verified-icon">
+                          <img src={markIcon} alt="Verified" />
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="dateOfBirth">Date Of Birth</label>
+                    <div className="verified-input-wrapper">
+                      <input id="dateOfBirth" className="form-input verified-input" value={form.dateOfBirth} readOnly />
+                      {form.dateOfBirth && (
+                        <span className="verified-icon">
+                          <img src={markIcon} alt="Verified" />
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {age !== null && (
+                    <div className={`form-group age-status ${age >= 18 ? "age-valid" : "age-invalid"}`}>
+                      {age >= 18 ? `✓ Age verified (${age} years)` : `✗ Must be 18 or older (${age} years)`}
+                    </div>
+                  )}
+                  {age !== null && age < 18 && (
+                    <p style={{ color: "#ef4444", fontWeight: 600 }}>
+                      Under 18? Your attestation will reflect this status, but you can still continue.
+                    </p>
+                  )}
+
+                  <div className="action-buttons-dual">
+                    <button className="back-btn" onClick={() => setCurrentStep(2)}>Back</button>
+                    <button className="next-btn" onClick={() => setCurrentStep(4)} disabled={!form.fullName || !form.dateOfBirth}>
+                      Continue
+                    </button>
                   </div>
                 </div>
-
-                <div className="form-group">
-                  <label className="form-label" htmlFor="dateOfBirth">Date Of Birth</label>
-                  <div className="verified-input-wrapper">
-                    <input id="dateOfBirth" className="form-input verified-input" value={form.dateOfBirth} readOnly />
-                    {form.dateOfBirth && (
-                      <span className="verified-icon">
-                        <img src={markIcon} alt="Verified" />
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {age !== null && (
-                  <div className={`form-group age-status ${age >= 18 ? "age-valid" : "age-invalid"}`}>
-                    {age >= 18 ? `✓ Age verified (${age} years)` : `✗ Must be 18 or older (${age} years)`}
-                  </div>
-                )}
-                {age !== null && age < 18 && (
-                  <p style={{ color: "#ef4444", fontWeight: 600 }}>
-                    Under 18? Your attestation will reflect this status, but you can still continue.
-                  </p>
-                )}
-
-                <div className="action-buttons-dual">
-                  <button className="back-btn" onClick={() => setCurrentStep(2)}>Back</button>
-                  <button className="next-btn" onClick={() => setCurrentStep(4)} disabled={!form.fullName || !form.dateOfBirth}>
-                    Continue
-                  </button>
-                </div>
-              </div>
+              )}
             </>
           )}
 
