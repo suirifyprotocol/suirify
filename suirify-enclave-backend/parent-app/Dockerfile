@@ -7,7 +7,11 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential python3 \
     && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm install
+
+FROM node:20.11-bullseye-slim AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Runtime image keeps only what we need to serve the parent API
@@ -19,11 +23,19 @@ WORKDIR /app
 RUN useradd --create-home --uid 10001 nodeapp
 
 # Copy application files and pre-built node_modules from the deps stage
-COPY --from=deps /app /app
-RUN chown -R nodeapp:nodeapp /app
+COPY --from=builder /app /app
 
+# Create directory for the database file and set permissions
+# This ensures the 'nodeapp' user can write to db.json
+RUN mkdir -p /app/data && \
+    touch /app/data/db.json && \
+    chown -R nodeapp:nodeapp /app/data
+
+# Set the user to the non-root user
 USER nodeapp
+
 EXPOSE 4000
+
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD node scripts/health_check.js || exit 1
 
