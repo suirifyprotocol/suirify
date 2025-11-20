@@ -4,7 +4,7 @@ const crypto = require('crypto');
 require('dotenv').config();
 const { normalizeCountryKey } = require('./mockDB');
 
-const DB_PATH = path.join(__dirname, 'db.json');
+const DB_PATH = path.join(__dirname, 'data', 'db.json');
 const SECRET_PEPPER = process.env.SECRET_PEPPER || '';
 const LOG_LIMIT = Number(process.env.DB_LOG_LIMIT || 500);
 const GOV_HISTORY_LIMIT = Number(process.env.DB_HISTORY_LIMIT || 200);
