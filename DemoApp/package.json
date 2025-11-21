@@ -12,13 +12,13 @@
   "dependencies": {
     "@mysten/dapp-kit": "^0.14.19",
     "@mysten/sui.js": "^0.52.0",
+    "@suirify/suirifysdk": "^0.1.2",
     "@tanstack/react-query": "^5.83.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.462.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.30.1",
-    "suirifysdk": "file:../sdk"
+    "react-router-dom": "^6.30.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",
