@@ -1,0 +1,51 @@
+{
+  "name": "suirifysdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for reading SUIrify attestation objects over Sui RPC.",
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rimraf dist && rollup -c",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit",
+    "dev:web-demo": "npm run build && cd src/examples/web-demo && npm install && npm run dev",
+    "demo:node": "npm run build && node ./src/examples/node-demo/demo.js"
+  },
+  "keywords": [
+    "sui",
+    "suirify",
+    "attestation",
+    "sdk",
+    "identity"
+  ],
+  "author": "SUIrify Protocol",
+  "license": "MIT",
+  "dependencies": {
+    "@mysten/sui.js": "^0.52.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^25.0.7",
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@types/node": "^20.11.25",
+    "rimraf": "^5.0.5",
+    "rollup": "^4.6.1",
+    "rollup-plugin-typescript2": "^0.36.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  }
+}
