@@ -9,7 +9,7 @@
 /suirify-enclave-backend/parent-app/reference_photos/*
 /suirify-enclave-backend/parent-app/.env
 /suirify-enclave-backend/tests/node_modules/*
-/suirify-enclave-backend/tests/.env
+/suirify-enclave-backend/tests/test.env
 ## /suirify-enclave-backend/parent-app/db.json
 /sdk/node_modules/*
 /DemoApp/node_modules/*
