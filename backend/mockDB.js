@@ -23,6 +23,26 @@ const govMockDB = {
             barcodeData: 'barcode_suirify_devnet',
             additionalNotes: 'Internal record for automated testing'
         },
+        'NGA-00000000001': {
+            country: 'Nigeria',
+            documentType: 'national_id',
+            idNumber: 'NGA-00000000000',
+            fullName: 'Suirify Devnet Enclave',
+            givenName: 'Enclave Devnet',
+            familyName: 'Enclave',
+            dateOfBirth: '2006-01-01',
+            gender: 'unspecified',
+            nationality: 'Nigerian',
+            address: 'Suirify Lab, Devnet',
+            issuingAuthority: 'Suirify Test Authority',
+            issuanceDate: '2024-01-01',
+            expiryDate: null,
+            photoReference: null,
+            biometricHash: 'hash_suirify_devnet',
+            mrz: null,
+            barcodeData: 'barcode_suirify_devnet',
+            additionalNotes: 'Internal record for automated testing'
+        },
         'NGA-12345678901': {
             country: 'Nigeria',
             documentType: 'national_id',
