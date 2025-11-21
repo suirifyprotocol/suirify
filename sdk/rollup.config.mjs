@@ -1,34 +1,19 @@
-import resolve from "@rollup/plugin-node-resolve";
-import commonjs from "@rollup/plugin-commonjs";
-import json from "@rollup/plugin-json";
-import typescript from "@rollup/plugin-typescript";
-import { createRequire } from "node:module";
-
-const require = createRequire(import.meta.url);
-const pkg = require("./package.json");
+import typescript from '@rollup/plugin-typescript';
 
 export default {
   input: "src/index.ts",
-  external: [
-    ...Object.keys(pkg.dependencies || {}),
-    ...Object.keys(pkg.peerDependencies || {})
-  ],
   output: [
-    {
-      file: pkg.main,
-      format: "cjs",
-      sourcemap: true
-    },
-    {
-      file: pkg.module,
-      format: "es",
-      sourcemap: true
-    }
+    { file: "dist/index.cjs", format: "cjs" },
+    { file: "dist/index.mjs", format: "esm" }
   ],
   plugins: [
-    resolve({ preferBuiltins: true }),
-    commonjs(),
-    json(),
-    typescript({ tsconfig: "./tsconfig.json" })
+    typescript({
+      tsconfig: "./tsconfig.json",
+
+      // 👇 REQUIRED to output .d.ts files
+      declaration: true,
+      declarationDir: "dist",
+      emitDeclarationOnly: false
+    })
   ]
 };

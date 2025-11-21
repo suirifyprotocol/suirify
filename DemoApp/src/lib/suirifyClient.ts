@@ -1,4 +1,4 @@
-import { SuirifySdk } from "suirifysdk";
+import { SuirifySdk } from "@suirify/suirifysdk";
 
 const defaultRpc =
   (typeof window !== "undefined" && (window as any)?.SUI_RPC_URL) ||
