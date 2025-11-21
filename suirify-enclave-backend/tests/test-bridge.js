@@ -1,10 +1,10 @@
 const net = require('net');
 
-// Connect to the Proxy (Socat) on port 8000
+// Connect to the Proxy (Socat) on port 3000
 const client = new net.Socket();
-console.log("Connecting to Proxy on 8000...");
+console.log("Connecting to Proxy on 3000...");
 
-client.connect(8000, '127.0.0.1', () => {
+client.connect(3000, '127.0.0.1', () => {
     console.log('✅ Connected to Enclave via Proxy!');
     
     // Send a dummy command the Enclave understands
