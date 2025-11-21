@@ -1,16 +1,14 @@
 import resolve from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
 import json from "@rollup/plugin-json";
-import typescript from "rollup-plugin-typescript2";
+import typescript from "@rollup/plugin-typescript";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const pkg = require("./package.json");
 
-const input = "src/index.ts";
-
 export default {
-  input,
+  input: "src/index.ts",
   external: [
     ...Object.keys(pkg.dependencies || {}),
     ...Object.keys(pkg.peerDependencies || {})
@@ -31,6 +29,6 @@ export default {
     resolve({ preferBuiltins: true }),
     commonjs(),
     json(),
-    typescript({ useTsconfigDeclarationDir: true })
+    typescript({ tsconfig: "./tsconfig.json" })
   ]
 };

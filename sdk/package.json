@@ -1,7 +1,7 @@
 {
-  "name": "suirifysdk",
-  "version": "0.1.0",
-  "description": "TypeScript SDK for reading SUIrify attestation objects over Sui RPC.",
+  "name": "@suirify/suirifysdk",
+  "version": "0.1.1",
+  "description": "TypeScript SDK for reading Suirify attestation objects over Sui RPC.",
   "type": "module",
   "main": "dist/index.cjs",
   "module": "dist/index.mjs",
@@ -14,8 +14,13 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "rimraf dist && rollup -c",
     "test": "vitest run",
@@ -29,10 +34,17 @@
     "suirify",
     "attestation",
     "sdk",
-    "identity"
+    "identity",
+    "web3",
+    "rpc",
+    "typescript"
   ],
-  "author": "SUIrify Protocol",
+  "author": "Suirify Protocol",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/suirifyprotocol/"
+  },
   "dependencies": {
     "@mysten/sui.js": "^0.52.0",
     "dotenv": "^16.4.5"
@@ -41,6 +53,7 @@
     "@rollup/plugin-commonjs": "^25.0.7",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-typescript": "^12.3.0",
     "@types/node": "^20.11.25",
     "rimraf": "^5.0.5",
     "rollup": "^4.6.1",

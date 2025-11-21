@@ -85,29 +85,6 @@ const claims = await client.getPublicClaims(walletAddress, [
 ]);
 ```
 
-See `src/examples/web-demo/src/App.tsx` for a practical implementation.
-
-## Web Demo
-
-The React demo illustrates the UX end-to-end:
-
-1. User connects a Sui wallet (or pastes an address).
-2. App uses `SuirifySdk` to discover the attestation object.
-3. If none found, the user is redirected to https://devnet.suirify.com to get verified.
-4. When found, the user hits **Request Public Claims**, triggering a consent modal + wallet signature.
-5. Approved claims unlock simulated launchpad actions (join allowlist, view hidden details, etc.).
-
-Run it locally:
-
-```bash
-npm run build
-cd src/examples/web-demo
-npm install
-npm run dev
-```
-
-Then open http://localhost:5175.
-
 ## Node Demo
 
 A light CLI script fetches and prints a wallet's attestation:
