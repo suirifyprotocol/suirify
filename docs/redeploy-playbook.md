@@ -99,7 +99,7 @@ The deployment script writes `/etc/suirify/parent.env`. Start from the template 
 - `SUI_NETWORK`, `SUI_RPC`
 - On-chain IDs: `PACKAGE_ID`, `ADMIN_CAP_ID`, `PROTOCOL_CONFIG_ID`, `ATTESTATION_REGISTRY_ID`
 - Secrets: `ADMIN_PRIVATE_KEY`, `SECRET_PEPPER`, `API_TOKEN_SECRET`, `ADMIN_API_KEY`
-- Enclave binding: `ENCLAVE_CONFIG_ID`, `ENCLAVE_OBJECT_ID`, `ENCLAVE_CID`, `ENCLAVE_PORT`
+- Enclave binding: `ENCLAVE_CONFIG_ID`, `ENCLAVE_OBJECT_ID`, `ENCLAVE_PROXY_HOST=127.0.0.1`, `ENCLAVE_PROXY_PORT=8000`
 - Networking: `ALLOWED_ORIGINS` (comma-separated) and `HOST`
 
 You can override any key inline when running the script using `--set-env KEY=value`.
@@ -125,6 +125,8 @@ The script performs:
 4. Pulls the tagged image
 5. Renders `/etc/systemd/system/suirify-parent.service`
 6. Reloads systemd and restarts the service
+
+>The deploy-parent.sh script has been updated to use `--network host`. This allows the Docker container to communicate with the `socat` proxy running on the host machine at port `8000`.
 
 ### 3.6 Verify the parent service
 
@@ -198,6 +200,20 @@ Stopping the enclave:
 ```bash
 sudo nitro-cli terminate-enclave --enclave-id <EnclaveID>
 ```
+Instead of running `nitro-cli` manually, use the bridge script which handles the enclave AND the proxy connection required for the Parent App to talk to it.
+
+```bash
+cd suirify-enclave-backend/
+./scripts/run_bridge.sh
+```
+Or, preferably, rely on the systemd service created:
+
+```bash
+cd suirify-enclave-backend/
+cd scripts/templates
+sudo systemctl start enclave.service
+```
+
 
 ### 4.5 Common enclave issues
 
@@ -211,8 +227,8 @@ sudo nitro-cli terminate-enclave --enclave-id <EnclaveID>
 
 ### 5.1 Security groups
 
-- Parent host SG: allow ALB health checks on TCP 4000, allow Nitro vsock (no SG needed for vsock itself), allow SSH from admin IPs.
-- ALB SG: allow inbound 443 from the internet, outbound 4000 to parent host SG.
+- Parent host SG: Allow inbound TCP 4000 (ALB Health CHecks)
+- Internal Traffic: Since we use localhost via `--network host` for the Parent->Enclave connection, no Security Group rules are needed for the app-to-enclave communication.
 
 ### 5.2 Application Load Balancer
 

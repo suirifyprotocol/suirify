@@ -9,8 +9,13 @@ const { getPolicyId } = require('./jurisdictionPolicies');
 const db = require('./persistentDB');
 const fs = require('fs');
 const path = require('path');
-const vsock = require('vsock');
+const net = require('net');
 const { BCS, getSuiMoveConfig } = require('@mysten/bcs');
+
+// Configuration
+// Connect to a local TCP port on the Parent OS, which tunnels to the Enclave
+const PROXY_PORT = process.env.ENCLAVE_PROXY_PORT || 8000; 
+const PROXY_HOST = process.env.ENCLAVE_PROXY_HOST || '127.0.0.1';
 
 // Ensure server-side WebSocket implementation exists for Sui subscriptions
 let WebSocketImpl = null;
@@ -193,8 +198,8 @@ const HOST = process.env.HOST || '0.0.0.0';
 const MIST_PER_SUI = BigInt(1_000_000_000);
 
 //ENCLAVE CONFIGURATION FROM ENVIRONMENT
-const ENCLAVE_CID = 3; // Default Context ID for the first enclave
-const ENCLAVE_PORT = 5000;
+// const ENCLAVE_CID = 3; // Default Context ID for the first enclave
+// const ENCLAVE_PORT = 5000;
 const ENCLAVE_CONFIG_ID = process.env.ENCLAVE_CONFIG_ID;
 const ENCLAVE_OBJECT_ID = process.env.ENCLAVE_OBJECT_ID;
 
@@ -670,29 +675,33 @@ async function signTransactionWithKeypair(keypair, txBytes) {
 /// NEW HELPER FUNCTIONS FOR ENCLAVE INTEGRATION
 
 /**
- * Sends a JSON payload to the Nitro Enclave over a secure VSOCK channel.
+ * Sends a JSON payload to the Nitro Enclave via the local TCP Proxy.
+ * The local socat instance (TCP:8000) forwards this to the Enclave (VSOCK:5000).
  * @param {object} payload The JSON object to send.
  * @returns {Promise<object>} The JSON response from the enclave.
  */
 async function sendToEnclave(payload) {
   return new Promise((resolve, reject) => {
-    const socket = vsock.connect(ENCLAVE_CID, ENCLAVE_PORT);
-    socket.on('connect', () => {
+    const socket = new net.Socket();
+    
+    // Connect to localhost:8000 (where socat is listening)
+    socket.connect(PROXY_PORT, PROXY_HOST, () => {
       socket.write(JSON.stringify(payload));
     });
+
     socket.on('data', (buffer) => {
       try {
         const response = JSON.parse(buffer.toString());
         resolve(response);
+        socket.destroy(); // Close connection after receiving response
       } catch (e) {
         reject(new Error("Invalid JSON response from enclave"));
-      } finally {
-        socket.end();
       }
     });
+
     socket.on('error', (err) => {
-      console.error("VSOCK connection error:", err);
-      reject(new Error("Failed to communicate with the secure enclave."));
+      console.error("Enclave Proxy connection error:", err);
+      reject(new Error("Failed to communicate with the secure enclave proxy. Ensure socat is running on port 8000."));
     });
   });
 }

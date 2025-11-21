@@ -5,7 +5,9 @@ Requires=docker.service
 
 [Service]
 Type=simple
+User=root
 EnvironmentFile=/etc/suirify/parent.env
+WorkingDirectory=/opt/suirify/suirify/suirify-enclave-backend/parent-app
 ExecStartPre=-/usr/bin/docker rm -f suirify-parent
 ExecStart=/usr/bin/docker run \
   --name suirify-parent \

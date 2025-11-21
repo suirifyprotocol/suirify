@@ -1,21 +1,16 @@
-const vsock = require('vsock');
+const net = require('net'); // Use standard TCP networking
 require('dotenv').config();
 const { Ed25519Keypair } = require('@mysten/sui/keypairs/ed25519');
 
-// --- Load the Enclave's Private Key ---
-// This key corresponds to the public key registered in the on-chain `Enclave` object.
-// It should be provided as a base64-encoded 32-byte secret.
 const ENCLAVE_PRIVATE_KEY = process.env.ENCLAVE_PRIVATE_KEY;
-
 if (!ENCLAVE_PRIVATE_KEY) {
-  throw new Error("Critical secret ENCLAVE_PRIVATE_KEY is not set in the enclave environment.");
+  throw new Error("Critical secret ENCLAVE_PRIVATE_KEY is not set.");
 }
 
 const enclaveKeypair = Ed25519Keypair.fromSecretKey(
   Buffer.from(ENCLAVE_PRIVATE_KEY, 'base64')
 );
 
-/// Enclave Logic
 async function handleRequest(request) {
   const { command, data } = request;
 
@@ -24,37 +19,40 @@ async function handleRequest(request) {
       return { success: false, error: 'payloadHex is required.' };
     }
     const payloadBytes = Buffer.from(data.payloadHex, 'hex');
-
-    // The enclave's sole responsibility: sign the payload bytes.
     const signature = await enclaveKeypair.sign(payloadBytes);
-
     return {
       success: true,
       signature: Buffer.from(signature).toString('base64'),
     };
   }
-
   return { success: false, error: 'Unknown command' };
 }
 
-/// VSOCK Server
-const port = 5000;
+// --- TCP Server (Standard Node.js) ---
+// Listen on internal TCP 3000. Socat forwards traffic here.
+const INTERNAL_PORT = 3000;
 
+const server = net.createServer((socket) => {
+  console.log('Enclave: Connection received via Proxy');
 
-vsock.listen(port, (conn) => {
-  console.log('Enclave: Parent application connected.');
-  conn.on('data', async (buffer) => {
+  socket.on('data', async (buffer) => {
     try {
       const request = JSON.parse(buffer.toString());
-      console.log('Enclave: Received command:', request.command);
+      console.log('Enclave: Processing command:', request.command);
+      
       const response = await handleRequest(request);
-      conn.write(JSON.stringify(response));
+      
+      // Send response and close connection immediately (request/response pattern)
+      socket.write(JSON.stringify(response));
+      socket.end(); 
     } catch (e) {
-      console.error('Enclave: Error processing request:', e.message);
-      conn.write(JSON.stringify({ success: false, error: e.message }));
+      console.error('Enclave: Error:', e.message);
+      socket.write(JSON.stringify({ success: false, error: e.message }));
+      socket.end();
     }
   });
-  conn.on('end', () => console.log('Enclave: Parent application disconnected.'));
 });
 
-console.log(`Enclave: VSOCK server listening on port ${port}...`);
+server.listen(INTERNAL_PORT, '127.0.0.1', () => {
+  console.log(`Enclave App listening on 127.0.0.1:${INTERNAL_PORT}`);
+});
