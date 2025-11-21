@@ -1,20 +1,25 @@
 # syntax=docker/dockerfile:1.6
 
-ARG NODE_VERSION=20.11.0
+FROM amazonlinux:2023 AS base
 
-FROM node:${NODE_VERSION}-bookworm-slim AS base
+# Install Node.js 20 and SOCAT
+RUN yum update -y && \
+    yum install -y nodejs20 npm gcc-c++ make shadow-utils socat && \
+    yum clean all && \
+    rm -rf /var/cache/yum
+
 WORKDIR /app
-ENV NODE_ENV=production \
-	VSOCK_PORT=5000
+ENV NODE_ENV=production
 
 FROM base AS deps
+WORKDIR /app
 COPY package*.json ./
-RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev
+# Remove vsock from dependencies if present in package.json, or just install
+RUN npm uninstall vsock && npm ci --omit=dev
 
 FROM base AS runner
-LABEL org.opencontainers.image.source="https://github.com/suirifyprotocol/suirify" \
-	  org.opencontainers.image.description="Suirify enclave runtime image" \
-	  org.opencontainers.image.licenses="GPL-3.0"
+ARG ENCLAVE_PRIVATE_KEY
+ENV ENCLAVE_PRIVATE_KEY=${ENCLAVE_PRIVATE_KEY}
 
 RUN useradd --system --uid 10001 --create-home enclave
 
@@ -24,8 +29,11 @@ COPY . .
 RUN chown -R enclave:enclave /app
 
 USER enclave
-EXPOSE 5000
 
-HEALTHCHECK --interval=60s --timeout=5s --start-period=5s --retries=3 CMD node -e "process.exit(0)" || exit 1
+# No EXPOSE needed for Nitro Enclave
+# The internal app is on 3000, VSOCK is 5000.
 
-CMD ["node", "enclave.js"]
+# 1. Start Node app in background (listening on TCP 3000)
+# 2. Start socat to listen on VSOCK 5000 and forward to TCP 3000
+CMD node enclave.js & \
+    socat VSOCK-LISTEN:5000,fork,reuseaddr TCP:127.0.0.1:3000

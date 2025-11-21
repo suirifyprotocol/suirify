@@ -1,12 +1,10 @@
 # syntax=docker/dockerfile:1.6
 
-# Install production dependencies (including native vsock module) in a builder layer
 FROM node:20.11-bullseye-slim AS deps
 WORKDIR /app
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential python3 \
-    && rm -rf /var/lib/apt/lists/*
+
 COPY package.json package-lock.json ./
+# RUN npm ci --omit=dev
 RUN npm install
 
 FROM node:20.11-bullseye-slim AS builder
@@ -28,7 +26,7 @@ COPY --from=builder /app /app
 # Create directory for the database file and set permissions
 # This ensures the 'nodeapp' user can write to db.json
 RUN mkdir -p /app/data && \
-    touch /app/data/db.json && \
+    ##touch /app/data/db.json && \
     chown -R nodeapp:nodeapp /app/data
 
 # Set the user to the non-root user
@@ -37,6 +35,6 @@ USER nodeapp
 EXPOSE 4000
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD node scripts/health_check.js || exit 1
+  CMD node -e "require('http').get('http://localhost:4000/health', (res) => { if (res.statusCode !== 200) { process.exit(1); } process.exit(0); }).on('error', (err) => process.exit(1));"
 
 CMD ["node", "index.js"]

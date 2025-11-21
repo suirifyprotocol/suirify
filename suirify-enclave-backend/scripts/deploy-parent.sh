@@ -157,7 +157,8 @@ for pair in "${DECLARE_VARS[@]}"; do
 
 done
 
-DOCKER_EXTRA_ARGS=""
+DOCKER_EXTRA_ARGS="  --network host \\"
+DOCKER_EXTRA_ARGS+=$'\n'
 if [[ ${#DOCKER_VOLUMES[@]} -gt 0 ]]; then
   while IFS= read -r vol; do
     [[ -z "$vol" ]] && continue

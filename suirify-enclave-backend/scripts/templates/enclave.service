@@ -1,0 +1,18 @@
+[Unit]
+Description=Suirify Nitro Enclave and Proxy Bridge
+After=network.target docker.service nitro-enclaves-allocator.service
+Requires=nitro-enclaves-allocator.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/suirify/suirify/suirify-enclave-backend/
+ExecStart=/opt/suirify/suirify/suirify-enclave-backend/scripts/run_bridge.sh
+Restart=always
+RestartSec=5
+
+# Clean up processes if the service crashes
+KillMode=control-group
+
+[Install]
+WantedBy=multi-user.target
