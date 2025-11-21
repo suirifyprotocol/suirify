@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # 1. The Simulated Enclave
+  enclave-sim:
+    build:
+      context: ./enclave-app
+      dockerfile: Dockerfile
+    container_name: suirify_enclave_local
+    # OVERRIDE: Production uses socat/vsock. Locally we just run Node.
+    entrypoint: ["node", "enclave.js"]
+    expose:
+      - "3000"
+    environment:
+      - ENCLAVE_PRIVATE_KEY=${ENCLAVE_PRIVATE_KEY}
+    networks:
+      - suirify-net
+
+  # 2. The Proxy Bridge (Simulating the EC2 Socat)
+  # This makes "enclave-bridge:8000" look just like "localhost:8000" will in prod
+  enclave-bridge:
+    image: alpine/socat
+    container_name: suirify_bridge_local
+    # Forward traffic coming to port 8000 -> to enclave-sim port 3000
+    command: TCP-LISTEN:8000,fork,reuseaddr TCP:enclave-sim:3000
+    depends_on:
+      - enclave-sim
+    networks:
+      - suirify-net
+
+  # 3. The Parent App
+  parent-app:
+    build:
+      context: ./parent-app
+      dockerfile: Dockerfile
+    container_name: suirify_parent_local
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+      # CONNECT TO THE BRIDGE, NOT THE ENCLAVE DIRECTLY
+      - ENCLAVE_PROXY_HOST=enclave-bridge
+      - ENCLAVE_PROXY_PORT=8000
+      
+      # Load other vars from your .env file
+      - SUI_NETWORK=${SUI_NETWORK}
+      - SUI_RPC=${SUI_RPC}
+      - PACKAGE_ID=${PACKAGE_ID}
+      - ADMIN_CAP_ID=${ADMIN_CAP_ID}
+      - PROTOCOL_CONFIG_ID=${PROTOCOL_CONFIG_ID}
+      - ATTESTATION_REGISTRY_ID=${ATTESTATION_REGISTRY_ID}
+      - JURISDICTION_POLICY_MAP=${JURISDICTION_POLICY_MAP}
+      - JURISDICTION_POLICY_ID=${JURISDICTION_POLICY_ID}
+      - ENCLAVE_CONFIG_ID=${ENCLAVE_CONFIG_ID}
+      - ENCLAVE_OBJECT_ID=${ENCLAVE_OBJECT_ID}
+      - ADMIN_PRIVATE_KEY=${ADMIN_PRIVATE_KEY}
+      - SECRET_PEPPER=${SECRET_PEPPER}
+      - ADMIN_API_KEY=${ADMIN_API_KEY}
+    depends_on:
+      - enclave-bridge
+    networks:
+      - suirify-net
+
+networks:
+  suirify-net:

@@ -10,12 +10,36 @@ const db = require('./persistentDB');
 const fs = require('fs');
 const path = require('path');
 const net = require('net');
-const { BCS, getSuiMoveConfig } = require('@mysten/bcs');
+const { bcs } = require('@mysten/bcs');
+const { fromHex } = require('@mysten/sui/utils');
 
 // Configuration
 // Connect to a local TCP port on the Parent OS, which tunnels to the Enclave
 const PROXY_PORT = process.env.ENCLAVE_PROXY_PORT || 8000; 
 const PROXY_HOST = process.env.ENCLAVE_PROXY_HOST || '127.0.0.1';
+
+// Parse the Policy Map from Environment
+let POLICY_MAP = {};
+try {
+  const mapStr = process.env.JURISDICTION_POLICY_MAP;
+  if (mapStr) {
+    POLICY_MAP = JSON.parse(mapStr);
+    console.log("Loaded Jurisdiction Policy Map:", Object.keys(POLICY_MAP));
+  }
+} catch (e) {
+  console.warn("Failed to parse JURISDICTION_POLICY_MAP from .env", e.message);
+}
+
+// Helper to get Policy ID (replaces external file requirement if needed)
+function resolvePolicyId(countryName) {
+  // Check exact match
+  if (POLICY_MAP[countryName]) return POLICY_MAP[countryName];
+  
+  // Check normalized match (e.g., "Nigeria" vs "nigeria")
+  const norm = normalizeCountryKey(countryName);
+  const found = Object.keys(POLICY_MAP).find(k => normalizeCountryKey(k) === norm);
+  return found ? POLICY_MAP[found] : process.env.JURISDICTION_POLICY_ID || null;
+}
 
 // Ensure server-side WebSocket implementation exists for Sui subscriptions
 let WebSocketImpl = null;
@@ -624,7 +648,7 @@ function resolveVerificationLevelFromDocument(govRecord) {
     'nin',
     'nid',
     'ssn',
-    'bvn',
+    //'bvn',
   ];
   const matchesKeyword = nationalIdKeywords.some((kw) => normalized.includes(kw) || compact === kw.replace(/\s+/g, ''));
   if (matchesKeyword) {
@@ -713,21 +737,53 @@ async function sendToEnclave(payload) {
  * @returns {string} The hex-encoded string of the serialized data.
  */
 function serializeMintPayload(data) {
-  const bcs = new BCS(getSuiMoveConfig());
-  const writer = bcs.writer();
+  try {
+    // Helper to convert Hex Address to Byte Array (32 bytes)
+    const toBytes = (hex) => {
+      const clean = hex.startsWith('0x') ? hex.slice(2) : hex;
+      return Buffer.from(clean, 'hex');
+    };
+    // 1. Serialize Request ID (Address -> 32 bytes)
+    const requestIdBytes = bcs.bytes(32).serialize(toBytes(data.requestId)).toBytes();
+    // 2. Serialize Recipient (Address -> 32 bytes)
+    const recipientBytes = bcs.bytes(32).serialize(toBytes(data.recipient)).toBytes();
+    // 3. Serialize Jurisdiction Code (u16)
+    const jurisdictionBytes = bcs.u16().serialize(data.jurisdictionCode).toBytes();
+    // 4. Serialize Verification Level (u8)
+    const levelBytes = bcs.u8().serialize(data.verificationLevel).toBytes();
+    // 5. Serialize Verifier Source (u8)
+    const sourceBytes = bcs.u8().serialize(data.verifierSource).toBytes();
+    // 6. Serialize Name Hash (vector<u8>)
+    const nameHashArray = Array.from(data.nameHash); 
+    const nameHashBytes = bcs.vector(bcs.u8()).serialize(nameHashArray).toBytes();
+    // 7. Serialize Booleans (bool)
+    const humanBytes = bcs.bool().serialize(data.isHumanVerified).toBytes();
+    const over18Bytes = bcs.bool().serialize(data.isOver18).toBytes();
+    // 8. Serialize Verifier Version (u8)
+    const versionBytes = bcs.u8().serialize(data.verifierVersion).toBytes();
+    // 9. Serialize Issued Timestamp (u64)
+    const issuedBytes = bcs.u64().serialize(data.issuedMs).toBytes();
 
-  writer.write(bcs.ser('address', data.requestId).toBytes());
-  writer.write(bcs.ser('address', data.recipient).toBytes());
-  writer.write16(data.jurisdictionCode);
-  writer.write8(data.verificationLevel);
-  writer.write8(data.verifierSource);
-  writer.writeVec(data.nameHash, (w, el) => w.write8(el)); // Serialize vector<u8>
-  writer.write8(data.isHumanVerified ? 1 : 0); // Serialize bool as u8
-  writer.write8(data.isOver18 ? 1 : 0); // Serialize bool as u8
-  writer.write8(data.verifierVersion);
-  writer.write64(BigInt(data.issuedMs)); // Serialize u64
+    // Combine all buffers in the EXACT order of the Move struct
+    const combined = Buffer.concat([
+      Buffer.from(requestIdBytes),
+      Buffer.from(recipientBytes),
+      Buffer.from(jurisdictionBytes),
+      Buffer.from(levelBytes),
+      Buffer.from(sourceBytes),
+      Buffer.from(nameHashBytes),
+      Buffer.from(humanBytes),
+      Buffer.from(over18Bytes),
+      Buffer.from(versionBytes),
+      Buffer.from(issuedBytes)
+    ]);
 
-  return Buffer.from(writer.getBytes()).toString('hex');
+    return combined.toString('hex');
+
+  } catch (e) {
+    console.error("Serialization Error:", e);
+    throw new Error(`Failed to serialize payload: ${e.message}`);
+  }
 }
 
 /**
@@ -834,15 +890,16 @@ app.post('/start-verification', (req, res) => {
   const sessionId = crypto.randomBytes(16).toString('hex');
 
   // Resolve country-specific jurisdiction policy id (may come from env map or defaults)
-  const policyId = getPolicyId(normCountry) || JURISDICTION_POLICY_ID || null;
+  // const policyId = getPolicyId(normCountry) || JURISDICTION_POLICY_ID || null;
+  const policyId = resolvePolicyId(country);
   if (!policyId) {
     // allow session creation but warn; creation can proceed if policy is optional downstream
-    console.warn(`No jurisdiction policy id configured for country ${normCountry}.`);
+    console.warn(`No jurisdiction policy id configured for country ${Country}.`);
   }
 
   // store resolved iso code and policyId so later steps don't need to re-resolve
   verificationSessionStore.set(sessionId, { govRecord: record, country: normCountry, idNumber, jurisdictionCode: iso, policyId });
-  res.json({ success: true, sessionId });
+  res.json({ success: true, sessionId, policyId });
 });
 
 /**
@@ -1234,9 +1291,9 @@ app.post('/finalize-mint', async (req, res) => {
 
     // 5. The parent application's admin/sponsor signs and executes the transaction block.
     // This pays the gas fees for the transaction.
-    const executionResult = await suiClient.signAndExecuteTransactionBlock({
+    const executionResult = await suiClient.signAndExecuteTransaction({
       signer: adminKeypair,
-      transactionBlock: txb,
+      transaction: txb,
       options: { showEffects: true, showEvents: true, showObjectChanges: true },
       requestType: 'WaitForLocalExecution',
     });
