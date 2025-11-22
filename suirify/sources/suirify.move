@@ -151,8 +151,8 @@ module suirify::protocol {
             string::utf8(b"Suirify Attestation"),
             string::utf8(b"A soulbound, non-transferable identity attestation for the Sui ecosystem."),
             //string::utf8(b"https://devnet.suirify.com"),
-            string::utf8(b"https://i.ibb.co/NnQJgG9p/suirifyimg.png"),
-            string::utf8(b"https://i.ibb.co/NnQJgG9p/suirifyimg.png"),
+            string::utf8(b"https://i.ibb.co/sdh5jBSg/suirifyid.jpg"),
+            string::utf8(b"https://i.ibb.co/sdh5jBSg/suirifyid.jpg"),
             string::utf8(b"Suirify Protocol"),
             string::utf8(b"https://devnet.suirify.com"),
             //string::utf8(b"Jurisdiction Code: {jurisdiction_code}")
