@@ -2,46 +2,48 @@
 
 ![Suirify Logo](suirifyLogo.png)
 
-[![CI](https://github.com/suirifyprotocol/suirify/actions/workflows/ci.yml/badge.svg)](https://github.com/suirifyprotocol/suirify/actions) [![npm](https://img.shields.io/npm/v/suirify-sdk?label=npm)](https://www.npmjs.com/package/@suirify/suirifysdk)
+[![CI](https://github.com/suirifyprotocol/suirify/actions/workflows/ci.yml/badge.svg)](https://github.com/suirifyprotocol/suirify/actions)
+[![npm](https://img.shields.io/npm/v/suirify-sdk?label=npm)](https://www.npmjs.com/package/@suirify/suirifysdk)
+
 **Suirify** is a privacy-first sovereign identity protocol built on the Sui blockchain. We enable _verify once, use everywhere_ with consent-first, on-chain attestation objects that let dApps gate features without storing personal data.
 
 ---
 
-## Quick links
+## 📎 Quick Links
 
-- Repo: https://github.com/suirifyprotocol/suirify
-- Live demo: https://demoapp-gg11.onrender.com
-- Devnet portal: https://devnet.suirify.com
-- Docs / Wiki: (see repository Wiki or `docs/` folder)
+- [Repository](https://github.com/suirifyprotocol/suirify)
+- [Live Demo](https://demoapp-gg11.onrender.com)
+- [Devnet Portal](https://devnet.suirify.com)
+- [Documentation & Wiki](./docs/README.md)
 - Contact: hello@suirify.com
 
 ---
 
-## Why Suirify?
+## 🚀 Why Suirify?
 
-Suirify solves Web3's identity friction by combining privacy and verifiability:
+- **Privacy-first:** PII is processed in memory, then deleted; apps read only sanitized public claims.
+- **Reusable credentials:** One verification issues an on-chain attestation users can present across dApps.
+- **Compliance-friendly:** Auditable attestations enable compliant DeFi, KYC gating, and age checks.
+- **Designed for emerging markets:** First focus: Nigeria (NIN), then scale globally.
 
-- **Privacy-first** — PII is processed in memory, then deleted; apps read only sanitized public claims.
-- **Reusable credentials** — one verification issues an on-chain attestation users can present across dApps.
-- **Compliance-friendly** — auditable attestations enable compliant DeFi, KYC gating, and age checks.
-- **Designed for emerging markets** — first focus: Nigeria (NIN), then scale globally.
+---
 
-## Quickstart (run demo locally)
+## 🏁 Quickstart (Run Demo Locally)
 
-1. Clone the repo
+1. **Clone the repository**
 
 ```bash
 git clone https://github.com/suirifyprotocol/suirify
 cd suirify
 ```
 
-2. Install dependencies (root / per workspace)
+2. **Install dependencies** (Node.js >= 18 recommended)
 
 ```bash
 npm install
 ```
 
-3. Run the demo app
+3. **Run the demo app**
 
 ```bash
 cd DemoApp
@@ -50,47 +52,39 @@ npm run dev
 # Open the URL printed by the Vite dev server
 ```
 
-Full deployment instructions and production considerations (keys, webhook security, CI) live in **docs/README.md** and the project Wiki.
+Full deployment and production instructions (keys, webhook security, CI) are in [docs/README.md](./docs/README.md) and the project Wiki.
 
 ---
 
-## What you can build with Suirify
+## 🛠️ What You Can Build with Suirify
 
-- Verified-only Application, launchpads and token pre-sales
-- KYC-gated Applications
+- Verified-only applications, launchpads, and token pre-sales
+- KYC-gated applications
 - Sybil-resistant social platforms and governance
 - Age-restricted content and on-chain identity primitives
-- Many More...
+- ...and much more!
 
 ---
 
-## Contribute
-
-We welcome contributors.  
-See the `docs/` folder for contribution guidelines and the code of conduct.
-
----
-
-````markdown
-## Contents
+## 📖 Table of Contents
 
 - [Overview](#overview)
-- [Getting started](#getting-started)
-- [SDK Quickstart (conceptual)](#sdk-quickstart-conceptual)
-- [Demo (Verified Launchpad)](#demo-verified-launchpad)
+- [Getting Started](#getting-started)
+- [SDK Quickstart](#sdk-quickstart)
+- [Demo (Verified Launchpad)](#demo--verified-launchpad)
 - [Configuration & Environment](#configuration--environment)
-- [Consent handler pattern](#consent-handler-pattern)
-- [API / SDK Reference (v1.0)](#api--sdk-reference-v10)
+- [Consent Handler Pattern](#consent-handler-pattern)
+- [API / SDK Reference](#api--sdk-reference)
 - [Security & Privacy](#security--privacy)
 - [FAQ](#faq)
-- [Contributing & Code of Conduct](#contributing--code-of-conduct)
+- [Contributing](#contributing)
 - [Contact](#contact)
 
 ---
 
 ## Overview
 
-Suirify issues non-transferable attestation objects on Sui that represent a verified identity claim.  
+Suirify issues non-transferable attestation objects on Sui that represent a verified identity claim.
 The SDK provides a read-only, consent-first interface for dApps to:
 
 1. Discover whether a wallet owns a `Suirify_Attestation` on-chain.
@@ -102,25 +96,24 @@ This repo contains the SDK client code and an example Verified Launchpad demo sh
 
 ---
 
-## Getting started
+## Getting Started
 
-See the repo root README for a short quickstart, or follow the steps below for a local development setup:
+See the [Quickstart](#quickstart-run-demo-locally) above, or follow these steps for local development:
 
-1. Clone the repository
+1. **Clone the repository**
 
 ```bash
 git clone https://github.com/suirifyprotocol/suirify
 cd suirify
 ```
-````
 
-2. Install dependencies (recommended: Node.js >= 18)
+2. **Install dependencies**
 
 ```bash
 npm install
 ```
 
-3. Start the demo app
+3. **Start the demo app**
 
 ```bash
 cd DemoApp
@@ -130,17 +123,17 @@ npm run dev
 
 ---
 
-## SDK Quickstart (conceptual)
+## SDK Quickstart
 
 - Create a singleton `SuirifySdk` client with your `SUI_RPC_URL` and optional `SUIRIFY_ATTESTATION_TYPE`.
 - Register a `consentHandler` in your app that opens a modal asking the user to sign a consent message.
 - On wallet connect:
-  - call `getAttestationForOwner(address)`
-  - if found, call `getPublicClaims(address, fields)` after consent
+  - Call `getAttestationForOwner(address)`
+  - If found, call `getPublicClaims(address, fields)` after consent
 - Cache claims in your app state and gate UI interactions.
 - For high-value flows, always re-validate server-side.
 
-See `docs/API.md` for the full API reference and method signatures.
+See [`docs/API.md`](./docs/API.md) for the full API reference and method signatures.
 
 ---
 
@@ -153,7 +146,7 @@ The DemoApp showcases:
 - Consent modal pattern (user signs to authorize claims reads)
 - Allowlist join, comment/vote, and simulated token claim flows (client-side/mocked)
 
-Live demo: **https://demoapp-gg11.onrender.com**
+Live demo: [https://demoapp-gg11.onrender.com](https://demoapp-gg11.onrender.com)
 
 ---
 
@@ -174,12 +167,11 @@ VITE_SUIRIFY_FORCE_MOCK=false
 
 ---
 
-## Consent handler pattern
+## Consent Handler Pattern
 
-The SDK is UI-agnostic.  
-You must implement and register:
+The SDK is UI-agnostic. You must implement and register:
 
-```
+```js
 consentHandler(scopes: string[])
 ```
 
@@ -190,15 +182,13 @@ It should:
 - Prompt the user to sign a short message containing address + timestamp
 - Resolve `true` or `false`
 
-The SDK will abort the RPC read if the user denies consent.
-
-This pattern gives users control and creates an auditable consent record.
+The SDK will abort the RPC read if the user denies consent. This pattern gives users control and creates an auditable consent record.
 
 ---
 
-## API / SDK Reference (v1.0)
+## API / SDK Reference
 
-See `docs/API.md` (linked soon).
+See [`docs/API.md`](./docs/API.md).
 
 Core client class and methods:
 
@@ -213,13 +203,13 @@ Core client class and methods:
 
 ## Security & Privacy
 
-The client SDK is intentionally _read-only_.  
+The client SDK is intentionally _read-only_.
 Production deployments must:
 
 - Keep attester/issuer keys **server-side** (Vault / GCP KMS / AWS KMS)
 - Use **server-side verification** for high-value flows
 - Never commit `.env` or private keys
-- Review `docs/Security.md` for full hardening
+- Review [`docs/security.md`](./docs/security.md) for full hardening
 
 ---
 
@@ -231,25 +221,23 @@ A: No. Issuance is performed by Suirify’s verification backend.
 **Q: Can I store claim data?**  
 A: Only store minimal non-PII fields (attestation ID, wallet, expiry, verification level).
 
-See `docs/FAQ.md` for more Q&A.
+See [`docs/faq.md`](./docs/faq.md) for more Q&A.
 
 ---
 
-## Contributing & Code of Conduct
+## Contributing
 
-We welcome contributions.  
-Open issues for feature requests and use pull requests for code changes.
-
-See `docs/CONTRIBUTING.md`.
+We welcome contributions! Open issues for feature requests and use pull requests for code changes.
+See [`docs/contributing.md`](./docs/contributing.md) for guidelines and code of conduct.
 
 ---
 
 ## Contact
 
-Website: https://devnet.suirify.com  
-Demo: https://demoapp-gg11.onrender.com  
-GitHub: https://github.com/suirifyprotocol/suirify  
-Email: hello@suirify.com
+- Website: [https://devnet.suirify.com](https://devnet.suirify.com)
+- Demo: [https://demoapp-gg11.onrender.com](https://demoapp-gg11.onrender.com)
+- GitHub: [https://github.com/suirifyprotocol/suirify](https://github.com/suirifyprotocol/suirify)
+- Email: hello@suirify.com
 
 ```
 

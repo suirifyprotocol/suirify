@@ -65,6 +65,17 @@ const idValidation: Record<string, { placeholder: string; pattern: RegExp }> = {
   Nigeria: { placeholder: "Enter your 11-digit NIN", pattern: /^\d{11}$/ },
   Ghana: { placeholder: "Enter Ghana Card number", pattern: /^GHA-\w{9}$/ },
   Kenya: { placeholder: "Enter National ID", pattern: /^\d{8}$/ },
+  "United States": { placeholder: "Enter your 9-digit SSN (AAA-GG-SSSS)", pattern: /^\d{3}-?\d{2}-?\d{4}$/ },
+  "South Africa": { placeholder: "Enter your 13-digit ID (YYMMDDSSSSCAZ)", pattern: /^\d{13}$/ },
+  India: { placeholder: "Enter your 12-digit Aadhaar", pattern: /^\d{12}$/ },
+  Canada: { placeholder: "Enter your 9-digit SIN", pattern: /^\d{9}$/ },
+  "United Kingdom (UK)": { placeholder: "Enter your NINO (AB123456C)", pattern: /^[A-CEGHJ-PR-TW-Z]{2}\d{6}[A-D]$/i },
+  China: { placeholder: "Enter your 18-digit Resident ID", pattern: /^\d{17}[\dXx]$/ },
+  Japan: { placeholder: "Enter your 12-digit My Number", pattern: /^\d{12}$/ },
+  Germany: { placeholder: "Enter your German ID (alphanumeric)", pattern: /^[A-Z0-9]{9,12}$/i },
+  France: { placeholder: "Enter your French ID", pattern: /^[A-Z0-9]{10,15}$/i },
+  Brazil: { placeholder: "Enter your 11-digit CPF", pattern: /^\d{11}$/ },
+  Australia: { placeholder: "Enter your TFN or Medicare number", pattern: /^\d{8,12}$/ },
 };
 
 const ConnectedVerifyingPortal: React.FC = () => {

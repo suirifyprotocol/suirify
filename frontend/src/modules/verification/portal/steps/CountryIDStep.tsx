@@ -17,17 +17,77 @@ const COUNTRY_CONFIG: Record<string, CountryConfig> = {
     pattern: /^\d{11}$/,
     example: "12345678901",
   },
+  "United States": {
+    idType: "Social Security Number (SSN)",
+    placeholder: "Enter your 9-digit SSN (AAA-GG-SSSS)",
+    pattern: /^\d{3}-\d{2}-\d{4}$/,
+    example: "123-45-6789",
+  },
+  "South Africa": {
+    idType: "National ID",
+    placeholder: "Enter your 13-digit ID (YYMMDDSSSSCAZ)",
+    pattern: /^\d{13}$/,
+    example: "8001015009087",
+  },
+  India: {
+    idType: "Aadhaar",
+    placeholder: "Enter your 12-digit Aadhaar",
+    pattern: /^\d{12}$/,
+    example: "234567890123",
+  },
   Ghana: {
     idType: "Ghana Card Number",
     placeholder: "Enter your Ghana Card ID (e.g. GHA-123456789)",
-    pattern: /^GHA-[A-Z0-9]{9}$/i,
+    pattern: /^GHA-\d{9}$/i,
     example: "GHA-123456789",
   },
-  Kenya: {
-    idType: "Kenya National ID",
-    placeholder: "Enter your National ID (8 digits)",
-    pattern: /^\d{8}$/,
-    example: "12345678",
+  Canada: {
+    idType: "Social Insurance Number (SIN)",
+    placeholder: "Enter your 9-digit SIN",
+    pattern: /^\d{9}$/,
+    example: "123456789",
+  },
+  "United Kingdom (UK)": {
+    idType: "National Insurance Number (NINO)",
+    placeholder: "Enter your NINO (AB123456C)",
+    pattern: /^[A-CEGHJ-PR-TW-Z]{2}\d{6}[A-D]$/i,
+    example: "AB123456C",
+  },
+  China: {
+    idType: "Resident Identity Card",
+    placeholder: "Enter your 18-digit Resident ID",
+    pattern: /^\d{17}[\dXx]$/,
+    example: "11010519491231002X",
+  },
+  Japan: {
+    idType: "My Number (Individual Number)",
+    placeholder: "Enter your 12-digit My Number",
+    pattern: /^\d{12}$/,
+    example: "123456789012",
+  },
+  Germany: {
+    idType: "Personalausweis (ID Card)",
+    placeholder: "Enter your German ID (alphanumeric)",
+    pattern: /^[A-Z0-9]{9,12}$/i,
+    example: "ABC1234567",
+  },
+  France: {
+    idType: "Carte Nationale d’Identité (CNI)",
+    placeholder: "Enter your French ID",
+    pattern: /^\d{9}$/,
+    example: "123456789",
+  },
+  Brazil: {
+    idType: "CPF",
+    placeholder: "Enter your 11-digit CPF",
+    pattern: /^\d{11}$/,
+    example: "12345678901",
+  },
+  Australia: {
+    idType: "TFN or Medicare Number",
+    placeholder: "Enter your TFN or Medicare number",
+    pattern: /^\d{8,12}$/,
+    example: "123456789",
   },
 };
 
