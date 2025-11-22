@@ -1,4 +1,5 @@
 .env
+/nftdemo/build/*
 /backend/node_modules/*
 /backend/reference_photos/*
 /backend/.env
