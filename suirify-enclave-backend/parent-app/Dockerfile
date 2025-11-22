@@ -2,9 +2,7 @@
 
 FROM node:20.11-bullseye-slim AS deps
 WORKDIR /app
-
 COPY package.json package-lock.json ./
-# RUN npm ci --omit=dev
 RUN npm install
 
 FROM node:20.11-bullseye-slim AS builder
@@ -25,9 +23,9 @@ COPY --from=builder /app /app
 
 # Create directory for the database file and set permissions
 # This ensures the 'nodeapp' user can write to db.json
-RUN mkdir -p /app/data && \
-    ##touch /app/data/db.json && \
-    chown -R nodeapp:nodeapp /app/data
+RUN mkdir -p /app/data
+
+RUN chown -R nodeapp:nodeapp /app
 
 # Set the user to the non-root user
 USER nodeapp

@@ -15,7 +15,7 @@ const { fromHex } = require('@mysten/sui/utils');
 
 // Configuration
 // Connect to a local TCP port on the Parent OS, which tunnels to the Enclave
-const PROXY_PORT = process.env.ENCLAVE_PROXY_PORT || 8000; 
+const PROXY_PORT = process.env.ENCLAVE_PROXY_PORT || PROXY_PORT; 
 const PROXY_HOST = process.env.ENCLAVE_PROXY_HOST || '127.0.0.1';
 
 // Parse the Policy Map from Environment
@@ -700,7 +700,7 @@ async function signTransactionWithKeypair(keypair, txBytes) {
 
 /**
  * Sends a JSON payload to the Nitro Enclave via the local TCP Proxy.
- * The local socat instance (TCP:8000) forwards this to the Enclave (VSOCK:5000).
+ * The local socat instance (TCP:PROXY_PORT) forwards this to the Enclave (VSOCK:5000).
  * @param {object} payload The JSON object to send.
  * @returns {Promise<object>} The JSON response from the enclave.
  */
@@ -708,7 +708,7 @@ async function sendToEnclave(payload) {
   return new Promise((resolve, reject) => {
     const socket = new net.Socket();
     
-    // Connect to localhost:8000 (where socat is listening)
+    // Connect to localhost:PROXY_PORT (where socat is listening)
     socket.connect(PROXY_PORT, PROXY_HOST, () => {
       socket.write(JSON.stringify(payload));
     });
@@ -725,7 +725,7 @@ async function sendToEnclave(payload) {
 
     socket.on('error', (err) => {
       console.error("Enclave Proxy connection error:", err);
-      reject(new Error("Failed to communicate with the secure enclave proxy. Ensure socat is running on port 8000."));
+      reject(new Error("Failed to communicate with the secure enclave proxy. Ensure socat is running on port PROXY_PORT."));
     });
   });
 }
@@ -738,11 +738,14 @@ async function sendToEnclave(payload) {
  */
 function serializeMintPayload(data) {
   try {
-    // Helper to convert Hex Address to Byte Array (32 bytes)
     const toBytes = (hex) => {
-      const clean = hex.startsWith('0x') ? hex.slice(2) : hex;
+      let clean = hex.startsWith('0x') ? hex.slice(2) : hex;
+      if (clean.length < 64) {
+        clean = clean.padStart(64, '0');
+      }
       return Buffer.from(clean, 'hex');
     };
+
     // 1. Serialize Request ID (Address -> 32 bytes)
     const requestIdBytes = bcs.bytes(32).serialize(toBytes(data.requestId)).toBytes();
     // 2. Serialize Recipient (Address -> 32 bytes)
@@ -761,8 +764,8 @@ function serializeMintPayload(data) {
     const over18Bytes = bcs.bool().serialize(data.isOver18).toBytes();
     // 8. Serialize Verifier Version (u8)
     const versionBytes = bcs.u8().serialize(data.verifierVersion).toBytes();
-    // 9. Serialize Issued Timestamp (u64)
-    const issuedBytes = bcs.u64().serialize(data.issuedMs).toBytes();
+    // 9. Serialize Issued Timestamp (u64) -> Force BigInt to avoid JS number errors
+    const issuedBytes = bcs.u64().serialize(BigInt(data.issuedMs)).toBytes();
 
     // Combine all buffers in the EXACT order of the Move struct
     const combined = Buffer.concat([
@@ -792,48 +795,75 @@ function serializeMintPayload(data) {
 app.get('/attestation/:walletAddress', async (req, res) => {
   if (!suiClient) return res.status(500).json({ error: 'Sui client is not configured.' });
   const { walletAddress } = req.params;
+  
   try {
-    const storedSummary = summarizeStoredAttestation(walletAddress);
-    const toIsoOrNull = (ms) => {
-      if (ms === null || ms === undefined) return null;
-      const date = new Date(ms);
-      return Number.isNaN(date.getTime()) ? null : date.toISOString();
-    };
-
-    if (storedSummary && storedSummary.objectId) {
-      const dashboardData = {
-        objectId: storedSummary.objectId,
-        jurisdictionCode: storedSummary.jurisdictionCode,
-        verificationLevel: storedSummary.verificationLevel,
-        issueDate: toIsoOrNull(storedSummary.issueDateMs),
-        expiryDate: toIsoOrNull(storedSummary.expiryDateMs),
-        status: storedSummary.statusLabel || storedSummary.status,
-        statusCode: storedSummary.status,
-        source: 'db',
-      };
-      return res.json({ hasAttestation: true, isValid: storedSummary.isValid, data: dashboardData, source: 'db' });
-    }
-
+    // Fetch from Blockchain (The Source of Truth)
     const ownedObjects = await suiClient.getOwnedObjects({
       owner: walletAddress,
       filter: { StructType: `${PACKAGE_ID}::protocol::Suirify_Attestation` },
       options: { showContent: true },
     });
-    const attestationObject = ownedObjects.data.find((obj) => !obj.error);
-    const summary = summarizeAttestationObject(attestationObject);
-    if (!summary) return res.json({ hasAttestation: false, isValid: false, data: null });
+    
+    // Extract valid object from chain response
+    const chainObject = ownedObjects.data.find((obj) => !obj.error);
+    const chainSummary = summarizeAttestationObject(chainObject);
 
-    const dashboardData = {
-      objectId: summary.objectId,
-      jurisdictionCode: summary.jurisdictionCode,
-      verificationLevel: summary.verificationLevel,
-      issueDate: toIsoOrNull(summary.issueDateMs),
-      expiryDate: toIsoOrNull(summary.expiryDateMs),
-      status: summary.statusLabel,
-      statusCode: summary.status,
-      revoked: summary.revoked,
-    };
-    res.json({ hasAttestation: true, isValid: summary.isValid, data: dashboardData, source: 'chain' });
+    // Fetch from Local DB
+    const dbSummary = summarizeStoredAttestation(walletAddress);
+
+    // Helper for ISO dates
+    const toIsoOrNull = (ms) => (ms ? new Date(ms).toISOString() : null);
+
+    // Found on Blockchain. 
+    // Return Chain data immediately (it supersedes DB).
+    if (chainSummary) {
+      const dashboardData = {
+        objectId: chainSummary.objectId,
+        jurisdictionCode: chainSummary.jurisdictionCode,
+        verificationLevel: chainSummary.verificationLevel,
+        issueDate: toIsoOrNull(chainSummary.issueDateMs),
+        expiryDate: toIsoOrNull(chainSummary.expiryDateMs),
+        status: chainSummary.statusLabel,
+        statusCode: chainSummary.status,
+        revoked: chainSummary.revoked,
+      };
+      return res.json({ 
+        hasAttestation: true, 
+        isValid: chainSummary.isValid, 
+        data: dashboardData, 
+        source: 'chain' 
+      });
+    }
+
+    // Not on Blockchain, but DB says "Yes".
+    // We must verify: Does the user ACTUALLY own the Object ID stored in the DB?
+    if (dbSummary && dbSummary.objectId) {
+      
+      // Check if the object ID from DB exists in the list of objects we just fetched from chain
+      const isDbIdActuallyOwned = ownedObjects.data.some(
+        (obj) => obj.data && obj.data.objectId === dbSummary.objectId
+      );
+
+      if (isDbIdActuallyOwned) {
+        // The user owns it, but maybe our chain summarizer missed it (edge case). 
+        // We trust the DB here because the Chain confirmed ownership of the ID.
+        return res.json({ 
+          hasAttestation: true, 
+          isValid: dbSummary.isValid, 
+          data: dbSummary, 
+          source: 'db' 
+        });
+      } else {
+        // The DB says "Minted (ID: X)", but the Chain says "User does not own ID X".
+        // This implies the previous transaction failed or was reverted.
+        // We treat this as NO ATTESTATION so the user can try again.
+        console.warn(`DB mismatch for ${walletAddress}: DB claims object ${dbSummary.objectId}, but Chain does not see it. Treating as empty.`);
+      }
+    }
+
+    // Not on Chain, Not in DB (or DB was stale).
+    res.json({ hasAttestation: false, isValid: false, data: null });
+
   } catch (error) {
     console.error(`Error fetching attestation for ${req.params.walletAddress}:`, error);
     res.status(500).json({ error: 'Failed to query the blockchain.' });
