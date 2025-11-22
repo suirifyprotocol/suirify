@@ -51,7 +51,7 @@ const Compliance = () => {
           </h1>
           <p className="compliance-text">
             Developers don't want a better cryptographic toolkit; they want their compliance problem<br />
-            solved. SUlrify is a vertically integrated Compliance-as-a-Service (CaaS) product that delivers a
+            solved. Suirify is a vertically integrated Compliance-as-a-Service (CaaS) product that delivers a
             <br />complete solution.
           </p>
         </div>
@@ -110,7 +110,7 @@ const Compliance = () => {
               Our developer-friendly SDKs and APIs provide enterprise-grade reliability
               with regulatory compliance built-in.
             </p>
-            <Button size="lg" className="explore-docs-btn">Explore the Docs</Button>
+            <Button size="lg" className="explore-docs-btn"><a href="https://github.com/suirifyprotocol/suirify/wiki">Explore the Docs</a></Button>
           </div>
 
           {/* Right Side - Feature Grid */}
@@ -164,8 +164,7 @@ const Compliance = () => {
         <div className="quote-container">
           <div className="quote-mark">“</div>
           <div className="quote-text">
-            <span className="quote-dif">We Are Not Just Building A Startup—
-            <br />
+            <span className="quote-dif">
             We Are Crafting The</span> <span className="highlight">Future Of Human</span>
             <br />
             Identity, Trust, And Economic
@@ -183,7 +182,7 @@ const Compliance = () => {
           <div className="passport-content">
             <h2 className="passport-title">Learn more about<br/>Sovereign Identity & Web3</h2>
             <p className="passport-desc">Build your knowledge of the new digital economy with Suirify Learn. Understand everything from the basics of on-chain attestations to the future of compliant finance.</p>
-            <button className="Learn-button">Learn About Suirify</button>
+            <button className="Learn-button"><a href="https://github.com/suirifyprotocol/suirify/wiki">Learn About Suirify</a></button>
           </div>
 
           <div className="passport-art">
@@ -224,7 +223,7 @@ const Compliance = () => {
               <h2 className="start-building-title">Start Building With Suirify</h2>
               <p className="start-building-subtitle">Instant access to the foundational identity layer for compliant finance in Web3.</p>
               <div className="start-building-buttons">
-                <button type="button" className="start-building-btn start-building-btn--primary">Start Building</button>
+                <a href="https://github.com/suirifyprotocol/suirify/wiki"><button type="button" className="start-building-btn start-building-btn--primary">Start Building</button></a>
                 <button type="button" className="start-building-btn start-building-btn--secondary">Explore</button>
               </div>
             </div>
@@ -240,8 +239,7 @@ const Compliance = () => {
               <img src={suirifyLogo} alt="Suirify logo" />
             </div>
             <p className="footer-brand-text">
-              Suirify is the trust layer for compliant identity on Sui, bringing together verifiable
-              credentials, attestations, and developer tooling.
+              Suirify is the trust layer for compliant identity on Sui.
             </p>
             <p className="footer-copy">© 2025 Suirify Protocol · Identity Infrastructure</p>
           </div>
@@ -251,17 +249,17 @@ const Compliance = () => {
             <ul className="footer-links">
               <li><a className="footer-link" href="#">Blog</a></li>
               <li><a className="footer-link" href="#">News</a></li>
-              <li><a className="footer-link" href="#">Node Setup Guide</a></li>
+              <li><a className="footer-link" href="https://github.com/suirifyprotocol/suirify/wiki/sdk-integration">SDK Setup Guide</a></li>
             </ul>
           </div>
 
           <div className="footer-column">
             <h4 className="footer-heading">Developers</h4>
             <ul className="footer-links">
-              <li><a className="footer-link" href="#">Open Source Repos</a></li>
+              <li><a className="footer-link" href="https://github.com/suirifyprotocol/suirify/">Open Source Repos</a></li>
               <li><a className="footer-link" href="#">Suirify Governance</a></li>
               <li><a className="footer-link" href="#">Suirify Developer Portal</a></li>
-              <li><a className="footer-link" href="#">SuirifyTechnical & API Docs</a></li>
+              <li><a className="footer-link" href="https://github.com/suirifyprotocol/suirify/wiki">SuirifyTechnical & Sdk Docs</a></li>
             </ul>
           </div>
           <div className="footer-column">
@@ -270,7 +268,7 @@ const Compliance = () => {
               <li><a className="footer-link" href="#">Contact Us</a></li>
               <li><a className="footer-link" href="#">Privacy Policy</a></li>
               <li><a className="footer-link" href="#">Support Center</a></li>
-              <li><a className="footer-link" href="#">Partner Referrals</a></li>
+              <li><a className="footer-link" href="suirifyprotocol@gmail.com">Partner Referrals</a></li>
               <li><a className="footer-link" href="#">Terms of Service</a></li>
             </ul>
           </div>
@@ -278,7 +276,7 @@ const Compliance = () => {
             <h4 className="footer-heading">Social</h4>
             <ul className="footer-links footer-social-links">
               <li>
-                <a className="footer-link footer-social-link" href="#" aria-label="GitHub">
+                <a className="footer-link footer-social-link" href="https://github.com/suirifyprotocol/suirify" aria-label="GitHub">
                   <Github className="footer-social-icon" size={16} />
                   <span>Github</span>
                 </a>
@@ -296,7 +294,7 @@ const Compliance = () => {
                 </a>
               </li>
               <li>
-                <a className="footer-link footer-social-link" href="#" aria-label="Email">
+                <a className="footer-link footer-social-link" href="suirifyprotocol@gmail.com" aria-label="Email">
                   <Mail className="footer-social-icon" size={16} />
                   <span>Email</span>
                 </a>

@@ -35,7 +35,7 @@ const Index = () => {
               onMouseEnter={() => setShowResourcesDropdown(true)}
               onMouseLeave={() => setShowResourcesDropdown(false)}
             >
-              Resources ▾
+              <a href="https://github.com/suirifyprotocol/suirify/wiki">Resources ▾</a>
             </div>
 
             <a href="#faqs" className="nav-link">
@@ -43,7 +43,7 @@ const Index = () => {
             </a>
           </nav>
 
-          <button className="cta-button">Build with Suirify</button>
+          <button className="cta-button"><a href="https://github.com/suirifyprotocol/suirify/wiki">Build with Suirify</a></button>
         </header>
 
         {/* Hero content */}
@@ -69,7 +69,7 @@ const Index = () => {
       {/* Main site content */}
       <main className="site-content">
         <section>
-          <h2>WEB-3 Identity is Broken</h2>
+          <h2>Digital Identity is Broken</h2>
 
           <div className="picture">
             <img className="pin-bottom" src={object} alt="Character Logo" />

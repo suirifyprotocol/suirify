@@ -5,6 +5,22 @@ import markIcon from '@/modules/icons/mark.png';
 const Index = () => {
   const [country, setCountry] = useState('Nigeria');
   const [ninNumber, setNinNumber] = useState('');
+  // Map of country to ID type and placeholder
+  const countryIdInfo = {
+    'Nigeria': { idType: 'NIN', placeholder: 'Enter your 11-digit NIN', maxLength: 11 },
+    'United States': { idType: 'SSN', placeholder: 'Enter your 9-digit SSN (AAA-GG-SSSS)', maxLength: 11 },
+    'South Africa': { idType: 'National ID', placeholder: 'Enter your 13-digit ID (YYMMDDSSSSCAZ)', maxLength: 13 },
+    'India': { idType: 'Aadhaar', placeholder: 'Enter your 12-digit Aadhaar', maxLength: 12 },
+    'Ghana': { idType: 'Ghana Card', placeholder: 'Enter your Ghana Card Number', maxLength: 12 },
+    'Canada': { idType: 'SIN', placeholder: 'Enter your 9-digit SIN', maxLength: 9 },
+    'United Kingdom (UK)': { idType: 'NINO', placeholder: 'Enter your NINO (AB123456C)', maxLength: 9 },
+    'China': { idType: 'Resident ID', placeholder: 'Enter your 18-digit Resident ID', maxLength: 18 },
+    'Japan': { idType: 'My Number', placeholder: 'Enter your 12-digit My Number', maxLength: 12 },
+    'Germany': { idType: 'ID Card', placeholder: 'Enter your German ID (alphanumeric)', maxLength: 12 },
+    'France': { idType: 'CNI', placeholder: 'Enter your French ID', maxLength: 15 },
+    'Brazil': { idType: 'CPF', placeholder: 'Enter your 11-digit CPF', maxLength: 11 },
+    'Australia': { idType: 'TFN/Medicare', placeholder: 'Enter your TFN or Medicare number', maxLength: 12 },
+  };
   const [currentStep, setCurrentStep] = useState(1);
   const [fullName, setFullName] = useState('Salama Salam Obinna');
   const [dateOfBirth, setDateOfBirth] = useState('1993 - 12 - 25  ( 32 Years )');
@@ -112,27 +128,34 @@ const Index = () => {
                       onChange={(e) => setCountry(e.target.value)}
                     >
                       <option value="Nigeria">Nigeria</option>
-                      <option value="Ghana">Ghana</option>
-                      <option value="Kenya">Kenya</option>
-                      <option value="South Africa">South Africa</option>
                       <option value="United States">United States</option>
-                      <option value="United Kingdom">United Kingdom</option>
+                      <option value="South Africa">South Africa</option>
+                      <option value="India">India</option>
+                      <option value="Ghana">Ghana</option>
+                      <option value="Canada">Canada</option>
+                      <option value="United Kingdom (UK)">United Kingdom (UK)</option>
+                      <option value="China">China</option>
+                      <option value="Japan">Japan</option>
+                      <option value="Germany">Germany</option>
+                      <option value="France">France</option>
+                      <option value="Brazil">Brazil</option>
+                      <option value="Australia">Australia</option>
                     </select>
                   </div>
                 </div>
 
                 <div className="form-group">
                   <label className="form-label" htmlFor="ninNumber">
-                    Nin Number
+                    {countryIdInfo[country]?.idType || 'ID Number'}
                   </label>
                   <input
                     type="text"
                     id="ninNumber"
                     className="form-input"
-                    placeholder="Enter your 11 - digit NIN"
+                    placeholder={countryIdInfo[country]?.placeholder || 'Enter your ID number'}
                     value={ninNumber}
                     onChange={(e) => setNinNumber(e.target.value)}
-                    maxLength={11}
+                    maxLength={countryIdInfo[country]?.maxLength || 20}
                   />
                 </div>
 
@@ -154,7 +177,6 @@ const Index = () => {
                 <p className="instruction-text">Ensure good lighting</p>
                 <p className="instruction-text">Look straight at the camera</p>
                 <p className="instruction-text">Remove glasses and hats</p>
-                <p className="instruction-text">we'll compare with your government photo</p>
               </div>
 
               <div className="action-buttons-dual">
@@ -191,7 +213,7 @@ const Index = () => {
           {currentStep === 3 && (
             <>
               <div className="step-header">Step 3/4</div>
-              <h2 className="step-title">Verify Your Identity using NIN</h2>
+              <h2 className="step-title">Verify Your Identity</h2>
 
               <div className="form-container">
                 <div className="form-group">
@@ -274,7 +296,7 @@ const Index = () => {
                       className="consent-checkbox"
                     />
                     <span className="consent-text">
-                      <strong>I consent to mint my SUIlify Attestation .</strong><br />
+                      <strong>I consent to mint my Suirify Attestation .</strong><br />
                       I understand that my personal data will be permanently deleted
                       after verification , only Crypto-graphic proofs will be stored on-
                       chain , i can delete my attestation anytime.<br />

@@ -15,10 +15,7 @@ This folder provides everything developers need to integrate, deploy, and unders
 
 ### 2. SDK & Integration
 
-- [SDK Quickstart](./sdk-quickstart.md)
-- [SDK API Reference (v1.0)](./sdk-api.md)
-- [Consent Handler Pattern](./consent-pattern.md)
-- [Frontend Integration Guide](./frontend-integration.md)
+- [SDK Integration Guide](sdk-integration.md)
 
 ### 3. Systems & Deployment
 
