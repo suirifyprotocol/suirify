@@ -21,15 +21,9 @@
   ],
   "__meta": {
     "schemaVersion": 2,
-<<<<<<< HEAD
-    "createdAt": "2025-11-14T23:40:16.777Z",
-    "lastLoadedAt": "2025-11-22T20:30:49.366Z",
-    "lastPersistedAt": "2025-11-22T20:31:00.526Z"
-=======
     "createdAt": "2025-11-22T20:48:47.955Z",
     "lastLoadedAt": "2025-11-22T20:58:00.209Z",
     "lastPersistedAt": "2025-11-22T21:04:48.121Z"
->>>>>>> b8b71cf6d40d229f1966488533b6d71592af5bbf
   },
   "__walletIndex": {
     "0x8db87caf928be5ca14eacb846e79b78a7e1684ea6c2ffbc09e3e69a0db57d715": [
@@ -110,3 +104,4 @@
     "totalEvents": 1
   }
 }
+
