@@ -149,7 +149,7 @@ module suirify::protocol {
 
         let values = vector[
             string::utf8(b"Suirify Attestation"),
-            string::utf8(b"A soulbound, non-transferable identity attestation for the Sui ecosystem."),
+            string::utf8(b"A Decentralized Regulatory-Native Soverign, Privacy-preserving Identity Protocol powered by Sui."),
             //string::utf8(b"https://devnet.suirify.com"),
             string::utf8(b"https://i.ibb.co/sdh5jBSg/suirifyid.jpg"),
             string::utf8(b"https://i.ibb.co/sdh5jBSg/suirifyid.jpg"),
