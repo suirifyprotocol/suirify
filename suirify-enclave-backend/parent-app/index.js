@@ -15,7 +15,7 @@ const { fromHex } = require('@mysten/sui/utils');
 
 // Configuration
 // Connect to a local TCP port on the Parent OS, which tunnels to the Enclave
-const PROXY_PORT = process.env.ENCLAVE_PROXY_PORT || 8000; 
+const PROXY_PORT = process.env.ENCLAVE_PROXY_PORT || PROXY_PORT; 
 const PROXY_HOST = process.env.ENCLAVE_PROXY_HOST || '127.0.0.1';
 
 // Parse the Policy Map from Environment
@@ -700,7 +700,7 @@ async function signTransactionWithKeypair(keypair, txBytes) {
 
 /**
  * Sends a JSON payload to the Nitro Enclave via the local TCP Proxy.
- * The local socat instance (TCP:8000) forwards this to the Enclave (VSOCK:5000).
+ * The local socat instance (TCP:PROXY_PORT) forwards this to the Enclave (VSOCK:5000).
  * @param {object} payload The JSON object to send.
  * @returns {Promise<object>} The JSON response from the enclave.
  */
@@ -708,7 +708,7 @@ async function sendToEnclave(payload) {
   return new Promise((resolve, reject) => {
     const socket = new net.Socket();
     
-    // Connect to localhost:8000 (where socat is listening)
+    // Connect to localhost:PROXY_PORT (where socat is listening)
     socket.connect(PROXY_PORT, PROXY_HOST, () => {
       socket.write(JSON.stringify(payload));
     });
@@ -725,7 +725,7 @@ async function sendToEnclave(payload) {
 
     socket.on('error', (err) => {
       console.error("Enclave Proxy connection error:", err);
-      reject(new Error("Failed to communicate with the secure enclave proxy. Ensure socat is running on port 8000."));
+      reject(new Error("Failed to communicate with the secure enclave proxy. Ensure socat is running on port PROXY_PORT."));
     });
   });
 }
