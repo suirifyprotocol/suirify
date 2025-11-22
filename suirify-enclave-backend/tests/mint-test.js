@@ -44,7 +44,7 @@ async function runTest() {
         console.log("\n[1/5] Starting Verification Session...");
         const startRes = await axios.post(`${BACKEND_URL}/start-verification`, {
             country: 'Nigeria',
-            idNumber: '' // Ensure this matches your mock DB logic
+            idNumber: '0000000000' // Ensure this matches your mock DB logic
         });
         const { sessionId } = startRes.data;
         console.log(`   ✅ Session Created: ${sessionId}`);
