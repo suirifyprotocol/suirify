@@ -4,6 +4,8 @@ const resolveCandidateUrls = () => {
   const candidates = [
     import.meta.env.VITE_API_URL,
     typeof window !== "undefined" ? `${window.location.protocol}//${window.location.hostname}:4000` : null,
+    "https://v1.backend.devnet.api.suirify.com/",
+    "https://suirify-backend.onrender.com/",
     "http://localhost:4000/"
   ];
 
