@@ -22,8 +22,8 @@
   "__meta": {
     "schemaVersion": 2,
     "createdAt": "2025-11-22T20:48:47.955Z",
-    "lastLoadedAt": "2025-11-22T22:39:01.593Z",
-    "lastPersistedAt": "2025-11-22T22:39:01.593Z"
+    "lastLoadedAt": "2025-11-24T11:07:30.123Z",
+    "lastPersistedAt": "2025-11-24T11:07:30.123Z"
   },
   "__walletIndex": {
     "0x8db87caf928be5ca14eacb846e79b78a7e1684ea6c2ffbc09e3e69a0db57d715": [
@@ -104,4 +104,3 @@
     "totalEvents": 1
   }
 }
-
