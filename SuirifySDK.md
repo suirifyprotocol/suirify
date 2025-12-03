@@ -43,8 +43,8 @@ Environment variables you will typically define:
 ```bash
 # .env
 SUI_RPC_URL=https://fullnode.devnet.sui.io:443
-SUIRIFY_PACKAGE_ID=0xYourPackageIfCustom
-SUIRIFY_ATTESTATION_TYPE=0xPackage::protocol::Suirify_Attestation # optional override
+SUIRIFY_PACKAGE_ID=0x3c71db613cf881d906cbe28739e9e4d932fff569fb67cb1a329a633337234f74
+SUIRIFY_ATTESTATION_TYPE=0x3c71db613cf881d906cbe28739e9e4d932fff569fb67cb1a329a633337234f74::protocol::Suirify_Attestation # optional override
 ```
 
 In front-end frameworks, expose them via Vite-style `VITE_` prefixes (e.g., `VITE_SUI_RPC_URL`).

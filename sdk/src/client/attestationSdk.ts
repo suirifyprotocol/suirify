@@ -18,7 +18,7 @@ const getEnv = (key: string): string | undefined =>
   typeof process !== "undefined" ? process.env?.[key] : undefined;
 
 const ENV_PACKAGE_ID = getEnv("SUIRIFY_PACKAGE_ID") || getEnv("PACKAGE_ID");
-const FALLBACK_PACKAGE_ID = "0x213371dcba7963562d0350d7fcf05e5f33da501a1d6ad316f9cd2b87a958897f";
+const FALLBACK_PACKAGE_ID = "0x3c71db613cf881d906cbe28739e9e4d932fff569fb67cb1a329a633337234f74";
 const DEFAULT_PACKAGE_ID = ENV_PACKAGE_ID || FALLBACK_PACKAGE_ID;
 
 const ENV_ATTESTATION_TYPE =

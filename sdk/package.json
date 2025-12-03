@@ -1,6 +1,6 @@
 {
   "name": "@suirify/suirifysdk",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "TypeScript SDK for reading Suirify attestation objects over Sui RPC.",
   "type": "module",
   "main": "dist/index.cjs",
