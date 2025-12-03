@@ -13,6 +13,7 @@ const COUNTRIES = [
   { name: 'France', localName: 'France', iso: 250, alpha2: 'FR', alpha3: 'FRA' },
   { name: 'Brazil', localName: 'Brazil', iso: 76, alpha2: 'BR', alpha3: 'BRA' },
   { name: 'Australia', localName: 'Australia', iso: 36, alpha2: 'AU', alpha3: 'AUS' },
+  { name: 'Kenya', localName: 'Republic of Kenya', iso: 404, alpha2: 'KE', alpha3: 'KEN' }
 ];
 
 // normalize names for lookup (case-insensitive, trim)
