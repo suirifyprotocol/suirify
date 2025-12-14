@@ -9,23 +9,28 @@ import type {
   AttestationResult,
   ConsentScope,
   SuirifySdkOptions,
-  SuiProviderInstance
+  SuiProviderInstance,
 } from "./types.js";
-import { normalizeRpcObject, parseAttestationObject } from "../utils/parseObject.js";
+import {
+  normalizeRpcObject,
+  parseAttestationObject,
+} from "../utils/parseObject.js";
 import { msUntil, nowMs } from "../utils/time.js";
 
 const getEnv = (key: string): string | undefined =>
   typeof process !== "undefined" ? process.env?.[key] : undefined;
 
 const ENV_PACKAGE_ID = getEnv("SUIRIFY_PACKAGE_ID") || getEnv("PACKAGE_ID");
-const FALLBACK_PACKAGE_ID = "0x3c71db613cf881d906cbe28739e9e4d932fff569fb67cb1a329a633337234f74";
+const FALLBACK_PACKAGE_ID =
+  "0xecd5a7ed68fce7a16251eecb72e75df9f8b26fe77d4609056a3c41a543a59b99";
 const DEFAULT_PACKAGE_ID = ENV_PACKAGE_ID || FALLBACK_PACKAGE_ID;
 
 const ENV_ATTESTATION_TYPE =
   getEnv("SUIRIFY_ATTESTATION_TYPE") || getEnv("ATTESTATION_TYPE");
 
 export const ATTESTATION_TYPE =
-  ENV_ATTESTATION_TYPE || `${DEFAULT_PACKAGE_ID}::protocol::Suirify_Attestation`;
+  ENV_ATTESTATION_TYPE ||
+  `${DEFAULT_PACKAGE_ID}::protocol::Suirify_Attestation`;
 
 const DEFAULT_CACHE_MS = 5000;
 const PUBLIC_FIELDS: AttestationField[] = [
@@ -33,7 +38,7 @@ const PUBLIC_FIELDS: AttestationField[] = [
   "is_over_18",
   "verification_level",
   "expiry_time_ms",
-  "revoked"
+  "revoked",
 ];
 
 type CacheEntry = { timestamp: number; result: AttestationResult };
@@ -76,7 +81,9 @@ export class SuirifySdk {
   }
 
   /** Fetches and parses an attestation object by ID. */
-  async getAttestationByObjectId(objectId: string): Promise<AttestationOnChain | null> {
+  async getAttestationByObjectId(
+    objectId: string
+  ): Promise<AttestationOnChain | null> {
     const raw = await this.provider.getObject(objectId);
     if (!raw) return null;
     return parseAttestationObject(raw);
@@ -85,13 +92,18 @@ export class SuirifySdk {
   /**
    * Returns the primary attestation for `ownerAddress`, or found=false if none exist.
    */
-  async getAttestationForOwner(ownerAddress: string): Promise<AttestationResult> {
+  async getAttestationForOwner(
+    ownerAddress: string
+  ): Promise<AttestationResult> {
     const cached = this.cache.get(ownerAddress);
     if (cached && nowMs() - cached.timestamp < this.cacheMs) {
       return cached.result;
     }
 
-    await this.ensureConsent(["attestation_lookup"], "User denied attestation lookup request");
+    await this.ensureConsent(
+      ["attestation_lookup"],
+      "User denied attestation lookup request"
+    );
 
     try {
       const objectIds = await this.findAttestationObjects(ownerAddress);
@@ -105,7 +117,7 @@ export class SuirifySdk {
       if (!attestation) {
         const res: AttestationResult = {
           found: false,
-          error: "Unable to parse attestation object"
+          error: "Unable to parse attestation object",
         };
         this.cache.set(ownerAddress, { timestamp: nowMs(), result: res });
         return res;
@@ -114,7 +126,7 @@ export class SuirifySdk {
       const res: AttestationResult = {
         found: true,
         attestation,
-        objectId: attestation.objectId
+        objectId: attestation.objectId,
       };
       this.cache.set(ownerAddress, { timestamp: nowMs(), result: res });
       return res;
@@ -122,7 +134,7 @@ export class SuirifySdk {
       console.error("Failed to read attestation", error);
       const res: AttestationResult = {
         found: false,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       };
       this.cache.set(ownerAddress, { timestamp: nowMs(), result: res });
       return res;
@@ -132,7 +144,9 @@ export class SuirifySdk {
   /**
    * Checks revocation and expiry fields for validity.
    */
-  async isValid(att: AttestationOnChain): Promise<{ valid: boolean; reason?: string }> {
+  async isValid(
+    att: AttestationOnChain
+  ): Promise<{ valid: boolean; reason?: string }> {
     if (att.revoked) {
       return { valid: false, reason: "Attestation revoked" };
     }
@@ -147,7 +161,7 @@ export class SuirifySdk {
     if (att.status !== undefined && att.status !== 1) {
       return {
         valid: false,
-        reason: "Attestation is not in an active status (status !== 1)"
+        reason: "Attestation is not in an active status (status !== 1)",
       };
     }
 
@@ -182,13 +196,18 @@ export class SuirifySdk {
     ownerAddress: string,
     fields: AttestationField[] = ["is_human_verified", "is_over_18"]
   ): Promise<Partial<Pick<AttestationOnChain, AttestationField>>> {
-    const sanitizedFields = fields.filter((field) => PUBLIC_FIELDS.includes(field));
+    const sanitizedFields = fields.filter((field) =>
+      PUBLIC_FIELDS.includes(field)
+    );
 
     if (sanitizedFields.length === 0) {
       throw new Error("No readable public fields were requested");
     }
 
-    await this.ensureConsent(sanitizedFields, "User did not consent to read attestation fields");
+    await this.ensureConsent(
+      sanitizedFields,
+      "User did not consent to read attestation fields"
+    );
 
     const res = await this.getAttestationForOwner(ownerAddress);
     if (!res.found || !res.attestation) {

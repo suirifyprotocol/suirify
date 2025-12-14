@@ -1,4 +1,6 @@
-export const PACKAGE_ID = import.meta.env.VITE_SUIRIFY_PACKAGE_ID || "0x3c71db613cf881d906cbe28739e9e4d932fff569fb67cb1a329a633337234f74";
+export const PACKAGE_ID =
+  import.meta.env.VITE_SUIRIFY_PACKAGE_ID ||
+  "0xecd5a7ed68fce7a16251eecb72e75df9f8b26fe77d4609056a3c41a543a59b99";
 
 export const STRUCT_ATTESTATION = `${PACKAGE_ID}::protocol::Suirify_Attestation`;
 
@@ -9,4 +11,8 @@ export const explorer = {
   object: (id: string) => `${DEFAULT_EXPLORER_BASE}/object/${id}`,
 };
 
-export type AttestationStatus = "ACTIVE" | "EXPIRED" | "REVOKED" | "PENDING_BURN";
+export type AttestationStatus =
+  | "ACTIVE"
+  | "EXPIRED"
+  | "REVOKED"
+  | "PENDING_BURN";
