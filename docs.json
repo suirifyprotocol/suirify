@@ -1,6 +1,5 @@
 {
-  "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
+  "$schema": "https://mintlify.com/schema.json",
   "name": "Suirify Documentation",
   "logo": {
     "light": "/suirifyLogo.png",
@@ -10,52 +9,73 @@
   "colors": {
     "primary": "#0D9373",
     "light": "#07C983",
-    "dark": "#0D9373"
+    "dark": "#0D9373",
+    "anchors": {
+      "from": "#0D9373",
+      "to": "#07C983"
+    }
   },
-  "navigation": {
-    "groups": [
-      {
-        "group": "Getting started",
-        "pages": [
-          "/docs/README",
-          "/docs/concepts",
-          "/docs/architecture"
-        ]
-      },
-      {
-        "group": "Core concepts",
-        "pages": [
-          "/docs/attestations",
-          "/docs/security",
-          "/docs/glossary"
-        ]
-      },
-      {
-        "group": "Integration",
-        "pages": [
-          "/docs/sdk-integration",
-          "/docs/frontend-integration",
-          "/docs/backend-validation"
-        ]
-      },
-      {
-        "group": "Development",
-        "pages": [
-          "/docs/environment",
-          "/docs/contributing",
-          "/docs/ci",
-          "/docs/redeploy-playbook"
-        ]
-      },
-      {
-        "group": "Resources",
-        "pages": [
-          "/docs/faq"
-        ]
-      }
-    ]
+  "topbarLinks": [
+    {
+      "name": "Support",
+      "url": "mailto:support@suirify.com"
+    }
+  ],
+  "topbarCtaButton": {
+    "name":  "Dashboard",
+    "url": "https://devnet.suirify.com"
   },
+  "tabs": [
+    {
+      "name": "API Reference",
+      "url": "api-reference"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": [
+        "docs/README",
+        "docs/concepts",
+        "docs/architecture"
+      ]
+    },
+    {
+      "group": "Core Concepts",
+      "pages": [
+        "docs/attestations",
+        "docs/security",
+        "docs/glossary"
+      ]
+    },
+    {
+      "group":  "Integration",
+      "pages": [
+        "docs/sdk-integration",
+        "docs/frontend-integration",
+        "docs/backend-validation"
+      ]
+    },
+    {
+      "group":  "Development",
+      "pages": [
+        "docs/environment",
+        "docs/contributing",
+        "docs/ci",
+        "docs/redeploy-playbook"
+      ]
+    },
+    {
+      "group":  "Resources",
+      "pages": [
+        "docs/faq"
+      ]
+    }
+  ],
   "footerSocials": {
-    "github": "https://github.com/suirifyprotocol/suirify"
-  }
+    "github": "https://github.com/suirifyprotocol/",
+    "twitter": "https://twitter.com/suirify",
+    "linkedin": "https://www.linkedin.com/company/suirify"
+  },
+  "backgroundImage": "/background.png"
 }
