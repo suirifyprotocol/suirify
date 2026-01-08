@@ -17,40 +17,40 @@
       {
         "group": "Getting started",
         "pages": [
-          "README",
-          "concepts",
-          "architecture"
+          "/docs/README",
+          "/docs/concepts",
+          "/docs/architecture"
         ]
       },
       {
         "group": "Core concepts",
         "pages": [
-          "attestations",
-          "security",
-          "glossary"
+          "/docs/attestations",
+          "/docs/security",
+          "/docs/glossary"
         ]
       },
       {
         "group": "Integration",
         "pages": [
-          "sdk-integration",
-          "frontend-integration",
-          "backend-validation"
+          "/docs/sdk-integration",
+          "/docs/frontend-integration",
+          "/docs/backend-validation"
         ]
       },
       {
         "group": "Development",
         "pages": [
-          "environment",
-          "contributing",
-          "ci",
-          "redeploy-playbook"
+          "/docs/environment",
+          "/docs/contributing",
+          "/docs/ci",
+          "/docs/redeploy-playbook"
         ]
       },
       {
         "group": "Resources",
         "pages": [
-          "faq"
+          "/docs/faq"
         ]
       }
     ]
