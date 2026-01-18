@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0
+// Project: https://github.com/suirifyprotocol/suirify
+// Author: https://github.com/CYBWithFlourish
 /// suirify.move
 /// The main module for the Suirify protocol.
 /// This package is responsible for creating, managing, and verifying attestations.
@@ -38,7 +41,8 @@ module suirify::protocol {
         owner: address,
         jurisdiction_code: u16,
         verification_level: u8,
-        verifier_source: u8,
+        verifier_source: u8, // primary source
+        verifier_sources: vector<u8>, // aggregated sources (includes primary)
         verifier_version: u8,
         issue_time_ms: u64,
         expiry_time_ms: u64,
@@ -74,9 +78,16 @@ module suirify::protocol {
         id: UID,
         user_attestations: Table<address, ID>,
         pending_mint_requests: Table<ID, MintRequest>,
+        pending_renew_update_requests: Table<ID, RenewUpdateRequest>,
     }
 
     public struct MintRequest has store {
+        payment: Balance<SUI>,
+        requester: address,
+    }
+
+    /// Renewal/upgrade request that locks the upgrade fee until consumed.
+    public struct RenewUpdateRequest has store {
         payment: Balance<SUI>,
         requester: address,
     }
@@ -92,7 +103,18 @@ module suirify::protocol {
         reason_code: u8,
     }
 
+    public struct AttestationRenewUpdateUpgraded has copy, drop {
+        objectId: ID,
+        new_expiry_time_ms: u64,
+        issued_time_ms: u64,
+    }
+
     public struct MintRequestCreated has copy, drop {
+        request_id: ID,
+        requester: address,
+    }
+
+    public struct RenewUpdateRequestCreated has copy, drop {
         request_id: ID,
         requester: address,
     }
@@ -133,6 +155,7 @@ module suirify::protocol {
             id: object::new(ctx),
             user_attestations: table::new(ctx),
             pending_mint_requests: table::new(ctx),
+            pending_renew_update_requests: table::new(ctx),
         };
         transfer::share_object(registry);
 
@@ -195,6 +218,30 @@ module suirify::protocol {
         request_id
     }
 
+    /// Create a renewal/update request that locks the upgrade_fee until processed.
+    public fun create_renew_update_request(
+        registry: &mut AttestationRegistry,
+        payment: Coin<SUI>,
+        ctx: &mut TxContext,
+    ): ID {
+        let request_uid = object::new(ctx);
+        let request_id = object::uid_to_inner(&request_uid);
+        let requester = tx_context::sender(ctx);
+        let request = RenewUpdateRequest {
+            payment: coin::into_balance(payment),
+            requester,
+        };
+        table::add(&mut registry.pending_renew_update_requests, request_id, request);
+        object::delete(request_uid);
+
+        event::emit(RenewUpdateRequestCreated {
+            request_id,
+            requester,
+        });
+
+        request_id
+    }
+
     /// Creates a new Suirify_Attestation with extended metadata and transfers it
     /// to the recipient.
     public fun mint_attestation(
@@ -206,6 +253,7 @@ module suirify::protocol {
         recipient: address,
         jurisdiction_code: u16,
         verifier_source: u8,
+        extra_verifier_sources: vector<u8>,
         verification_level: u8,
         name_hash: vector<u8>,
         is_human_verified: bool,
@@ -236,6 +284,20 @@ module suirify::protocol {
         // assert!(vector::contains(&policy.allowed_sources, &verifier_source), EInvalidVerifierSource);
         assert!(jurisdictions::get_iso_num(policy) == jurisdiction_code, EJurisdictionMismatch);
         assert!(vector::contains(jurisdictions::get_allowed_sources(policy), &verifier_source), EInvalidVerifierSource);
+        let allowed_sources_ref = jurisdictions::get_allowed_sources(policy);
+        let mut combined_sources = vector::empty<u8>();
+        vector::push_back(&mut combined_sources, verifier_source);
+        let len_extra = vector::length(&extra_verifier_sources);
+        let mut i = 0;
+        while (i < len_extra) {
+            let s = *vector::borrow(&extra_verifier_sources, i);
+            assert!(vector::contains(allowed_sources_ref, &s), EInvalidVerifierSource);
+            // avoid duplicates
+            if (!vector::contains(&combined_sources, &s)) {
+                vector::push_back(&mut combined_sources, s);
+            };
+            i = i + 1;
+        };
 
 
         // If an allowlist is configured (non-empty), enforce membership
@@ -258,6 +320,7 @@ module suirify::protocol {
             jurisdiction_code,
             verification_level,
             verifier_source,
+            verifier_sources: combined_sources,
             verifier_version,
             issue_time_ms: now,
             expiry_time_ms: now + config.default_expiry_duration_ms,
@@ -323,6 +386,7 @@ module suirify::protocol {
             recipient,
             jurisdiction_code,
             verifier_source,
+            vector::empty(),
             verification_level,
             name_hash,
             is_human_verified,
@@ -365,6 +429,149 @@ module suirify::protocol {
         object::delete(id);
     }
 
+    /// Renews/updates an existing attestation for the owner, resetting expiry and status.
+    /// Uses upgrade_fee locked in a renew request and enforces global per-day limit similar to mint.
+    public fun renew_update_upgrade_attestation(
+        _cap: &VerifierAdminCap,
+        config: &mut ProtocolConfig,
+        registry: &mut AttestationRegistry,
+        attestation: &mut Suirify_Attestation,
+        request_id: ID,
+        jurisdiction_code: u16,
+        verifier_source: u8,
+        extra_verifier_sources: vector<u8>,
+        verification_level: u8,
+        name_hash: vector<u8>,
+        is_human_verified: bool,
+        is_over_18: bool,
+        verifier_version: u8,
+        ctx: &mut TxContext,
+    ) {
+        assert!(!config.paused, EProtocolPaused);
+
+        let sender = tx_context::sender(ctx);
+        assert!(attestation.owner == sender, EUnauthorized);
+
+        // Fetch and verify locked payment
+        {
+            let request_ref = table::borrow_mut(&mut registry.pending_renew_update_requests, request_id);
+            assert!(request_ref.requester == sender, ERequestRecipientMismatch);
+            let locked_amount = sui::balance::value(&request_ref.payment);
+            assert!(locked_amount == config.upgrade_fee, EInvalidMintRequestAmount);
+        };
+
+        let RenewUpdateRequest { payment, requester: _ } =
+            table::remove(&mut registry.pending_renew_update_requests, request_id);
+        let fee_coin = coin::from_balance(payment, ctx);
+        transfer::public_transfer(fee_coin, config.treasury_address);
+
+        // Enforce daily limit similar to mint
+        let now = tx_context::epoch_timestamp_ms(ctx);
+        reset_daily_mint_if_needed(config, now);
+        let next_mint_count = config.mints_today + 1;
+        assert!(next_mint_count <= config.global_mint_limit_per_day, EUnauthorized);
+        config.mints_today = next_mint_count;
+
+        // Enforce immutable fields and allow controlled upgrades
+        assert!(attestation.jurisdiction_code == jurisdiction_code, EJurisdictionMismatch);
+        assert!(attestation.verifier_source == verifier_source, EInvalidVerifierSource);
+        assert!(verification_level >= attestation.verification_level, EUnauthorized);
+
+        // Merge verifier sources, keeping primary and adding new allowed extras
+        let mut merged_sources = attestation.verifier_sources;
+        let len_extra = vector::length(&extra_verifier_sources);
+        let mut i = 0;
+        while (i < len_extra) {
+            let s = *vector::borrow(&extra_verifier_sources, i);
+            if (!vector::contains(&merged_sources, &s)) {
+                vector::push_back(&mut merged_sources, s);
+            };
+            i = i + 1;
+        };
+
+        // Refresh attestation fields
+        attestation.issue_time_ms = now;
+        attestation.expiry_time_ms = now + config.default_expiry_duration_ms;
+        attestation.status = StatusActive;
+        attestation.revoked = false;
+        attestation.revoke_time_ms = 0;
+        attestation.revoke_reason_code = 0;
+
+        // Apply updatable verification fields
+        attestation.verifier_sources = merged_sources;
+        attestation.verification_level = verification_level;
+        attestation.name_hash = name_hash;
+        attestation.is_human_verified = is_human_verified;
+        attestation.is_over_18 = is_over_18;
+
+        // Bring version forward if contract/min verifier versions moved ahead
+        attestation.version = config.contract_version;
+        let target_verifier_version = if (verifier_version > config.min_verifier_version) {
+            verifier_version
+        } else {
+            config.min_verifier_version
+        };
+        if (attestation.verifier_version < target_verifier_version) {
+            attestation.verifier_version = target_verifier_version;
+        };
+
+        event::emit(AttestationRenewUpdateUpgraded {
+            objectId: object::id(attestation),
+            new_expiry_time_ms: attestation.expiry_time_ms,
+            issued_time_ms: attestation.issue_time_ms,
+        });
+    }
+
+    /// Renews/updates an attestation using enclave-verified payload; requires owner match and pending renew/update request.
+    public fun renew_update_upgrade_attestation_with_enclave(
+        _cap: &VerifierAdminCap,
+        config: &mut ProtocolConfig,
+        registry: &mut AttestationRegistry,
+        attestation: &mut Suirify_Attestation,
+        request_id: ID,
+        enclave_config: &enclave::EnclaveConfig,
+        enclave_obj: &enclave::Enclave,
+        payload: vector<u8>,
+        signature: vector<u8>,
+        ctx: &mut TxContext,
+    ) {
+        assert!(enclave::get_config_id(enclave_obj) == object::id(enclave_config), EEnclaveConfigMismatch);
+        assert!(enclave::get_config_version(enclave_obj) == enclave::get_config_version_from_config(enclave_config), EEnclaveConfigMismatch);
+
+        let (
+            signed_request_id,
+            recipient,
+            jurisdiction_code,
+            verification_level,
+            verifier_source,
+            name_hash,
+            is_human_verified,
+            is_over_18,
+            verifier_version,
+            _issued_ms,
+        ) = enclave::verify_and_extract_mint_data(enclave_obj, &payload, &signature);
+
+        assert!(signed_request_id == request_id, EEnclaveDataMismatch);
+        assert!(recipient == attestation.owner, ERequestRecipientMismatch);
+
+        renew_update_upgrade_attestation(
+            _cap,
+            config,
+            registry,
+            attestation,
+            request_id,
+            jurisdiction_code,
+            verifier_source,
+            vector::empty(),
+            verification_level,
+            name_hash,
+            is_human_verified,
+            is_over_18,
+            verifier_version,
+            ctx,
+        );
+    }
+
     // Getter functions for cross-module access
     public fun get_status(attestation: &Suirify_Attestation): u8 {
         attestation.status
@@ -376,6 +583,14 @@ module suirify::protocol {
 
     public fun get_expiry_time(attestation: &Suirify_Attestation): u64 {
         attestation.expiry_time_ms
+    }
+
+    /// Returns the attestation ID mapped to the specified owner.
+    public fun get_attestation_id_for_owner(
+        registry: &AttestationRegistry,
+        owner: address,
+    ): ID {
+        *table::borrow(&registry.user_attestations, owner)
     }
 
     public fun get_name_hash(attestation: &Suirify_Attestation): vector<u8> {
