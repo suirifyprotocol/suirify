@@ -1,0 +1,58 @@
+# Sui deployment + activation steps (placeholders)
+# Replace:
+#   <PKG_PATH> local folder path to sources/
+#   <PKG> published package ID (from publish output)
+#   <CAP> VerifierAdminCap object ID
+#   <CONFIG> ProtocolConfig object ID
+#   <REGISTRY> AttestationRegistry object ID
+#   <JURIS_REG> JurisdictionRegistry object ID
+#   <POLICY> JurisdictionPolicy object ID
+#   <BRIDGE_REG> EVMRegistry object ID
+#   <ENCLAVE_CFG>/<ENCLAVE_OBJ> EnclaveConfig/Enclave object IDs (provisioned off-chain)
+#   <REQUEST> mint/renew request ID (inner ID)
+#   <PAYMENT> Coin<SUI> object ID with exact fee for request creation
+#   <ADDR> address; <VEC_U8> hex bytes; <BOOL> true/false; <U8>/<U16>/<U64> integers
+#   --gas-budget values are examples; adjust as needed
+
+# 0) Publish once, capture object IDs (VerifierAdminCap, ProtocolConfig, AttestationRegistry)
+sui client publish --path <PKG_PATH> --gas-budget 400000000 --json
+# Record <PKG>, <CAP>, <CONFIG>, <REGISTRY> from publish output
+
+# 1) Bootstrap core registries and policy (common to all flows)
+# 1a) Initialize jurisdiction registry
+sui client call --package <PKG> --module jurisdictions --function init_registry --args <CAP> --gas-budget 20000000
+# 1b) Add a jurisdiction policy (example allows sources 1 and 2)
+sui client call --package <PKG> --module jurisdictions --function add_jurisdiction_policy --args <CAP> <JURIS_REG> <U16:iso_num> <VEC_U8:allowed_sources> --gas-budget 20000000
+# (Optional) add allowlist entries
+sui client call --package <PKG> --module protocol --function add_to_allowlist --args <CAP> <CONFIG> <ADDR> --gas-budget 20000000
+
+# 2) Flow: Mint without enclave (Sui-only)
+# 2a) Lock mint fee into a request
+sui client call --package <PKG> --module protocol --function create_mint_request --args <REGISTRY> <PAYMENT> --gas-budget 15000000
+# 2b) Mint the attestation
+sui client call --package <PKG> --module protocol --function mint_attestation --args <CAP> <CONFIG> <REGISTRY> <REQUEST> <POLICY> <ADDR:recipient> <U16:jurisdiction_code> <U8:verifier_source> <VEC_U8:extra_sources> <U8:verification_level> <VEC_U8:name_hash> <BOOL:is_human_verified> <BOOL:is_over_18> <U8:verifier_version> --gas-budget 32000000
+
+# 3) Flow: Mint with enclave
+# Requires provisioned <ENCLAVE_CFG> and <ENCLAVE_OBJ>; payload + signature from enclave
+# 3a) Lock mint fee into a request
+sui client call --package <PKG> --module protocol --function create_mint_request --args <REGISTRY> <PAYMENT> --gas-budget 15000000
+# 3b) Mint via enclave attestation
+sui client call --package <PKG> --module protocol --function mint_attestation_with_enclave --args <CAP> <CONFIG> <REGISTRY> <REQUEST> <POLICY> <ENCLAVE_CFG> <ENCLAVE_OBJ> <VEC_U8:payload> <VEC_U8:signature> --gas-budget 34000000
+
+# 4) Flow: EVM bridge mint without enclave
+# 4a) Init EVM registry (one-time)
+sui client call --package <PKG> --module evm --function init --args --gas-budget 15000000
+# 4b) Lock mint fee into a request (same as 2a)
+sui client call --package <PKG> --module protocol --function create_mint_request --args <REGISTRY> <PAYMENT> --gas-budget 15000000
+# 4c) Create bridge + mint attestation (chain-agnostic, extra sources empty)
+sui client call --package <PKG> --module evm --function create_evm_bridge --args <BRIDGE_REG> <REGISTRY> <CONFIG> <CAP> <POLICY> <REQUEST> <VEC_U8:evm_addr20> <VEC_U8:evm_sig> <U64:evm_chain_id> <U16:jurisdiction_code> <U8:verifier_source> <U8:verification_level> <VEC_U8:name_hash> <BOOL:is_human_verified> <BOOL:is_over_18> <U8:verifier_version> --gas-budget 30000000
+
+# 5) Flow: EVM bridge mint with enclave
+# 5a) Ensure EVM registry exists (4a) and enclave objects ready
+# 5b) Lock mint fee into a request (same as 2a)
+sui client call --package <PKG> --module protocol --function create_mint_request --args <REGISTRY> <PAYMENT> --gas-budget 15000000
+# 5c) Create bridge + mint via enclave flow
+sui client call --package <PKG> --module evm --function create_evm_bridge_with_enclave --args <BRIDGE_REG> <REGISTRY> <CONFIG> <CAP> <POLICY> <ENCLAVE_CFG> <ENCLAVE_OBJ> <REQUEST> <VEC_U8:evm_addr20> <VEC_U8:evm_sig> <U64:evm_chain_id> <VEC_U8:payload> <VEC_U8:enclave_sig> --gas-budget 32000000
+
+# (Optional) Renew/upgrade flows after mint
+# Create renew request then call renew_update_upgrade_attestation (protocol) or renew_update_upgrade_evm_attestation (evm) with or without enclave payload.

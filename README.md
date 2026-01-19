@@ -156,8 +156,8 @@ Create a `.env` (do not commit it) with these variables for local development:
 
 ```ini
 SUI_RPC_URL=https://fullnode.devnet.sui.io:443
-SUIRIFY_PACKAGE_ID=0x213371dcba7963562d0350d7fcf05e5f33da501a1d6ad316f9cd2b87a958897f
-SUIRIFY_ATTESTATION_TYPE=0x213371dcba7963562d0350d7fcf05e5f33da501a1d6ad316f9cd2b87a958897f::protocol::Suirify_Attestation
+SUIRIFY_PACKAGE_ID=0xecd5a7ed68fce7a16251eecb72e75df9f8b26fe77d4609056a3c41a543a59b99
+SUIRIFY_ATTESTATION_TYPE=0xecd5a7ed68fce7a16251eecb72e75df9f8b26fe77d4609056a3c41a543a59b99::protocol::Suirify_Attestation
 
 VITE_SUI_RPC_URL=...
 VITE_SUIRIFY_FORCE_MOCK=false

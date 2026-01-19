@@ -1,0 +1,64 @@
+# Sui client call examples (placeholders) — sorted alphabetically by function
+# Replace:
+#   <PKG> with your published package ID
+#   <CAP> VerifierAdminCap object ID
+#   <CONFIG> ProtocolConfig object ID
+#   <REGISTRY> AttestationRegistry object ID
+#   <POLICY> JurisdictionPolicy object ID
+#   <ENCLAVE_CFG> EnclaveConfig object ID
+#   <ENCLAVE_OBJ> Enclave object ID
+#   <BRIDGE_REG> EVMRegistry object ID
+#   <ATTESTATION> Suirify_Attestation object ID
+#   <REQUEST> mint/renew request ID (inner ID)
+#   <PAYMENT> Coin<SUI> object ID with exact fee locked (for request creation)
+#   <ADDR> address; <VEC_U8> hex bytes; <BOOL> true/false; <U8>/<U16>/<U64> integers
+#   --gas-budget values are examples; adjust as needed
+
+sui client call --package <PKG> --module protocol --function add_to_allowlist --args <CAP> <CONFIG> <ADDR> --gas-budget 20000000
+sui client call --package <PKG> --module jurisdictions --function add_jurisdiction_policy --args <CAP> <JURIS_REG> <U16:iso_num> <VEC_U8:allowed_sources> --gas-budget 20000000
+sui client call --package <PKG> --module protocol --function burn_self --args <ATTESTATION> <REGISTRY> --gas-budget 20000000
+sui client call --package <PKG> --module user_actions --function burn_self --args <ATTESTATION> <REGISTRY> --gas-budget 20000000
+sui client call --package <PKG> --module evm --function create_evm_bridge --args <BRIDGE_REG> <REGISTRY> <CONFIG> <CAP> <POLICY> <REQUEST> <VEC_U8:evm_addr20> <VEC_U8:evm_sig> <U64:evm_chain_id> <U16:jurisdiction_code> <U8:verifier_source> <U8:verification_level> <VEC_U8:name_hash> <BOOL:is_human_verified> <BOOL:is_over_18> <U8:verifier_version> --gas-budget 30000000
+sui client call --package <PKG> --module evm --function create_evm_bridge_with_enclave --args <BRIDGE_REG> <REGISTRY> <CONFIG> <CAP> <POLICY> <ENCLAVE_CFG> <ENCLAVE_OBJ> <REQUEST> <VEC_U8:evm_addr20> <VEC_U8:evm_sig> <U64:evm_chain_id> <VEC_U8:payload> <VEC_U8:enclave_sig> --gas-budget 32000000
+sui client call --package <PKG> --module protocol --function create_mint_request --args <REGISTRY> <PAYMENT> --gas-budget 15000000
+sui client call --package <PKG> --module protocol --function create_renew_update_request --args <REGISTRY> <PAYMENT> --gas-budget 15000000
+sui client call --package <PKG> --module evm --function get_attestation_id --args <BRIDGE_OBJ> --gas-budget 10000000
+sui client call --package <PKG> --module protocol --function get_attestation_id_for_owner --args <REGISTRY> <ADDR> --gas-budget 10000000
+sui client call --package <PKG> --module evm --function get_chain_id --args <BRIDGE_OBJ> --gas-budget 10000000
+sui client call --package <PKG> --module evm --function get_evm_address --args <BRIDGE_OBJ> --gas-budget 10000000
+sui client call --package <PKG> --module protocol --function get_expiry_time --args <ATTESTATION> --gas-budget 10000000
+sui client call --package <PKG> --module protocol --function get_mint_fee --args <CONFIG> --gas-budget 10000000
+sui client call --package <PKG> --module protocol --function get_mints_today --args <CONFIG> --gas-budget 10000000
+sui client call --package <PKG> --module protocol --function get_name_hash --args <ATTESTATION> --gas-budget 10000000
+sui client call --package <PKG> --module attestation_utils --function get_name_hash --args <ATTESTATION> --gas-budget 10000000
+sui client call --package <PKG> --module protocol --function get_owner --args <ATTESTATION> --gas-budget 10000000
+sui client call --package <PKG> --module protocol --function get_status --args <ATTESTATION> --gas-budget 10000000
+sui client call --package <PKG> --module evm --function get_sui_address --args <BRIDGE_OBJ> --gas-budget 10000000
+sui client call --package <PKG> --module evm --function get_total_bridges --args <BRIDGE_REG> --gas-budget 10000000
+sui client call --package <PKG> --module evm --function init --args --gas-budget 15000000
+sui client call --package <PKG> --module jurisdictions --function init_registry --args <CAP> --gas-budget 20000000
+sui client call --package <PKG> --module protocol --function is_active --args <ATTESTATION> --gas-budget 10000000
+sui client call --package <PKG> --module evm --function is_active --args <BRIDGE_OBJ> --gas-budget 10000000
+sui client call --package <PKG> --module protocol --function is_expired_status --args <ATTESTATION> --gas-budget 10000000
+sui client call --package <PKG> --module protocol --function is_in_allowlist --args <CAP> <CONFIG> <ADDR> --gas-budget 10000000
+sui client call --package <PKG> --module protocol --function is_revoked --args <ATTESTATION> --gas-budget 10000000
+sui client call --package <PKG> --module attestation_utils --function is_valid --args <ATTESTATION> <CLOCK> --gas-budget 12000000
+sui client call --package <PKG> --module protocol --function mark_expired_if_needed --args <ATTESTATION> <U64:now_ms> --gas-budget 12000000
+sui client call --package <PKG> --module protocol --function mint_attestation --args <CAP> <CONFIG> <REGISTRY> <REQUEST> <POLICY> <ADDR:recipient> <U16:jurisdiction_code> <U8:verifier_source> <VEC_U8:extra_sources> <U8:verification_level> <VEC_U8:name_hash> <BOOL:is_human_verified> <BOOL:is_over_18> <U8:verifier_version> --gas-budget 32000000
+sui client call --package <PKG> --module protocol --function mint_attestation_with_enclave --args <CAP> <CONFIG> <REGISTRY> <REQUEST> <POLICY> <ENCLAVE_CFG> <ENCLAVE_OBJ> <VEC_U8:payload> <VEC_U8:signature> --gas-budget 34000000
+sui client call --package <PKG> --module jurisdictions --function add_jurisdiction_policy --args <CAP> <JURIS_REG> <U16:iso_num> <VEC_U8:allowed_sources> --gas-budget 20000000
+sui client call --package <PKG> --module protocol --function remove_from_allowlist --args <CAP> <CONFIG> <ADDR> --gas-budget 20000000
+sui client call --package <PKG> --module evm --function renew_update_upgrade_evm_attestation --args <REGISTRY> <CONFIG> <CAP> <ATTESTATION> <REQUEST> <U16:jurisdiction_code> <U8:verifier_source> <VEC_U8:extra_sources> <U8:verification_level> <VEC_U8:name_hash> <BOOL:is_human_verified> <BOOL:is_over_18> <U8:verifier_version> --gas-budget 32000000
+sui client call --package <PKG> --module evm --function renew_update_upgrade_evm_attestation_with_enclave --args <REGISTRY> <CONFIG> <CAP> <ATTESTATION> <REQUEST> <ENCLAVE_CFG> <ENCLAVE_OBJ> <VEC_U8:payload> <VEC_U8:signature> --gas-budget 34000000
+sui client call --package <PKG> --module protocol --function renew_update_upgrade_attestation --args <CAP> <CONFIG> <REGISTRY> <ATTESTATION> <REQUEST> <U16:jurisdiction_code> <U8:verifier_source> <VEC_U8:extra_sources> <U8:verification_level> <VEC_U8:name_hash> <BOOL:is_human_verified> <BOOL:is_over_18> <U8:verifier_version> --gas-budget 32000000
+sui client call --package <PKG> --module protocol --function renew_update_upgrade_attestation_with_enclave --args <CAP> <CONFIG> <REGISTRY> <ATTESTATION> <REQUEST> <ENCLAVE_CFG> <ENCLAVE_OBJ> <VEC_U8:payload> <VEC_U8:signature> --gas-budget 34000000
+sui client call --package <PKG> --module evm --function revoke_bridge --args <BRIDGE_OBJ> --gas-budget 15000000
+sui client call --package <PKG> --module protocol --function revoke_attestation --args <CAP> <CONFIG> <ATTESTATION> <U8:reason_code> --gas-budget 20000000
+sui client call --package <PKG> --module protocol --function set_protocol_paused --args <CAP> <CONFIG> <BOOL:paused> --gas-budget 15000000
+sui client call --package <PKG> --module protocol --function update_default_expiry_duration --args <CAP> <CONFIG> <U64:new_duration_ms> --gas-budget 15000000
+sui client call --package <PKG> --module protocol --function update_global_mint_limit_per_day --args <CAP> <CONFIG> <U64:new_limit> --gas-budget 15000000
+sui client call --package <PKG> --module protocol --function update_min_verifier_version --args <CAP> <CONFIG> <U8:new_min_verifier_version> --gas-budget 15000000
+sui client call --package <PKG> --module protocol --function update_mint_fee --args <CAP> <CONFIG> <U64:new_fee> --gas-budget 15000000
+sui client call --package <PKG> --module protocol --function update_renewal_period --args <CAP> <CONFIG> <U64:new_period_ms> --gas-budget 15000000
+sui client call --package <PKG> --module protocol --function update_treasury_address --args <CAP> <CONFIG> <ADDR:new_treasury> --gas-budget 15000000
+sui client call --package <PKG> --module protocol --function update_upgrade_fee --args <CAP> <CONFIG> <U64:new_upgrade_fee> --gas-budget 15000000
