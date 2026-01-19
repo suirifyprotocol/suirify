@@ -22,7 +22,7 @@ const getEnv = (key: string): string | undefined =>
 
 const ENV_PACKAGE_ID = getEnv("SUIRIFY_PACKAGE_ID") || getEnv("PACKAGE_ID");
 const FALLBACK_PACKAGE_ID =
-  "0xecd5a7ed68fce7a16251eecb72e75df9f8b26fe77d4609056a3c41a543a59b99";
+  "0xa85543374b7abcac6c414149af27ab600ac580ca7a856ed34fd017b7397de8aa";
 const DEFAULT_PACKAGE_ID = ENV_PACKAGE_ID || FALLBACK_PACKAGE_ID;
 
 const ENV_ATTESTATION_TYPE =

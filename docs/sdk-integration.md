@@ -31,8 +31,8 @@ The Suirify SDK enables your dApp (React/Node) to read attestation objects from 
 ```env
 # .env
 SUI_RPC_URL=https://fullnode.devnet.sui.io:443
-SUIRIFY_PACKAGE_ID=0xecd5a7ed68fce7a16251eecb72e75df9f8b26fe77d4609056a3c41a543a59b99
-SUIRIFY_ATTESTATION_TYPE=0xecd5a7ed68fce7a16251eecb72e75df9f8b26fe77d4609056a3c41a543a59b99::protocol::Suirify_Attestation # optional
+SUIRIFY_PACKAGE_ID=0xa85543374b7abcac6c414149af27ab600ac580ca7a856ed34fd017b7397de8aa
+SUIRIFY_ATTESTATION_TYPE=0xa85543374b7abcac6c414149af27ab600ac580ca7a856ed34fd017b7397de8aa::protocol::Suirify_Attestation # optional
 ```
 
 In frontend frameworks, use Vite-style `VITE_` prefixes (e.g., `VITE_SUI_RPC_URL`).
