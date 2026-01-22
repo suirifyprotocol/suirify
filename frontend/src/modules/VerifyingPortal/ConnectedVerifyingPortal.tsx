@@ -91,6 +91,8 @@ const ConnectedVerifyingPortal: React.FC = () => {
   const [faceVerifying, setFaceVerifying] = useState(false);
   const faceVerifyingRef = useRef(false);
   const [capturedFrame, setCapturedFrame] = useState<string | null>(null);
+  const [cameraAvailable, setCameraAvailable] = useState(true);
+  const [cameraInitError, setCameraInitError] = useState<string | null>(null);
 
   // camera refs for face capture
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -170,8 +172,11 @@ const ConnectedVerifyingPortal: React.FC = () => {
     if (currentStep !== 2.5) {
       clearPreviewTimer();
       setCapturedFrame(null);
+      setCameraInitError(null);
+      setCameraAvailable(true);
+      cleanupStream();
     }
-  }, [clearPreviewTimer, currentStep]);
+  }, [cleanupStream, clearPreviewTimer, currentStep]);
 
   const ensureCamera = useCallback(async () => {
     if (!streamRef.current) {
@@ -213,6 +218,40 @@ const ConnectedVerifyingPortal: React.FC = () => {
     return canvas.toDataURL("image/jpeg", 0.9);
   }, []);
 
+  const bypassAndVerify = useCallback(async () => {
+    if (faceVerifyingRef.current) return;
+    if (!form.sessionId) {
+      setError("No active verification session. Go back and retry.");
+      return;
+    }
+
+    faceVerifyingRef.current = true;
+    setFaceVerifying(true);
+    setLoading(true);
+    setError(null);
+
+    try {
+      const result = await verifyFace({ sessionId: form.sessionId, livePhoto: null });
+      setForm((prev) => ({
+        ...prev,
+        livePhoto: null,
+        faceVerified: result.match,
+        faceSimilarity: result.similarity,
+        faceDiffPercent: result.diffPercent,
+      }));
+      setCapturedFrame(null);
+      setCameraInitError(null);
+      setCurrentStep(3);
+    } catch (e) {
+      const msg = toUserFacingMessage(e, "Face verification failed. Please try again.");
+      setError(msg);
+    } finally {
+      faceVerifyingRef.current = false;
+      setFaceVerifying(false);
+      setLoading(false);
+    }
+  }, [form.sessionId, setForm]);
+
   // Step handlers
   const handleNextFromStep1 = async () => {
     if (!form.country || !validateId(form.country, form.idNumber)) return;
@@ -250,6 +289,9 @@ const ConnectedVerifyingPortal: React.FC = () => {
       return;
     }
     setError(null);
+    setCapturedFrame(null);
+    setCameraInitError(null);
+    setCameraAvailable(true);
     setCurrentStep(2.5);
   };
 
@@ -259,6 +301,12 @@ const ConnectedVerifyingPortal: React.FC = () => {
       setError("No active verification session. Go back and retry.");
       return;
     }
+
+    if (!cameraAvailable) {
+      await bypassAndVerify();
+      return;
+    }
+
     faceVerifyingRef.current = true;
     setFaceVerifying(true);
     setLoading(true);
@@ -303,7 +351,7 @@ const ConnectedVerifyingPortal: React.FC = () => {
         setFaceVerifying(false);
       }
       setLoading(false);
-      if (shouldResumeStream) {
+      if (shouldResumeStream && cameraAvailable) {
         await resumeCamera();
       }
     }
@@ -322,13 +370,19 @@ const ConnectedVerifyingPortal: React.FC = () => {
     (async () => {
       try {
         await ensureCamera();
+        if (!cancelled) {
+          setCameraAvailable(true);
+          setCameraInitError(null);
+        }
       } catch (e) {
         if (cancelled) return;
         cleanupStream();
         const raw = e instanceof Error ? e.message : "";
-        const friendly = toUserFacingMessage(e, "Unable to access your camera.");
-        setError(raw.toLowerCase().includes("denied") ? "Camera permission was denied. Please allow access to continue." : friendly);
-        setCurrentStep(2);
+        const friendly = toUserFacingMessage(e, "Unable to access your camera. We'll continue without it.");
+        const denied = raw.toLowerCase().includes("denied");
+        setError(denied ? "Camera permission was denied. Continuing without camera." : friendly);
+        setCameraInitError(friendly);
+        setCameraAvailable(false);
       }
     })();
     return () => {
@@ -572,22 +626,50 @@ const ConnectedVerifyingPortal: React.FC = () => {
               <h2 className="step-title">Face Verification</h2>
 
               <div className="camera-container">
-                <div className="camera-placeholder">
-                  <video
-                    ref={videoRef}
-                    className="camera-feed"
-                    autoPlay
-                    playsInline
-                    muted
-                    style={{ opacity: capturedFrame ? 0 : 1 }}
-                  />
-                  {capturedFrame && (
-                    <img src={capturedFrame} alt="Captured preview" className="camera-feed capture-preview" />
+                <div className={`camera-placeholder ${cameraAvailable ? "" : "no-camera"}`}>
+                  {cameraAvailable ? (
+                    <>
+                      <video
+                        ref={videoRef}
+                        className="camera-feed"
+                        autoPlay
+                        playsInline
+                        muted
+                        style={{ opacity: capturedFrame ? 0 : 1 }}
+                      />
+                      {capturedFrame && (
+                        <img src={capturedFrame} alt="Captured preview" className="camera-feed capture-preview" />
+                      )}
+                    </>
+                  ) : (
+                    <div className="camera-fallback">
+                      <strong>No camera detected</strong>
+                      <span>{cameraInitError || "We couldn't access a camera on this device."}</span>
+                      <span>You can continue without capturing a live photo.</span>
+                    </div>
                   )}
                 </div>
                 <p className="camera-instruction">
-                  {capturedFrame ? "Hold on, processing your capture..." : "Please look straight at the camera"}
+                  {cameraAvailable
+                    ? capturedFrame
+                      ? "Hold on, processing your capture..."
+                      : "Please look straight at the camera"
+                    : cameraInitError || "Continuing without camera input."}
                 </p>
+                {!cameraAvailable && (
+                  <button
+                    type="button"
+                    className="camera-mode-toggle"
+                    onClick={() => {
+                      setCameraAvailable(true);
+                      setCameraInitError(null);
+                      setError(null);
+                      setTimeout(() => ensureCamera().catch(() => setCameraAvailable(false)), 0);
+                    }}
+                  >
+                    Retry camera access
+                  </button>
+                )}
               </div>
 
               <div className="action-buttons-dual">
@@ -597,13 +679,19 @@ const ConnectedVerifyingPortal: React.FC = () => {
                     clearPreviewTimer();
                     setCapturedFrame(null);
                     cleanupStream();
+                    setCameraInitError(null);
+                    setCameraAvailable(true);
                     setCurrentStep(2);
                   }}
                 >
                   Back
                 </button>
-                <button className="next-btn" onClick={captureAndVerify} disabled={loading || faceVerifying}>
-                  {faceVerifying ? "Verifying..." : "Capture & Verify"}
+                <button
+                  className="next-btn"
+                  onClick={captureAndVerify}
+                  disabled={loading || faceVerifying}
+                >
+                  {faceVerifying ? "Verifying..." : cameraAvailable ? "Capture & Verify" : "Continue without camera"}
                 </button>
               </div>
             </>

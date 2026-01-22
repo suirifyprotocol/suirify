@@ -110,7 +110,7 @@ export type FaceVerificationResponse = {
   bypassed?: boolean;
 };
 
-export async function verifyFace(payload: { sessionId: string; livePhoto: string }): Promise<FaceVerificationResponse> {
+export async function verifyFace(payload: { sessionId: string; livePhoto?: string | null }): Promise<FaceVerificationResponse> {
   return request<FaceVerificationResponse>("/face-verify", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -139,6 +139,8 @@ export type MintConfigResponse = {
   mintFeeSource?: string | null;
   contractVersion: number | null;
   treasuryAddress: string | null;
+  mintingDisabled?: boolean;
+  disabledReason?: string | null;
 };
 
 export async function fetchMintConfig() {

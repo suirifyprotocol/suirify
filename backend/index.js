@@ -122,6 +122,51 @@ const DEFAULT_RPC_BY_NETWORK = {
 };
 const networkFallbackRpc = DEFAULT_RPC_BY_NETWORK[SUI_NETWORK] || DEFAULT_RPC_BY_NETWORK.devnet;
 const SUI_RPC = process.env.SUI_RPC || (typeof getFullnodeUrl === 'function' ? getFullnodeUrl(SUI_NETWORK) : networkFallbackRpc);
+const FALLBACK_RPC_BY_NETWORK = {
+  devnet: [
+    'https://fullnode.devnet.sui.io:443',
+    'https://sui-devnet.gateway.tatum.io/',
+  ],
+  testnet: [
+    'https://fullnode.testnet.sui.io:443',
+    'https://sui-testnet.gateway.tatum.io/',
+  ],
+  mainnet: [
+    'https://fullnode.mainnet.sui.io:443',
+    'https://sui-mainnet.chainode.tech/',
+  ],
+  localnet: ['http://127.0.0.1:9000'],
+};
+
+const parseRpcList = (value) => {
+  if (!value || typeof value !== 'string') return [];
+  return value
+    .split(/[,\s]+/)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length);
+};
+
+const dedupeRpcList = (list) => {
+  const seen = new Set();
+  const result = [];
+  list.forEach((entry) => {
+    if (!entry || typeof entry !== 'string') return;
+    const normalized = entry.trim();
+    if (!normalized.length || seen.has(normalized)) return;
+    seen.add(normalized);
+    result.push(normalized);
+  });
+  return result;
+};
+
+const configuredRpcFallbacks = parseRpcList(process.env.SUI_RPC_LIST || process.env.SUI_RPC_FALLBACKS || '');
+const builtinFallbacks = FALLBACK_RPC_BY_NETWORK[SUI_NETWORK] || [];
+const rpcCandidateInput = [SUI_RPC, ...configuredRpcFallbacks, ...builtinFallbacks, networkFallbackRpc];
+const SUI_RPC_CANDIDATES = dedupeRpcList(rpcCandidateInput);
+if (!SUI_RPC_CANDIDATES.length) {
+  SUI_RPC_CANDIDATES.push(networkFallbackRpc);
+}
+console.log('Sui RPC candidates:', SUI_RPC_CANDIDATES.join(', '));
 const PACKAGE_ID = process.env.PACKAGE_ID;
 const ADMIN_CAP_ID = process.env.ADMIN_CAP_ID;
 const PROTOCOL_CONFIG_ID = process.env.PROTOCOL_CONFIG_ID;
@@ -182,20 +227,118 @@ console.log(`Sui network configured: ${SUI_NETWORK} (rpc: ${SUI_RPC})`);
 
 let suiClient;
 let adminKeypair;
+let activeRpcIndex = 0;
+const suiClientCache = new Map();
+const RETRYABLE_RPC_ERROR_CODES = new Set([
+  'UND_ERR_CONNECT_TIMEOUT',
+  'UND_ERR_HEADERS_TIMEOUT',
+  'UND_ERR_SOCKET',
+  'UND_ERR_BODY_TIMEOUT',
+  'UND_ERR_RESPONSE_STATUS_CODE',
+  'UND_ERR_ABORTED',
+  'ECONNRESET',
+  'ECONNREFUSED',
+  'ETIMEDOUT',
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+]);
+
+const hasSuiRpcSupport = () => typeof SuiClient === 'function' && SUI_RPC_CANDIDATES.length > 0;
+
+function getOrCreateSuiClientForUrl(rpcUrl) {
+  if (!rpcUrl || !hasSuiRpcSupport()) return null;
+  if (suiClientCache.has(rpcUrl)) {
+    return suiClientCache.get(rpcUrl);
+  }
+  try {
+    const client = new SuiClient({ url: rpcUrl });
+    suiClientCache.set(rpcUrl, client);
+    console.log(`Sui client instantiated (rpc=${rpcUrl}).`);
+    return client;
+  } catch (err) {
+    console.error(`Failed to instantiate Sui client for ${rpcUrl}:`, err && err.message ? err.message : err);
+    return null;
+  }
+}
+
+const describeRpcError = (error) => {
+  if (!error) return 'unknown error';
+  const parts = [];
+  const root = error.cause || error;
+  if (root.code) parts.push(root.code);
+  if (error.message) {
+    parts.push(error.message);
+  } else if (root.message) {
+    parts.push(root.message);
+  }
+  return parts.length ? parts.join(' — ') : String(error);
+};
+
+function isRetryableRpcError(error) {
+  if (!error) return false;
+  const root = error.cause || error;
+  if (root && root.code && RETRYABLE_RPC_ERROR_CODES.has(root.code)) {
+    return true;
+  }
+  const message = (root && root.message ? root.message : error.message || '').toLowerCase();
+  if (!message) return false;
+  return (
+    message.includes('fetch failed') ||
+    message.includes('timeout') ||
+    message.includes('network') ||
+    message.includes('connect') ||
+    message.includes('socket')
+  );
+}
+
+async function withSuiClient(operationName, handler) {
+  if (!hasSuiRpcSupport()) {
+    throw new Error('Sui client is not configured.');
+  }
+
+  let lastError = null;
+  const total = SUI_RPC_CANDIDATES.length;
+  for (let offset = 0; offset < total; offset += 1) {
+    const candidateIndex = (activeRpcIndex + offset) % total;
+    const rpcUrl = SUI_RPC_CANDIDATES[candidateIndex];
+    const client = getOrCreateSuiClientForUrl(rpcUrl);
+    if (!client) {
+      lastError = new Error(`Unable to instantiate Sui client for ${rpcUrl}`);
+      continue;
+    }
+    try {
+      const result = await handler(client, rpcUrl);
+      suiClient = client;
+      if (candidateIndex !== activeRpcIndex) {
+        console.log(`Switched active Sui RPC to ${rpcUrl} for ${operationName}.`);
+        activeRpcIndex = candidateIndex;
+      }
+      return result;
+    } catch (err) {
+      lastError = err;
+      if (!isRetryableRpcError(err) || total === 1) {
+        throw err;
+      }
+      console.warn(`[${operationName}] RPC ${rpcUrl} failed (${describeRpcError(err)}). Trying next endpoint...`);
+    }
+  }
+
+  throw lastError || new Error('All configured Sui RPC endpoints failed.');
+}
 
 // Instantiate Sui client when available; load admin signer only if provided.
 try {
-	if (typeof SuiClient === 'function') {
-		try {
-			suiClient = new SuiClient({ url: SUI_RPC });
-			console.log(`Sui client instantiated (rpc=${SUI_RPC}).`);
-		} catch (e) {
-			console.error('Failed to instantiate SuiClient:', e);
-			suiClient = null;
-		}
-	} else {
-		console.warn('Sui client constructor not found in @mysten/sui exports. On-chain features disabled.');
-	}
+  if (hasSuiRpcSupport()) {
+    const initialClient = getOrCreateSuiClientForUrl(SUI_RPC_CANDIDATES[0]);
+    if (initialClient) {
+      suiClient = initialClient;
+      activeRpcIndex = 0;
+    } else {
+      console.error('Failed to instantiate initial Sui client. Will attempt again on demand.');
+    }
+  } else {
+    console.warn('Sui client constructor not found in @mysten/sui exports. On-chain features disabled.');
+  }
 
 	if (ADMIN_PRIVATE_KEY) {
     if (Ed25519Keypair && typeof Ed25519Keypair.fromSecretKey === 'function') {
@@ -359,13 +502,15 @@ function extractAttestationFromChanges(objectChanges) {
 }
 
 async function getExistingAttestation(walletAddress) {
-  if (!suiClient || !PACKAGE_ID || !walletAddress) return null;
+  if (!hasSuiRpcSupport() || !PACKAGE_ID || !walletAddress) return null;
   try {
-    const ownedObjects = await suiClient.getOwnedObjects({
+    const ownedObjects = await withSuiClient('attestation.lookup', (client) =>
+      client.getOwnedObjects({
       owner: walletAddress,
       filter: { StructType: `${PACKAGE_ID}::protocol::Suirify_Attestation` },
       options: { showContent: true },
-    });
+      })
+    );
     const attestationObject = ownedObjects?.data?.find((obj) => obj && !obj.error);
     const summary = summarizeAttestationObject(attestationObject);
     if (!summary) return null;
@@ -386,7 +531,7 @@ async function getExistingAttestation(walletAddress) {
 }
 
 async function getLatestPendingMintRequest(walletAddress, limit = 20, preferredRequestId = null) {
-  if (!suiClient || !PACKAGE_ID || !walletAddress) return null;
+  if (!hasSuiRpcSupport() || !PACKAGE_ID || !walletAddress) return null;
   try {
     const normalizedWallet = typeof walletAddress === 'string' ? walletAddress.trim() : walletAddress;
     if (!normalizedWallet) {
@@ -394,7 +539,9 @@ async function getLatestPendingMintRequest(walletAddress, limit = 20, preferredR
     }
     const filter = { MoveEventType: `${PACKAGE_ID}::protocol::MintRequestCreated` };
 
-    const response = await suiClient.queryEvents({ query: filter, limit });
+    const response = await withSuiClient('mintRequest.queryEvents', (client) =>
+      client.queryEvents({ query: filter, limit })
+    );
     const events = Array.isArray(response?.data) ? response.data.slice() : [];
     events.sort((a, b) => {
       const aTs = a?.timestampMs ? Number(a.timestampMs) : 0;
@@ -587,7 +734,7 @@ async function signTransactionWithKeypair(keypair, txBytes) {
  * ENDPOINT 1: Check for an existing attestation & get dashboard data.
  */
 app.get('/attestation/:walletAddress', async (req, res) => {
-  if (!suiClient) return res.status(500).json({ error: 'Sui client is not configured.' });
+  if (!hasSuiRpcSupport()) return res.status(500).json({ error: 'Sui client is not configured.' });
   const { walletAddress } = req.params;
   try {
     const storedSummary = summarizeStoredAttestation(walletAddress);
@@ -611,11 +758,13 @@ app.get('/attestation/:walletAddress', async (req, res) => {
       return res.json({ hasAttestation: true, isValid: storedSummary.isValid, data: dashboardData, source: 'db' });
     }
 
-    const ownedObjects = await suiClient.getOwnedObjects({
-      owner: walletAddress,
-      filter: { StructType: `${PACKAGE_ID}::protocol::Suirify_Attestation` },
-      options: { showContent: true },
-    });
+    const ownedObjects = await withSuiClient('attestation.endpoint', (client) =>
+      client.getOwnedObjects({
+        owner: walletAddress,
+        filter: { StructType: `${PACKAGE_ID}::protocol::Suirify_Attestation` },
+        options: { showContent: true },
+      })
+    );
     const attestationObject = ownedObjects.data.find((obj) => !obj.error);
     const summary = summarizeAttestationObject(attestationObject);
     if (!summary) return res.json({ hasAttestation: false, isValid: false, data: null });
@@ -761,11 +910,50 @@ app.post('/complete-verification', async (req, res) => {
  * Provide mint configuration so the frontend can construct mint requests client-side.
  */
 app.get('/mint-config', async (_req, res) => {
-  if (!suiClient) {
-    return res.status(500).json({ error: 'Sui client is not configured on the server.' });
+  let disabledReason = null;
+
+  if (!hasSuiRpcSupport()) {
+    disabledReason = 'Sui client is not configured on the server.';
   }
-  if (!PACKAGE_ID || !ATTESTATION_REGISTRY_ID) {
-    return res.status(500).json({ error: 'Protocol package or registry id is not configured.' });
+
+  if (!disabledReason) {
+    const missingIds = [];
+    if (!PACKAGE_ID) missingIds.push('PACKAGE_ID');
+    if (!ATTESTATION_REGISTRY_ID) missingIds.push('ATTESTATION_REGISTRY_ID');
+    if (!ADMIN_CAP_ID || !PROTOCOL_CONFIG_ID) missingIds.push('protocol admin objects');
+    if (missingIds.length) {
+      disabledReason = `Protocol configuration missing: ${missingIds.join(', ')}.`;
+    }
+  }
+
+  if (!disabledReason) {
+    try {
+      await withSuiClient('mint-config.package-check', (client) =>
+        client.getObject({ id: PACKAGE_ID, options: { showType: true } })
+      );
+    } catch (err) {
+      const raw = err && err.message ? err.message : String(err);
+      console.warn('Protocol package lookup failed:', raw);
+      disabledReason = `Protocol package unavailable on the selected network. ${raw}`;
+    }
+  }
+
+  if (disabledReason) {
+    return res.json({
+      success: true,
+      packageId: PACKAGE_ID || null,
+      protocolConfigId: PROTOCOL_CONFIG_ID || null,
+      attestationRegistryId: ATTESTATION_REGISTRY_ID || null,
+      defaultPolicyId: JURISDICTION_POLICY_ID || null,
+      mintFee: null,
+      mintFeeMist: null,
+      mintFeeSui: null,
+      mintFeeSource: null,
+      contractVersion: null,
+      treasuryAddress: null,
+      mintingDisabled: true,
+      disabledReason,
+    });
   }
 
   let mintFeeMist = STATIC_MINT_FEE ? String(STATIC_MINT_FEE) : null;
@@ -776,7 +964,9 @@ app.get('/mint-config', async (_req, res) => {
 
   if (PROTOCOL_CONFIG_ID) {
     try {
-      const configObject = await suiClient.getObject({ id: PROTOCOL_CONFIG_ID, options: { showContent: true } });
+      const configObject = await withSuiClient('mint-config.protocol-config', (client) =>
+        client.getObject({ id: PROTOCOL_CONFIG_ID, options: { showContent: true } })
+      );
       const fields = configObject?.data?.content?.fields;
       if (fields) {
         if (fields.mint_fee !== undefined && fields.mint_fee !== null) {
@@ -832,6 +1022,8 @@ app.get('/mint-config', async (_req, res) => {
     mintFeeSource,
     contractVersion,
     treasuryAddress,
+    mintingDisabled: false,
+    disabledReason: null,
   });
 });
 
@@ -841,7 +1033,7 @@ app.get('/mint-config', async (_req, res) => {
  * and has not yet been finalised by this server instance.
  */
 app.get('/mint-request/:walletAddress', async (req, res) => {
-  if (!suiClient) {
+  if (!hasSuiRpcSupport()) {
     return res.status(500).json({ success: false, error: 'Sui client is not configured on the server.' });
   }
 
@@ -872,7 +1064,7 @@ app.get('/mint-request/:walletAddress', async (req, res) => {
  * Admin endpoint: list recent mint requests, optionally filtered by wallet.
  */
 app.get('/admin/mint-requests', requireAdmin, async (req, res) => {
-  if (!suiClient) {
+  if (!hasSuiRpcSupport()) {
     return res.status(500).json({ success: false, error: 'Sui client is not configured on the server.' });
   }
   if (!PACKAGE_ID) {
@@ -902,7 +1094,9 @@ app.get('/admin/mint-requests', requireAdmin, async (req, res) => {
   }
 
   try {
-  const response = await suiClient.queryEvents({ query, limit, cursor: cursorParam });
+  const response = await withSuiClient('admin.mintRequests', (client) =>
+      client.queryEvents({ query, limit, cursor: cursorParam })
+    );
     const events = Array.isArray(response?.data) ? response.data : [];
     const items = [];
 
@@ -975,7 +1169,7 @@ app.post('/finalize-mint', async (req, res) => {
   let requestId = typeof rawRequestId === 'string' && rawRequestId.trim().length ? rawRequestId.trim() : null;
   let requestDigestInput = typeof requestTxDigest === 'string' && requestTxDigest.trim().length ? requestTxDigest.trim() : null;
 
-  if (!suiClient) {
+  if (!hasSuiRpcSupport()) {
     return res.status(500).json({ error: 'Sui client is not configured on the server.' });
   }
 
@@ -1125,15 +1319,17 @@ app.post('/finalize-mint', async (req, res) => {
     txb.setSender(adminAddress);
     txb.setGasBudget(50_000_000);
 
-    const txBytes = await txb.build({ client: suiClient });
-    const signature = await signTransactionWithKeypair(adminKeypair, txBytes);
-    const txBase64 = Buffer.from(txBytes).toString('base64');
+    const executionResult = await withSuiClient('mint.finalize', async (client) => {
+      const txBytes = await txb.build({ client });
+      const signature = await signTransactionWithKeypair(adminKeypair, txBytes);
+      const txBase64 = Buffer.from(txBytes).toString('base64');
 
-    const executionResult = await suiClient.executeTransactionBlock({
-      transactionBlock: txBase64,
-      signature,
-      options: { showEffects: true, showEvents: true, showObjectChanges: true },
-      requestType: 'WaitForLocalExecution',
+      return client.executeTransactionBlock({
+        transactionBlock: txBase64,
+        signature,
+        options: { showEffects: true, showEvents: true, showObjectChanges: true },
+        requestType: 'WaitForLocalExecution',
+      });
     });
 
     const digest = executionResult?.digest || executionResult?.effects?.transactionDigest || null;
@@ -1225,90 +1421,92 @@ app.post('/finalize-mint', async (req, res) => {
  * Event Indexer for final, permanent storage.
  */
 async function startIndexer() {
-  if (!suiClient) {
+  if (!hasSuiRpcSupport()) {
     console.warn('Cannot start indexer: Sui client not configured.');
     return;
   }
   console.log('Starting event indexer...');
   try {
-    await suiClient.subscribeEvent({
-      filter: { MoveEventType: `${PACKAGE_ID}::protocol::AttestationMinted` },
-      onMessage: async (event) => {
-        // Be a bit defensive about payload shape
-        const recipient =
-          (event && event.payload && event.payload.recipient) ||
-          (event && event.parsedJson && event.parsedJson.recipient) ||
-          null;
-        const requestIdFromEvent =
-          (event && event.payload && event.payload.request_id) ||
-          (event && event.parsedJson && (event.parsedJson.request_id || event.parsedJson.requestId)) ||
-          null;
-        const attestationObjectIdFromEvent =
-          (event && event.payload && event.payload.objectId) ||
-          (event && event.parsedJson && event.parsedJson.objectId) ||
-          null;
-        if (requestIdFromEvent) {
-          markRequestConsumed(requestIdFromEvent, {
-            finalizedAt: new Date().toISOString(),
-            source: 'event-indexer',
-            attestationId: attestationObjectIdFromEvent || null,
-            status: 'ACTIVE',
-            statusCode: STATUS_CODE_ACTIVE,
-            statusLabel: 'Active',
-            eventType: 'indexer-attestation',
-            walletAddress: recipient || null,
-            recipient,
-          });
-        }
-        if (!recipient) return;
+    await withSuiClient('event.subscribe', (client) =>
+      client.subscribeEvent({
+        filter: { MoveEventType: `${PACKAGE_ID}::protocol::AttestationMinted` },
+        onMessage: async (event) => {
+          // Be a bit defensive about payload shape
+          const recipient =
+            (event && event.payload && event.payload.recipient) ||
+            (event && event.parsedJson && event.parsedJson.recipient) ||
+            null;
+          const requestIdFromEvent =
+            (event && event.payload && event.payload.request_id) ||
+            (event && event.parsedJson && (event.parsedJson.request_id || event.parsedJson.requestId)) ||
+            null;
+          const attestationObjectIdFromEvent =
+            (event && event.payload && event.payload.objectId) ||
+            (event && event.parsedJson && event.parsedJson.objectId) ||
+            null;
+          if (requestIdFromEvent) {
+            markRequestConsumed(requestIdFromEvent, {
+              finalizedAt: new Date().toISOString(),
+              source: 'event-indexer',
+              attestationId: attestationObjectIdFromEvent || null,
+              status: 'ACTIVE',
+              statusCode: STATUS_CODE_ACTIVE,
+              statusLabel: 'Active',
+              eventType: 'indexer-attestation',
+              walletAddress: recipient || null,
+              recipient,
+            });
+          }
+          if (!recipient) return;
 
-        const pendingMint = pendingMints.get(recipient);
-        if (pendingMint) {
-          let attSummary = pendingMint.attestationSummary;
-          if (!attSummary) {
+          const pendingMint = pendingMints.get(recipient);
+          if (pendingMint) {
+            let attSummary = pendingMint.attestationSummary;
+            if (!attSummary) {
+              try {
+                attSummary = await getExistingAttestation(recipient);
+              } catch (summaryErr) {
+                console.error('Indexer failed to load attestation summary:', summaryErr);
+              }
+            }
+            const attestationIdFromSummary = attSummary?.objectId || pendingMint.attestationId || attestationObjectIdFromEvent || null;
             try {
-              attSummary = await getExistingAttestation(recipient);
-            } catch (summaryErr) {
-              console.error('Indexer failed to load attestation summary:', summaryErr);
+              const record = db.markUsedGovId(
+                pendingMint.country,
+                pendingMint.idNumber,
+                Object.assign(
+                  {
+                    walletAddress: recipient,
+                    eventType: 'indexer-attestation',
+                    source: 'event-indexer',
+                    indexedAt: new Date().toISOString(),
+                    requestId: pendingMint.requestId || null,
+                    requestedRequestId: pendingMint.requestedRequestId || null,
+                    attestationId: attestationIdFromSummary,
+                    status: attSummary?.status || 'ACTIVE',
+                    statusCode: attSummary?.statusCode ?? STATUS_CODE_ACTIVE,
+                    statusLabel: attSummary?.statusLabel || 'Active',
+                    jurisdictionCode: attSummary?.jurisdictionCode ?? null,
+                    verificationLevel: attSummary?.verificationLevel ?? null,
+                    issueDateMs: attSummary?.issueDateMs ?? null,
+                    expiryDateMs: attSummary?.expiryDateMs ?? null,
+                  },
+                  pendingMint.fullNameHash ? { fullNameHash: pendingMint.fullNameHash } : {}
+                )
+              );
+              if (record && record.idHash) {
+                console.log(`✅ SUCCESS: Recorded attestation for wallet ${recipient} (country=${pendingMint.country}, idHash=${record.idHash.slice(0, 12)}…).`);
+              } else {
+                console.log(`✅ SUCCESS: Recorded attestation for wallet ${recipient} (country=${pendingMint.country}).`);
+              }
+            } catch (e) {
+              console.error('Failed to mark gov id as used in persistent DB:', e);
             }
+            pendingMints.delete(recipient);
           }
-          const attestationIdFromSummary = attSummary?.objectId || pendingMint.attestationId || attestationObjectIdFromEvent || null;
-          try {
-            const record = db.markUsedGovId(
-              pendingMint.country,
-              pendingMint.idNumber,
-              Object.assign(
-                {
-                  walletAddress: recipient,
-                  eventType: 'indexer-attestation',
-                  source: 'event-indexer',
-                  indexedAt: new Date().toISOString(),
-                  requestId: pendingMint.requestId || null,
-                  requestedRequestId: pendingMint.requestedRequestId || null,
-                  attestationId: attestationIdFromSummary,
-                  status: attSummary?.status || 'ACTIVE',
-                  statusCode: attSummary?.statusCode ?? STATUS_CODE_ACTIVE,
-                  statusLabel: attSummary?.statusLabel || 'Active',
-                  jurisdictionCode: attSummary?.jurisdictionCode ?? null,
-                  verificationLevel: attSummary?.verificationLevel ?? null,
-                  issueDateMs: attSummary?.issueDateMs ?? null,
-                  expiryDateMs: attSummary?.expiryDateMs ?? null,
-                },
-                pendingMint.fullNameHash ? { fullNameHash: pendingMint.fullNameHash } : {}
-              )
-            );
-            if (record && record.idHash) {
-              console.log(`✅ SUCCESS: Recorded attestation for wallet ${recipient} (country=${pendingMint.country}, idHash=${record.idHash.slice(0, 12)}…).`);
-            } else {
-              console.log(`✅ SUCCESS: Recorded attestation for wallet ${recipient} (country=${pendingMint.country}).`);
-            }
-          } catch (e) {
-            console.error('Failed to mark gov id as used in persistent DB:', e);
-          }
-          pendingMints.delete(recipient);
-        }
-      },
-    });
+        },
+      })
+    );
     console.log('Indexer successfully subscribed to events.');
   } catch (error) {
     console.error('Failed to start event indexer:', error);
@@ -1449,13 +1647,15 @@ const path = require('path');
 
 // POST /face-verify
 app.post('/face-verify', async (req, res) => {
-  const { sessionId, livePhoto } = req.body;
-  if (!sessionId || !livePhoto) return res.status(400).json({ success: false, error: 'sessionId and livePhoto are required' });
+  const { sessionId, livePhoto } = req.body || {};
+  if (!sessionId) return res.status(400).json({ success: false, error: 'sessionId is required' });
 
   const sessionData = verificationSessionStore.get(sessionId);
   if (!sessionData || !sessionData.govRecord) return res.status(404).json({ success: false, error: 'Verification session not found or invalid' });
 
-  if (BYPASS_FACE_MATCH || !Jimp || typeof Jimp.read !== 'function') {
+  const shouldBypassFaceMatch = BYPASS_FACE_MATCH || !Jimp || typeof Jimp.read !== 'function';
+
+  if (shouldBypassFaceMatch) {
     sessionData.faceVerification = {
       match: true,
       similarity: 1,
@@ -1466,6 +1666,8 @@ app.post('/face-verify', async (req, res) => {
     verificationSessionStore.set(sessionId, sessionData);
     return res.json({ success: true, match: true, similarity: 1, diffPercent: 0, bypassed: true });
   }
+
+  if (!livePhoto) return res.status(400).json({ success: false, error: 'livePhoto is required when camera capture is enabled' });
 
   try {
     // reference photo may be a data URL, a local path, or a remote URL
@@ -1619,4 +1821,4 @@ function shutdown(signal) {
 
 // existing graceful shutdown code (leave unchanged)
 process.on('SIGINT', () => shutdown('SIGINT'));
-process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));process.on('SIGTERM', () => shutdown('SIGTERM'));
