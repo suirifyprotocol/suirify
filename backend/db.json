@@ -1,10 +1,200 @@
 {
-  "__log": [],
+  "__log": [
+    {
+      "timestamp": "2026-01-23T08:38:52.838Z",
+      "type": "mintRequest.consumed",
+      "walletAddress": "0x8db87caf928be5ca14eacb846e79b78a7e1684ea6c2ffbc09e3e69a0db57d715",
+      "requestId": "0xf6c66e4dac63d97cc1a00be4bc7a59598e431df1403948e825a2210ae9199b86",
+      "eventType": "mint-finalized",
+      "source": "finalize-handler"
+    },
+    {
+      "timestamp": "2026-01-23T08:38:52.840Z",
+      "type": "govId.marked",
+      "country": "Nigeria",
+      "idHash": "b84d5c0303cf7b2a0ae3621522a4c184e5d1db7063671b42404e62f1e85bdd46",
+      "walletAddress": "0x8db87caf928be5ca14eacb846e79b78a7e1684ea6c2ffbc09e3e69a0db57d715",
+      "requestId": "0xf6c66e4dac63d97cc1a00be4bc7a59598e431df1403948e825a2210ae9199b86",
+      "eventType": "mint-finalized",
+      "source": "finalize-handler"
+    },
+    {
+      "timestamp": "2026-01-23T08:41:40.447Z",
+      "type": "mintRequest.consumed",
+      "walletAddress": "0x40a4248dfa216c7dde67bbdd9cf165b172a31a83df1396d091601bb9b972a1c4",
+      "requestId": "0xf67abe6249ef867e19295a5865607f5cc4f6d1b7989c959b0e2ded59a923edfc",
+      "eventType": "mint-finalized",
+      "source": "finalize-handler"
+    },
+    {
+      "timestamp": "2026-01-23T08:41:40.449Z",
+      "type": "govId.marked",
+      "country": "Nigeria",
+      "idHash": "caaae9e8278f8fbb6722fd302faf51a6b4421d4755a76b7b38b0da29377419c1",
+      "walletAddress": "0x40a4248dfa216c7dde67bbdd9cf165b172a31a83df1396d091601bb9b972a1c4",
+      "requestId": "0xf67abe6249ef867e19295a5865607f5cc4f6d1b7989c959b0e2ded59a923edfc",
+      "eventType": "mint-finalized",
+      "source": "finalize-handler"
+    }
+  ],
   "__meta": {
     "schemaVersion": 2,
     "createdAt": "2026-01-22T20:35:50.486Z",
-    "lastLoadedAt": "2026-01-22T22:03:22.974Z",
-    "lastPersistedAt": "2026-01-22T22:03:22.975Z"
+    "lastLoadedAt": "2026-01-23T08:26:21.557Z",
+    "lastPersistedAt": "2026-01-23T08:41:40.449Z"
   },
-  "__walletIndex": {}
+  "__walletIndex": {
+    "0x8db87caf928be5ca14eacb846e79b78a7e1684ea6c2ffbc09e3e69a0db57d715": [
+      "gov:Nigeria:b84d5c0303cf7b2a0ae3621522a4c184e5d1db7063671b42404e62f1e85bdd46"
+    ],
+    "0x40a4248dfa216c7dde67bbdd9cf165b172a31a83df1396d091601bb9b972a1c4": [
+      "gov:Nigeria:caaae9e8278f8fbb6722fd302faf51a6b4421d4755a76b7b38b0da29377419c1"
+    ]
+  },
+  "mintRequest:0xf6c66e4dac63d97cc1a00be4bc7a59598e431df1403948e825a2210ae9199b86": {
+    "requestId": "0xf6c66e4dac63d97cc1a00be4bc7a59598e431df1403948e825a2210ae9199b86",
+    "firstSeenAt": "2026-01-23T08:38:52.838Z",
+    "history": [
+      {
+        "timestamp": "2026-01-23T08:38:52.838Z",
+        "metadataVersion": 2,
+        "walletAddress": "0x8db87caf928be5ca14eacb846e79b78a7e1684ea6c2ffbc09e3e69a0db57d715",
+        "originalRequestId": "0xf6c66e4dac63d97cc1a00be4bc7a59598e431df1403948e825a2210ae9199b86",
+        "finalizeDigest": "4emKPvcWRtVEz4rAijdVvnQZsHs8c3qx4aD2YCzbuiYm",
+        "requestTxDigest": "7N9S3y8xvnB2oVAeMrKUUSwBXPYio8vyYNdbCyUcxfxL",
+        "finalizedAt": "2026-01-23T08:38:52.837Z",
+        "requestedRequestId": "0xf6c66e4dac63d97cc1a00be4bc7a59598e431df1403948e825a2210ae9199b86",
+        "source": "finalize-handler",
+        "eventType": "mint-finalized"
+      }
+    ],
+    "wallets": [
+      "0x8db87caf928be5ca14eacb846e79b78a7e1684ea6c2ffbc09e3e69a0db57d715"
+    ],
+    "lastUpdatedAt": "2026-01-23T08:38:52.838Z",
+    "latest": {
+      "metadataVersion": 2,
+      "walletAddress": "0x8db87caf928be5ca14eacb846e79b78a7e1684ea6c2ffbc09e3e69a0db57d715",
+      "originalRequestId": "0xf6c66e4dac63d97cc1a00be4bc7a59598e431df1403948e825a2210ae9199b86",
+      "finalizeDigest": "4emKPvcWRtVEz4rAijdVvnQZsHs8c3qx4aD2YCzbuiYm",
+      "requestTxDigest": "7N9S3y8xvnB2oVAeMrKUUSwBXPYio8vyYNdbCyUcxfxL",
+      "finalizedAt": "2026-01-23T08:38:52.837Z",
+      "requestedRequestId": "0xf6c66e4dac63d97cc1a00be4bc7a59598e431df1403948e825a2210ae9199b86",
+      "source": "finalize-handler",
+      "eventType": "mint-finalized"
+    },
+    "walletAddress": "0x8db87caf928be5ca14eacb846e79b78a7e1684ea6c2ffbc09e3e69a0db57d715"
+  },
+  "gov:Nigeria:b84d5c0303cf7b2a0ae3621522a4c184e5d1db7063671b42404e62f1e85bdd46": {
+    "country": "Nigeria",
+    "idHash": "b84d5c0303cf7b2a0ae3621522a4c184e5d1db7063671b42404e62f1e85bdd46",
+    "firstSeenAt": "2026-01-23T08:38:52.840Z",
+    "history": [
+      {
+        "timestamp": "2026-01-23T08:38:52.840Z",
+        "metadataVersion": 2,
+        "walletAddress": "0x8db87caf928be5ca14eacb846e79b78a7e1684ea6c2ffbc09e3e69a0db57d715",
+        "requestId": "0xf6c66e4dac63d97cc1a00be4bc7a59598e431df1403948e825a2210ae9199b86",
+        "finalizeDigest": "4emKPvcWRtVEz4rAijdVvnQZsHs8c3qx4aD2YCzbuiYm",
+        "requestTxDigest": "7N9S3y8xvnB2oVAeMrKUUSwBXPYio8vyYNdbCyUcxfxL",
+        "recordedAt": "2026-01-23T08:38:52.839Z",
+        "requestedRequestId": "0xf6c66e4dac63d97cc1a00be4bc7a59598e431df1403948e825a2210ae9199b86",
+        "source": "finalize-handler",
+        "eventType": "mint-finalized",
+        "fullNameHash": "53523dadb4a4de6664e24d0b3986fd13a7db39ab3191ec86d0c787d0ca5b6383"
+      }
+    ],
+    "wallets": [
+      "0x8db87caf928be5ca14eacb846e79b78a7e1684ea6c2ffbc09e3e69a0db57d715"
+    ],
+    "lastUpdatedAt": "2026-01-23T08:38:52.840Z",
+    "walletAddress": "0x8db87caf928be5ca14eacb846e79b78a7e1684ea6c2ffbc09e3e69a0db57d715",
+    "fullNameHash": "53523dadb4a4de6664e24d0b3986fd13a7db39ab3191ec86d0c787d0ca5b6383",
+    "latest": {
+      "metadataVersion": 2,
+      "walletAddress": "0x8db87caf928be5ca14eacb846e79b78a7e1684ea6c2ffbc09e3e69a0db57d715",
+      "requestId": "0xf6c66e4dac63d97cc1a00be4bc7a59598e431df1403948e825a2210ae9199b86",
+      "finalizeDigest": "4emKPvcWRtVEz4rAijdVvnQZsHs8c3qx4aD2YCzbuiYm",
+      "requestTxDigest": "7N9S3y8xvnB2oVAeMrKUUSwBXPYio8vyYNdbCyUcxfxL",
+      "recordedAt": "2026-01-23T08:38:52.839Z",
+      "requestedRequestId": "0xf6c66e4dac63d97cc1a00be4bc7a59598e431df1403948e825a2210ae9199b86",
+      "source": "finalize-handler",
+      "eventType": "mint-finalized",
+      "fullNameHash": "53523dadb4a4de6664e24d0b3986fd13a7db39ab3191ec86d0c787d0ca5b6383"
+    },
+    "totalEvents": 1
+  },
+  "mintRequest:0xf67abe6249ef867e19295a5865607f5cc4f6d1b7989c959b0e2ded59a923edfc": {
+    "requestId": "0xf67abe6249ef867e19295a5865607f5cc4f6d1b7989c959b0e2ded59a923edfc",
+    "firstSeenAt": "2026-01-23T08:41:40.447Z",
+    "history": [
+      {
+        "timestamp": "2026-01-23T08:41:40.447Z",
+        "metadataVersion": 2,
+        "walletAddress": "0x40a4248dfa216c7dde67bbdd9cf165b172a31a83df1396d091601bb9b972a1c4",
+        "originalRequestId": "0xf67abe6249ef867e19295a5865607f5cc4f6d1b7989c959b0e2ded59a923edfc",
+        "finalizeDigest": "FZiNRvKnLZhikCFmyCdbZd7JsPTZ6kpKaym1ifpzJNRn",
+        "requestTxDigest": "J4hNYANVmiHBzpbSBnk8J4m7AmU2fpTA91zDYh2eo4C8",
+        "finalizedAt": "2026-01-23T08:41:40.447Z",
+        "requestedRequestId": "0xf67abe6249ef867e19295a5865607f5cc4f6d1b7989c959b0e2ded59a923edfc",
+        "source": "finalize-handler",
+        "eventType": "mint-finalized"
+      }
+    ],
+    "wallets": [
+      "0x40a4248dfa216c7dde67bbdd9cf165b172a31a83df1396d091601bb9b972a1c4"
+    ],
+    "lastUpdatedAt": "2026-01-23T08:41:40.447Z",
+    "latest": {
+      "metadataVersion": 2,
+      "walletAddress": "0x40a4248dfa216c7dde67bbdd9cf165b172a31a83df1396d091601bb9b972a1c4",
+      "originalRequestId": "0xf67abe6249ef867e19295a5865607f5cc4f6d1b7989c959b0e2ded59a923edfc",
+      "finalizeDigest": "FZiNRvKnLZhikCFmyCdbZd7JsPTZ6kpKaym1ifpzJNRn",
+      "requestTxDigest": "J4hNYANVmiHBzpbSBnk8J4m7AmU2fpTA91zDYh2eo4C8",
+      "finalizedAt": "2026-01-23T08:41:40.447Z",
+      "requestedRequestId": "0xf67abe6249ef867e19295a5865607f5cc4f6d1b7989c959b0e2ded59a923edfc",
+      "source": "finalize-handler",
+      "eventType": "mint-finalized"
+    },
+    "walletAddress": "0x40a4248dfa216c7dde67bbdd9cf165b172a31a83df1396d091601bb9b972a1c4"
+  },
+  "gov:Nigeria:caaae9e8278f8fbb6722fd302faf51a6b4421d4755a76b7b38b0da29377419c1": {
+    "country": "Nigeria",
+    "idHash": "caaae9e8278f8fbb6722fd302faf51a6b4421d4755a76b7b38b0da29377419c1",
+    "firstSeenAt": "2026-01-23T08:41:40.449Z",
+    "history": [
+      {
+        "timestamp": "2026-01-23T08:41:40.449Z",
+        "metadataVersion": 2,
+        "walletAddress": "0x40a4248dfa216c7dde67bbdd9cf165b172a31a83df1396d091601bb9b972a1c4",
+        "requestId": "0xf67abe6249ef867e19295a5865607f5cc4f6d1b7989c959b0e2ded59a923edfc",
+        "finalizeDigest": "FZiNRvKnLZhikCFmyCdbZd7JsPTZ6kpKaym1ifpzJNRn",
+        "requestTxDigest": "J4hNYANVmiHBzpbSBnk8J4m7AmU2fpTA91zDYh2eo4C8",
+        "recordedAt": "2026-01-23T08:41:40.448Z",
+        "requestedRequestId": "0xf67abe6249ef867e19295a5865607f5cc4f6d1b7989c959b0e2ded59a923edfc",
+        "source": "finalize-handler",
+        "eventType": "mint-finalized",
+        "fullNameHash": "7901ec6ceb541359a3c3fb32364cc5c4ea805fb330fda96b9a6b21141ccbea26"
+      }
+    ],
+    "wallets": [
+      "0x40a4248dfa216c7dde67bbdd9cf165b172a31a83df1396d091601bb9b972a1c4"
+    ],
+    "lastUpdatedAt": "2026-01-23T08:41:40.449Z",
+    "walletAddress": "0x40a4248dfa216c7dde67bbdd9cf165b172a31a83df1396d091601bb9b972a1c4",
+    "fullNameHash": "7901ec6ceb541359a3c3fb32364cc5c4ea805fb330fda96b9a6b21141ccbea26",
+    "latest": {
+      "metadataVersion": 2,
+      "walletAddress": "0x40a4248dfa216c7dde67bbdd9cf165b172a31a83df1396d091601bb9b972a1c4",
+      "requestId": "0xf67abe6249ef867e19295a5865607f5cc4f6d1b7989c959b0e2ded59a923edfc",
+      "finalizeDigest": "FZiNRvKnLZhikCFmyCdbZd7JsPTZ6kpKaym1ifpzJNRn",
+      "requestTxDigest": "J4hNYANVmiHBzpbSBnk8J4m7AmU2fpTA91zDYh2eo4C8",
+      "recordedAt": "2026-01-23T08:41:40.448Z",
+      "requestedRequestId": "0xf67abe6249ef867e19295a5865607f5cc4f6d1b7989c959b0e2ded59a923edfc",
+      "source": "finalize-handler",
+      "eventType": "mint-finalized",
+      "fullNameHash": "7901ec6ceb541359a3c3fb32364cc5c4ea805fb330fda96b9a6b21141ccbea26"
+    },
+    "totalEvents": 1
+  }
 }

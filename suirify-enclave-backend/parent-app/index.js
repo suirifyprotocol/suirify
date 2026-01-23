@@ -191,14 +191,14 @@ app.get('/health', (req, res) => res.json({ ok: true, time: Date.now() }));
 // compute SUI_RPC now that getFullnodeUrl may be defined
 const PORT = process.env.PORT || 4000;
 const SECRET_PEPPER = process.env.SECRET_PEPPER || '';
-const SUI_NETWORK = process.env.SUI_NETWORK || 'devnet';
+const SUI_NETWORK = process.env.SUI_NETWORK || 'testnet';
 const DEFAULT_RPC_BY_NETWORK = {
   devnet: 'https://fullnode.devnet.sui.io:443',
   testnet: 'https://fullnode.testnet.sui.io:443',
   mainnet: 'https://fullnode.mainnet.sui.io:443',
   localnet: 'http://127.0.0.1:9000',
 };
-const networkFallbackRpc = DEFAULT_RPC_BY_NETWORK[SUI_NETWORK] || DEFAULT_RPC_BY_NETWORK.devnet;
+const networkFallbackRpc = DEFAULT_RPC_BY_NETWORK[SUI_NETWORK] || DEFAULT_RPC_BY_NETWORK.testnet;
 const SUI_RPC = process.env.SUI_RPC || (typeof getFullnodeUrl === 'function' ? getFullnodeUrl(SUI_NETWORK) : networkFallbackRpc);
 const deriveWebsocketUrl = (rpcUrl) => {
   if (!rpcUrl) return null;

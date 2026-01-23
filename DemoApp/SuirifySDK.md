@@ -8,7 +8,7 @@ This guide walks partner teams through installing, configuring, and embedding th
 
 ```
 ┌─────────────┐    RPC over HTTPS    ┌──────────────────────┐
-│ Your dApp   │ <──────────────────► │ Sui Fullnode (devnet)│
+│ Your dApp   │ <──────────────────► │ Sui Fullnode (testnet)│
 │ (React/Node)│                      └──────────────────────┘
 │             │         ▲
 │             │         │    SUIrify_Attestation objects
@@ -34,7 +34,7 @@ Nothing is ever written on-chain—this is a read-only, consent-first flow.
 | Requirement        | Notes                                                                                |
 | ------------------ | ------------------------------------------------------------------------------------ |
 | Node.js ≥ 18       | Matches the SDK toolchain and Mysten Dapp Kit requirements.                          |
-| HTTPS Sui RPC      | Default is `https://fullnode.devnet.sui.io:443`. You may pass any fullnode URL.      |
+| HTTPS Sui RPC      | Default is `https://fullnode.testnet.sui.io:443`. You may pass any fullnode URL.     |
 | Wallet integration | Use Mysten Dapp Kit (as in DemoApp) or any library capable of `signPersonalMessage`. |
 | Build tooling      | Vite/Next.js/etc. with TypeScript recommended.                                       |
 
@@ -42,9 +42,9 @@ Environment variables you will typically define:
 
 ```bash
 # .env
-SUI_RPC_URL=https://fullnode.devnet.sui.io:443
-SUIRIFY_PACKAGE_ID=0xa85543374b7abcac6c414149af27ab600ac580ca7a856ed34fd017b7397de8aa
-SUIRIFY_ATTESTATION_TYPE=0xa85543374b7abcac6c414149af27ab600ac580ca7a856ed34fd017b7397de8aa::protocol::Suirify_Attestation # optional override
+SUI_RPC_URL=https://fullnode.testnet.sui.io:443
+SUIRIFY_PACKAGE_ID=0x2a81ddb98779253bd431e4737caca7c29bcfa8ac8ed57eaddecaf6fc530226e2
+SUIRIFY_ATTESTATION_TYPE=0x2a81ddb98779253bd431e4737caca7c29bcfa8ac8ed57eaddecaf6fc530226e2::protocol::Suirify_Attestation # optional override
 ```
 
 In front-end frameworks, expose them via Vite-style `VITE_` prefixes (e.g., `VITE_SUI_RPC_URL`).
@@ -91,7 +91,7 @@ import { SuirifySdk } from "suirifysdk";
 const rpcUrl =
   window?.SUI_RPC_URL ||
   import.meta.env.VITE_SUI_RPC_URL ||
-  "https://fullnode.devnet.sui.io:443";
+  "https://fullnode.testnet.sui.io:443";
 
 const attestationType =
   window?.SUIRIFY_ATTESTATION_TYPE ||

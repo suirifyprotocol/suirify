@@ -18,9 +18,9 @@ const { networkConfig } = createNetworkConfig({
   mainnet: { url: getFullnodeUrl("mainnet") },
 });
 
-const configuredNetwork = (import.meta.env.VITE_SUI_NETWORK as string) || "devnet";
+const configuredNetwork = (import.meta.env.VITE_SUI_NETWORK as string) || "testnet";
 const defaultNetwork =
-  configuredNetwork in networkConfig ? (configuredNetwork as keyof typeof networkConfig) : "devnet";
+  configuredNetwork in networkConfig ? (configuredNetwork as keyof typeof networkConfig) : "testnet";
 
 const queryClient = new QueryClient();
 
@@ -34,7 +34,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <BrowserRouter>
       <QueryClientProvider client={queryClient}>
-  <SuiClientProvider networks={networkConfig} defaultNetwork={defaultNetwork}>
+        <SuiClientProvider networks={networkConfig} defaultNetwork={defaultNetwork}>
           <WalletProvider autoConnect slushWallet={slushWalletConfig}>
             <App />
           </WalletProvider>

@@ -16,7 +16,7 @@ Use this if you need to filter objects manually outside of the client helpers.
 
 ### `SuirifySdkOptions`
 
-- `rpcUrl?: string` – override the RPC endpoint (defaults to `process.env.SUI_RPC`, `SUI_RPC_URL`, etc., or devnet).
+- `rpcUrl?: string` – override the RPC endpoint (defaults to `process.env.SUI_RPC`, `SUI_RPC_URL`, etc., or testnet).
 - `provider?: SuiProviderInstance` – inject your own `@mysten/sui.js` provider.
 - `cacheMs?: number` – cache duration for `getAttestationForOwner` (default 5000 ms).
 - `attestationType?: string` – override the struct type filter (defaults to `ATTESTATION_TYPE`).

@@ -155,9 +155,9 @@ Live demo: [https://demoapp-gg11.onrender.com](https://demoapp-gg11.onrender.com
 Create a `.env` (do not commit it) with these variables for local development:
 
 ```ini
-SUI_RPC_URL=https://fullnode.devnet.sui.io:443
-SUIRIFY_PACKAGE_ID=0xa85543374b7abcac6c414149af27ab600ac580ca7a856ed34fd017b7397de8aa
-SUIRIFY_ATTESTATION_TYPE=0xa85543374b7abcac6c414149af27ab600ac580ca7a856ed34fd017b7397de8aa::protocol::Suirify_Attestation
+SUI_RPC_URL=https://fullnode.testnet.sui.io:443
+SUIRIFY_PACKAGE_ID=0x2a81ddb98779253bd431e4737caca7c29bcfa8ac8ed57eaddecaf6fc530226e2
+SUIRIFY_ATTESTATION_TYPE=0x2a81ddb98779253bd431e4737caca7c29bcfa8ac8ed57eaddecaf6fc530226e2::protocol::Suirify_Attestation
 
 VITE_SUI_RPC_URL=...
 VITE_SUIRIFY_FORCE_MOCK=false

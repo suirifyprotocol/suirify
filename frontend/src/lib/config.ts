@@ -33,16 +33,16 @@ export const STRUCT_ATTESTATION =
   import.meta.env.VITE_SUIRIFY_STRUCT_ATTESTATION ?? DEFAULT_STRUCT_ATTESTATION;
 
 export const SUI_NETWORK =
-  import.meta.env.VITE_SUI_NETWORK ?? 'devnet';
+  import.meta.env.VITE_SUI_NETWORK ?? 'testnet';
 export const SUI_RPC =
-  import.meta.env.VITE_SUI_RPC ?? 'https://fullnode.devnet.sui.io:443';
+  import.meta.env.VITE_SUI_RPC ?? 'https://fullnode.testnet.sui.io:443';
 
 const resolveExplorerNetwork = (network: string) => {
   const normalized = network.trim().toLowerCase();
   if (normalized === 'mainnet') return 'mainnet';
   if (normalized === 'testnet') return 'testnet';
   if (normalized === 'localnet') return 'localnet';
-  return 'devnet';
+  return 'testnet';
 };
 
 const explorerBaseUrl =

@@ -13,7 +13,7 @@ const resolveDefaultRpc = () => {
         process.env?.SUI_FULLNODE_URL ||
         process.env?.SUI_PROVIDER_URL);
 };
-const DEFAULT_RPC_URL = resolveDefaultRpc() || "https://fullnode.devnet.sui.io:443";
+const DEFAULT_RPC_URL = resolveDefaultRpc() || "https://fullnode.testnet.sui.io:443";
 class DefaultSuiProvider {
     constructor(rpcUrl = DEFAULT_RPC_URL) {
         this.client = new client.SuiClient({ url: rpcUrl });
@@ -155,7 +155,7 @@ const msUntil = (futureMs) => {
  */
 const getEnv = (key) => typeof process !== "undefined" ? process.env?.[key] : undefined;
 const ENV_PACKAGE_ID = getEnv("SUIRIFY_PACKAGE_ID") || getEnv("PACKAGE_ID");
-const FALLBACK_PACKAGE_ID = "0xa85543374b7abcac6c414149af27ab600ac580ca7a856ed34fd017b7397de8aa";
+const FALLBACK_PACKAGE_ID = "0x2a81ddb98779253bd431e4737caca7c29bcfa8ac8ed57eaddecaf6fc530226e2";
 const DEFAULT_PACKAGE_ID = ENV_PACKAGE_ID || FALLBACK_PACKAGE_ID;
 const ENV_ATTESTATION_TYPE = getEnv("SUIRIFY_ATTESTATION_TYPE") || getEnv("ATTESTATION_TYPE");
 const ATTESTATION_TYPE = ENV_ATTESTATION_TYPE ||

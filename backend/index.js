@@ -113,14 +113,14 @@ app.get('/health', (req, res) => res.json({ ok: true, time: Date.now() }));
 // compute SUI_RPC now that getFullnodeUrl may be defined
 const PORT = Number.parseInt(process.env.PORT, 10) || 4000;
 const SECRET_PEPPER = process.env.SECRET_PEPPER || '';
-const SUI_NETWORK = process.env.SUI_NETWORK || 'devnet';
+const SUI_NETWORK = process.env.SUI_NETWORK || 'testnet';
 const DEFAULT_RPC_BY_NETWORK = {
   devnet: 'https://fullnode.devnet.sui.io:443',
   testnet: 'https://fullnode.testnet.sui.io:443',
   mainnet: 'https://fullnode.mainnet.sui.io:443',
   localnet: 'http://127.0.0.1:9000',
 };
-const networkFallbackRpc = DEFAULT_RPC_BY_NETWORK[SUI_NETWORK] || DEFAULT_RPC_BY_NETWORK.devnet;
+const networkFallbackRpc = DEFAULT_RPC_BY_NETWORK[SUI_NETWORK] || DEFAULT_RPC_BY_NETWORK.testnet;
 const SUI_RPC = process.env.SUI_RPC || (typeof getFullnodeUrl === 'function' ? getFullnodeUrl(SUI_NETWORK) : networkFallbackRpc);
 const FALLBACK_RPC_BY_NETWORK = {
   devnet: [
@@ -1198,7 +1198,17 @@ app.post('/finalize-mint', async (req, res) => {
 
   const auditNameHash = sessionData?.govRecord?.fullName ? hashFullNameForStorage(sessionData.govRecord.fullName) : null;
 
-  const { userWalletAddress, jurisdictionCode, verifierSource, verificationLevel, nameHash, isHumanVerified, isOver18, verifierVersion } = preparedData;
+  const {
+    userWalletAddress,
+    jurisdictionCode,
+    verifierSource,
+    verificationLevel,
+    nameHash,
+    isHumanVerified,
+    isOver18,
+    verifierVersion,
+    extraVerifierSources = [],
+  } = preparedData;
 
   try {
     const pending = await getLatestPendingMintRequest(userWalletAddress, 50, requestId);
@@ -1297,17 +1307,29 @@ app.post('/finalize-mint', async (req, res) => {
       ? txb.pure.vector('u8', Array.from(nameHash))
       : txb.pure(Array.from(nameHash));
 
+    const extraSourcesArray = Array.isArray(extraVerifierSources)
+      ? extraVerifierSources.map((value) => Number(value) || 0)
+      : [];
+    const extraSourcesVector = typeof txb.pure.vector === 'function'
+      ? txb.pure.vector('u8', extraSourcesArray)
+      : txb.pure(extraSourcesArray);
+
+    const requestIdArg = typeof txb.pure.id === 'function'
+      ? txb.pure.id(requestId)
+      : txb.pure.address(requestId);
+
     txb.moveCall({
       target: `${PACKAGE_ID}::protocol::mint_attestation`,
       arguments: [
         txb.object(ADMIN_CAP_ID),
         txb.object(PROTOCOL_CONFIG_ID),
         txb.object(ATTESTATION_REGISTRY_ID),
-        txb.pure.address(requestId),
+        requestIdArg,
         txb.object(policyObjectId),
         txb.pure.address(userWalletAddress),
         txb.pure.u16(Number(jurisdictionCode)),
         txb.pure.u8(Number(verifierSource)),
+        extraSourcesVector,
         txb.pure.u8(Number(verificationLevel)),
         nameHashVector,
         txb.pure.bool(Boolean(isHumanVerified)),

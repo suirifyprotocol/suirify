@@ -22,7 +22,7 @@ The Suirify SDK enables your dApp (React/Node) to read attestation objects from 
 | Requirement        | Notes                                                         |
 | ------------------ | ------------------------------------------------------------- |
 | Node.js ≥ 18       | Required for SDK and Mysten Dapp Kit                          |
-| HTTPS Sui RPC      | Default: `https://fullnode.devnet.sui.io:443`                 |
+| HTTPS Sui RPC      | Default: `https://fullnode.testnet.sui.io:443`                |
 | Wallet integration | Use Mysten Dapp Kit or any library with `signPersonalMessage` |
 | Build tooling      | Vite, Next.js, etc. (TypeScript recommended)                  |
 
@@ -30,9 +30,9 @@ The Suirify SDK enables your dApp (React/Node) to read attestation objects from 
 
 ```env
 # .env
-SUI_RPC_URL=https://fullnode.devnet.sui.io:443
-SUIRIFY_PACKAGE_ID=0xa85543374b7abcac6c414149af27ab600ac580ca7a856ed34fd017b7397de8aa
-SUIRIFY_ATTESTATION_TYPE=0xa85543374b7abcac6c414149af27ab600ac580ca7a856ed34fd017b7397de8aa::protocol::Suirify_Attestation # optional
+SUI_RPC_URL=https://fullnode.testnet.sui.io:443
+SUIRIFY_PACKAGE_ID=0x2a81ddb98779253bd431e4737caca7c29bcfa8ac8ed57eaddecaf6fc530226e2
+SUIRIFY_ATTESTATION_TYPE=0x2a81ddb98779253bd431e4737caca7c29bcfa8ac8ed57eaddecaf6fc530226e2::protocol::Suirify_Attestation # optional
 ```
 
 In frontend frameworks, use Vite-style `VITE_` prefixes (e.g., `VITE_SUI_RPC_URL`).
@@ -95,7 +95,7 @@ import { SuirifySdk } from "suirifysdk";
 const rpcUrl =
   window?.SUI_RPC_URL ||
   import.meta.env.VITE_SUI_RPC_URL ||
-  "https://fullnode.devnet.sui.io:443";
+  "https://fullnode.testnet.sui.io:443";
 
 const attestationType =
   window?.SUIRIFY_ATTESTATION_TYPE ||
