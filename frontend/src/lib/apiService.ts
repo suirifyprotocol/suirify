@@ -6,7 +6,7 @@ const resolveCandidateUrls = () => {
     typeof window !== "undefined" ? `${window.location.protocol}//${window.location.hostname}:4000` : null,
     "http://localhost:4000/",
     "https://v1.backend.testnet.api.suirify.com/",
-    "https://suirify-backend.onrender.com/"
+    "https://suirify-backend-3kgp.onrender.com/"
   ];
 
   const seen = new Set<string>();
