@@ -11,12 +11,12 @@ try {
     ({ SuiClient, getFullnodeUrl } = require('@mysten/sui.js/client'));
   } catch (e2) {
     SuiClient = null;
-    getFullnodeUrl = (net) => (net === 'devnet' ? 'https://fullnode.devnet.sui.io:443' : 'https://fullnode.devnet.sui.io:443');
+    getFullnodeUrl = (net) => (net === 'testnet' ? 'https://fullnode.testnet.sui.io:443' : 'https://fullnode.testnet.sui.io:443');
   }
 }
 
 (async () => {
-  const SUI_RPC = process.env.SUI_RPC || (getFullnodeUrl ? getFullnodeUrl('devnet') : null);
+  const SUI_RPC = process.env.SUI_RPC || (getFullnodeUrl ? getFullnodeUrl('testnet') : null);
   const PACKAGE_ID = process.env.PACKAGE_ID || null;
 
   console.log('SUI Health Check');

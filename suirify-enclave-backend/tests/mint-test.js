@@ -16,7 +16,7 @@ if (!USER_PRIVATE_KEY) {
 }
 
 // Setup Sui Client
-const client = new SuiClient({ url: getFullnodeUrl('devnet') });
+const client = new SuiClient({ url: getFullnodeUrl('testnet') });
 
 // Load keypair
 let keypair;

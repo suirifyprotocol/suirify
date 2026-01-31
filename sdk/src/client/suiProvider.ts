@@ -15,7 +15,7 @@ const resolveDefaultRpc = () => {
   );
 };
 
-const DEFAULT_RPC_URL = resolveDefaultRpc() || "https://fullnode.devnet.sui.io:443";
+const DEFAULT_RPC_URL = resolveDefaultRpc() || "https://fullnode.testnet.sui.io:443";
 
 class DefaultSuiProvider implements SuiProviderInstance {
   private readonly client: SuiClient;

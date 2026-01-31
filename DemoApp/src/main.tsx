@@ -16,7 +16,7 @@ const queryClient = new QueryClient();
 const rpcUrl =
   (typeof window !== "undefined" && (window as any)?.SUI_RPC_URL) ||
   import.meta.env.VITE_SUI_RPC_URL ||
-  "https://fullnode.devnet.sui.io:443";
+  "https://fullnode.testnet.sui.io:443";
 
 const { networkConfig } = createNetworkConfig({ suirify: { url: rpcUrl } });
 

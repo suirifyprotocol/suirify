@@ -2,7 +2,7 @@
 
 Create `.env` (not committed):
 
-`SUI_RPC_URL=https://fullnode.devnet.sui.io:443`
+`SUI_RPC_URL=https://fullnode.testnet.sui.io:443`
 
 `SUIRIFY_PACKAGE_ID=`
 `SUIRIFY_ATTESTATION_TYPE=`

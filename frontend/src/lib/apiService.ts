@@ -4,9 +4,9 @@ const resolveCandidateUrls = () => {
   const candidates = [
     import.meta.env.VITE_API_URL,
     typeof window !== "undefined" ? `${window.location.protocol}//${window.location.hostname}:4000` : null,
-    "https://v1.backend.devnet.api.suirify.com/",
-    "https://suirify-backend.onrender.com/",
-    "http://localhost:4000/"
+    "http://localhost:4000/",
+    "https://v1.backend.testnet.api.suirify.com/",
+    "https://suirify-backend-3kgp.onrender.com/"
   ];
 
   const seen = new Set<string>();
@@ -110,7 +110,7 @@ export type FaceVerificationResponse = {
   bypassed?: boolean;
 };
 
-export async function verifyFace(payload: { sessionId: string; livePhoto: string }): Promise<FaceVerificationResponse> {
+export async function verifyFace(payload: { sessionId: string; livePhoto?: string | null }): Promise<FaceVerificationResponse> {
   return request<FaceVerificationResponse>("/face-verify", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -139,6 +139,8 @@ export type MintConfigResponse = {
   mintFeeSource?: string | null;
   contractVersion: number | null;
   treasuryAddress: string | null;
+  mintingDisabled?: boolean;
+  disabledReason?: string | null;
 };
 
 export async function fetchMintConfig() {

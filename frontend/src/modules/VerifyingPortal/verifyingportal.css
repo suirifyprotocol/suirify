@@ -371,6 +371,41 @@ body.vp-theme .header {
   font-weight: 300;
   letter-spacing: 0%;
 }
+.vp-root .camera-placeholder.no-camera {
+  border: 1.5px dashed #5c6bff;
+  background-color: rgba(255, 255, 255, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+.vp-root .camera-fallback {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #d1d5db;
+  text-align: center;
+}
+.vp-root .camera-fallback strong {
+  font-size: 20px;
+  color: #ffffff;
+}
+.vp-root .camera-mode-toggle {
+  margin-top: 12px;
+  background: none;
+  border: none;
+  color: #c084fc;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+.vp-root .camera-mode-toggle:hover {
+  text-decoration: underline;
+}
+.vp-root .camera-mode-toggle:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 
 /* Verified Input */
 .vp-root .verified-input-wrapper {

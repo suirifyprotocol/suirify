@@ -1,6 +1,6 @@
 {
   "name": "@suirify/suirifysdk",
-  "version": "0.1.4",
+  "version": "0.1.7",
   "description": "TypeScript SDK for reading Suirify attestation objects over Sui RPC.",
   "type": "module",
   "main": "dist/index.cjs",
@@ -47,6 +47,7 @@
   },
   "dependencies": {
     "@mysten/sui.js": "^0.52.0",
+    "@suirify/suirifysdk": "^0.1.5",
     "dotenv": "^16.4.5"
   },
   "devDependencies": {

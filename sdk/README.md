@@ -30,8 +30,8 @@ npm run dev
 Create a `.env` file (root and demos can share it) using `.env.example`:
 
 ```
-SUI_RPC_URL=https://fullnode.devnet.sui.io:443
-SUI_NETWORK=devnet
+SUI_RPC_URL=https://fullnode.testnet.sui.io:443
+SUI_NETWORK=testnet
 ```
 
 ## Installing as a dependency
@@ -90,7 +90,7 @@ const claims = await client.getPublicClaims(walletAddress, [
 A light CLI script fetches and prints a wallet's attestation:
 
 ```bash
-SUI_RPC_URL=https://fullnode.devnet.sui.io:443 \
+SUI_RPC_URL=https://fullnode.testnet.sui.io:443 \
   npx ts-node src/examples/node-demo/demo.ts 0xYourSuiAddress
 ```
 
@@ -114,7 +114,7 @@ Run them with `npm test`.
 
 ## RPC & Network Notes
 
-- Default RPC: `https://fullnode.devnet.sui.io:443`
+- Default RPC: `https://fullnode.testnet.sui.io:443`
 - Always use an HTTPS RPC endpoint.
 - Set `SUI_NETWORK` in `.env` for logging/documentation purposes (not currently enforced in code).
 
