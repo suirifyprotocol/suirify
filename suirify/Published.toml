@@ -7,3 +7,12 @@ chain-id = "58e278c2"
 published-at = "0xecd5a7ed68fce7a16251eecb72e75df9f8b26fe77d4609056a3c41a543a59b99"
 original-id = "0xecd5a7ed68fce7a16251eecb72e75df9f8b26fe77d4609056a3c41a543a59b99"
 version = 1
+
+[published.testnet]
+chain-id = "4c78adac"
+published-at = "0x2a81ddb98779253bd431e4737caca7c29bcfa8ac8ed57eaddecaf6fc530226e2"
+original-id = "0x2a81ddb98779253bd431e4737caca7c29bcfa8ac8ed57eaddecaf6fc530226e2"
+version = 1
+toolchain-version = "1.64.0"
+build-config = { flavor = "sui", edition = "2024" }
+upgrade-capability = "0x708bde779e2048a93c349d5d79ddc745c5bee48a7fc94357ad60b487d5af3660"
