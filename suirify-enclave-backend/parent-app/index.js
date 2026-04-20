@@ -1332,6 +1332,31 @@ app.post('/finalize-mint', async (req, res) => {
     const attestationSummary = extractAttestationFromChanges(executionResult?.objectChanges);
     const attestationObjectId = attestationSummary?.objectId || null;
 
+    // CRITICAL FIX: Persist attestation immediately after on-chain execution.
+    // This ensures attestations are in the DB even if event indexer fails.
+    // Mark as "pending_confirmation" until event indexer validates.
+    try {
+        if (attestationObjectId) {
+            db.recordAttestationMinted(attestationObjectId, {
+                walletAddress: userWalletAddress,
+                requestId,
+                finalizeDigest: digest,
+                recordedAt: new Date().toISOString(),
+                eventType: 'mint-finalized',
+                source: 'finalize-handler',
+                status: 'pending_confirmation',
+                statusCode: attestationSummary?.statusCode ?? null,
+                statusLabel: attestationSummary?.statusLabel || null,
+                jurisdictionCode: attestationSummary?.jurisdictionCode ?? null,
+                verificationLevel: attestationSummary?.verificationLevel ?? null,
+                issueDateMs: attestationSummary?.issueDateMs ?? null,
+                expiryDateMs: attestationSummary?.expiryDateMs ?? null,
+            });
+        }
+    } catch (recordErr) {
+        console.error('Failed to record attestation immediately after mint:', recordErr);
+    }
+
     if (requestId && typeof requestId === 'string') {
         markRequestConsumed(requestId, {
             finalizedAt: new Date().toISOString(),
@@ -1340,6 +1365,10 @@ app.post('/finalize-mint', async (req, res) => {
             eventType: 'mint-finalized',
             source: 'finalize-handler',
             attestationId: attestationObjectId,
+            statusCode: attestationSummary?.statusCode ?? null,
+            statusLabel: attestationSummary?.statusLabel || null,
+            jurisdictionCode: attestationSummary?.jurisdictionCode ?? null,
+            verificationLevel: attestationSummary?.verificationLevel ?? null,
         });
     }
 
