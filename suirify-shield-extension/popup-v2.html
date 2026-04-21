@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Suirify Shield</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <header class="popup-header">
+      <div class="header-top">
+        <div class="logo-section">
+          <div class="logo-icon">S</div>
+          <div class="logo-text">
+            <h1>Suirify Shield</h1>
+            <p class="tagline">Verify the internet back</p>
+          </div>
+        </div>
+        <div class="status-indicator" id="statusIndicator">
+          <div class="status-dot" id="statusDot"></div>
+        </div>
+      </div>
+      <div class="badges">
+        <span class="badge badge-azure">Powered by Microsoft Azure</span>
+        <span class="badge badge-ndpa">NDPA Compliant</span>
+      </div>
+    </header>
+
+    <!-- Controls -->
+    <section class="controls-section">
+      <div class="language-selector">
+        <label for="language" class="control-label">Language</label>
+        <select id="language" class="language-select" aria-label="Select analysis language">
+          <option value="EN">English</option>
+          <option value="PIDGIN">Pidgin</option>
+          <option value="YORUBA">Yoruba</option>
+        </select>
+      </div>
+
+      <button id="analyzeBtn" class="analyze-btn" aria-label="Analyze current website policy">
+        <span class="btn-icon" id="btnIcon">🔍</span>
+        <span class="btn-text" id="btnText">Analyze This Site</span>
+        <div class="btn-loader" id="btnLoader"></div>
+      </button>
+    </section>
+
+    <!-- Loading State -->
+    <div class="loading-state" id="loadingState" hidden>
+      <div class="loading-animation">
+        <div class="loading-spinner"></div>
+        <p class="loading-text">Analyzing policy with Azure AI...</p>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <section class="results-section" id="resultsSection" hidden>
+      <!-- Site Info -->
+      <div class="site-info" id="siteInfo">
+        <div class="site-url" id="siteUrl"></div>
+        <div class="analysis-meta" id="analysisMeta"></div>
+      </div>
+
+      <!-- Risk Score -->
+      <div class="risk-score-card">
+        <div class="risk-score-header">
+          <span class="risk-label">Risk Score</span>
+          <span class="risk-badge" id="riskBadge">SAFE</span>
+        </div>
+        <div class="risk-score-value" id="riskScore">0</div>
+        <div class="risk-score-bar">
+          <div class="risk-score-fill" id="riskScoreFill"></div>
+        </div>
+      </div>
+
+      <!-- Summary -->
+      <div class="summary-card">
+        <h3 class="summary-title">Quick Summary</h3>
+        <p class="summary-text" id="summaryText"></p>
+      </div>
+
+      <!-- Flagged Clauses -->
+      <div class="clauses-section">
+        <h3 class="section-title">Flagged Clauses</h3>
+        <div class="clauses-list" id="clausesList"></div>
+      </div>
+
+      <!-- Suirify Gap -->
+      <div class="gap-card">
+        <h3 class="gap-title">Suirify Gap Analysis</h3>
+        <p class="gap-text" id="gapText"></p>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions-section">
+        <button class="action-btn action-btn-secondary" id="newAnalysisBtn">
+          New Analysis
+        </button>
+        <button class="action-btn action-btn-primary" id="viewFullBtn">
+          View Full Report
+        </button>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="popup-footer">
+      <div class="footer-badge">
+        <span class="azure-icon">⚡</span>
+        <span>Powered by Microsoft Azure AI</span>
+      </div>
+      <div class="footer-links">
+        <a href="#" class="footer-link" id="aboutLink">About</a>
+        <span class="footer-divider">•</span>
+        <a href="#" class="footer-link" id="privacyLink">Privacy</a>
+      </div>
+    </footer>
+  </div>
+
+  <script src="popup-v2.js"></script>
+</body>
+</html>

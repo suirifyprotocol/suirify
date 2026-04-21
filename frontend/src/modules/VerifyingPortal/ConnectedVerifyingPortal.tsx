@@ -94,6 +94,11 @@ const ConnectedVerifyingPortal: React.FC = () => {
   const [cameraAvailable, setCameraAvailable] = useState(true);
   const [cameraInitError, setCameraInitError] = useState<string | null>(null);
 
+  // For automated scanning
+  const [scanProgress, setScanProgress] = useState(0);
+  const [scanInstruction, setScanInstruction] = useState("Position your face in the frame");
+  const [isScanning, setIsScanning] = useState(false);
+
   // camera refs for face capture
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -174,6 +179,8 @@ const ConnectedVerifyingPortal: React.FC = () => {
       setCapturedFrame(null);
       setCameraInitError(null);
       setCameraAvailable(true);
+      setIsScanning(false);
+      setScanProgress(0);
       cleanupStream();
     }
   }, [cleanupStream, clearPreviewTimer, currentStep]);
@@ -295,7 +302,7 @@ const ConnectedVerifyingPortal: React.FC = () => {
     setCurrentStep(2.5);
   };
 
-  const captureAndVerify = async () => {
+  const captureAndVerify = useCallback(async () => {
     if (faceVerifyingRef.current) return;
     if (!form.sessionId) {
       setError("No active verification session. Go back and retry.");
@@ -355,7 +362,7 @@ const ConnectedVerifyingPortal: React.FC = () => {
         await resumeCamera();
       }
     }
-  };
+  }, [form.sessionId, cameraAvailable, bypassAndVerify, ensureCamera, captureLivePhoto, cleanupStream, clearPreviewTimer, resumeCamera]);
 
   useEffect(() => {
     if (currentStep !== 2.5 && faceVerifyingRef.current) {
@@ -373,6 +380,8 @@ const ConnectedVerifyingPortal: React.FC = () => {
         if (!cancelled) {
           setCameraAvailable(true);
           setCameraInitError(null);
+          setIsScanning(true);
+          setScanInstruction("Position your face in the frame");
         }
       } catch (e) {
         if (cancelled) return;
@@ -383,12 +392,56 @@ const ConnectedVerifyingPortal: React.FC = () => {
         setError(denied ? "Camera permission was denied. Continuing without camera." : friendly);
         setCameraInitError(friendly);
         setCameraAvailable(false);
+        setIsScanning(false);
       }
     })();
     return () => {
       cancelled = true;
     };
   }, [cleanupStream, currentStep, ensureCamera, form.sessionId]);
+
+  // Automated UX Loop (Mock Liveness)
+  useEffect(() => {
+    if (!isScanning || faceVerifyingRef.current) return;
+    
+    // Quick 6-second total scan for mocked 'liveness'
+    const TOTAL_SCAN_TIME_MS = 6000;
+    const progressIntervalMs = 150;
+    
+    let progressTimer = window.setInterval(() => {
+      setScanProgress(p => {
+        if (p >= 100) return 100;
+        return p + (100 / (TOTAL_SCAN_TIME_MS / progressIntervalMs));
+      });
+    }, progressIntervalMs);
+
+    let instructionTimer = window.setInterval(() => {
+      const instructions = [
+        "Please nod your head slowly...",
+        "Now subtly turn your head right...",
+        "Processing AI Liveness..."
+      ];
+      // cycles every 2 seconds
+      setScanInstruction(instructions[Math.floor(Date.now() / 2000) % instructions.length]);
+    }, 2000);
+
+    let finishTimer = window.setTimeout(async () => {
+      window.clearInterval(progressTimer);
+      window.clearInterval(instructionTimer);
+      setIsScanning(false);
+
+      if (!faceVerifyingRef.current) {
+        await captureAndVerify();
+      }
+    }, TOTAL_SCAN_TIME_MS);
+
+    return () => {
+      window.clearInterval(progressTimer);
+      window.clearInterval(instructionTimer);
+      window.clearTimeout(finishTimer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isScanning]);
 
   const fetchVerifiedData = useCallback(async () => {
     if (!form.sessionId || !account?.address) return;
@@ -625,7 +678,7 @@ const ConnectedVerifyingPortal: React.FC = () => {
               <div className="step-header">Step 2/4</div>
               <h2 className="step-title">Face Verification</h2>
 
-              <div className="camera-container">
+              <div className="camera-container" style={{ position: "relative" }}>
                 <div className={`camera-placeholder ${cameraAvailable ? "" : "no-camera"}`}>
                   {cameraAvailable ? (
                     <>
@@ -640,6 +693,18 @@ const ConnectedVerifyingPortal: React.FC = () => {
                       {capturedFrame && (
                         <img src={capturedFrame} alt="Captured preview" className="camera-feed capture-preview" />
                       )}
+                      {isScanning && !faceVerifying && (
+                        <div style={{
+                          position: "absolute",
+                          bottom: 0,
+                          left: 0,
+                          height: "6px",
+                          background: "#00df89",
+                          boxShadow: "0 0 10px #00df89, 0 0 20px #00df89",
+                          transition: "width 0.25s linear",
+                          width: `${scanProgress}%`
+                        }} />
+                      )}
                     </>
                   ) : (
                     <div className="camera-fallback">
@@ -651,9 +716,9 @@ const ConnectedVerifyingPortal: React.FC = () => {
                 </div>
                 <p className="camera-instruction">
                   {cameraAvailable
-                    ? capturedFrame
+                    ? capturedFrame || faceVerifying
                       ? "Hold on, processing your capture..."
-                      : "Please look straight at the camera"
+                      : scanInstruction
                     : cameraInitError || "Continuing without camera input."}
                 </p>
                 {!cameraAvailable && (
@@ -681,18 +746,22 @@ const ConnectedVerifyingPortal: React.FC = () => {
                     cleanupStream();
                     setCameraInitError(null);
                     setCameraAvailable(true);
+                    setIsScanning(false);
                     setCurrentStep(2);
                   }}
+                  disabled={faceVerifying}
                 >
                   Back
                 </button>
-                <button
-                  className="next-btn"
-                  onClick={captureAndVerify}
-                  disabled={loading || faceVerifying}
-                >
-                  {faceVerifying ? "Verifying..." : cameraAvailable ? "Capture & Verify" : "Continue without camera"}
-                </button>
+                {!cameraAvailable && (
+                  <button
+                    className="next-btn"
+                    onClick={captureAndVerify}
+                    disabled={loading || faceVerifying}
+                  >
+                    {faceVerifying ? "Verifying..." : "Continue without camera"}
+                  </button>
+                )}
               </div>
             </>
           )}

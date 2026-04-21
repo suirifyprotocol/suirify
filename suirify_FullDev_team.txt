@@ -1,0 +1,118 @@
+SUIRIFY
+Full Team Development Plan
+All Roles | RegTech AI Hackathon | Microsoft AI Skills Week 2026
+
+April 2026  |  Internal Document
+ 
+1. Team Role Map
+
+Role	Owner	Responsibilities
+Frontend + AI Engineer	You	Verification flow, both dashboards, Chrome Extension, Azure Face API integration, T&C AI analysis, SDK docs
+Backend Engineer	Teammate	Enclave backend, NIMC NIN API, Rules Engine, Vector DB, /check-name-match API, all server-side endpoints
+Smart Contract Engineer	Teammate	Suirify_Attestation object on Sui Testnet, claims schema, expiry, revocation, on-chain query methods
+ 
+2. Backend Engineer Tasks
+Stack: Node.js + Express + Secure Enclave (Azure Confidential Computing). Vector DB for verification records. No PII ever written to disk.
+
+2.1 Enclave Backend — Core Pipeline
+Task	Specification
+NIN Submission Handler	Receive NIN from frontend. Route to NIMC NIN API. Extract: name_hash, DOB, photo, gender. Calculate is_over_18. Hold in memory only.
+NIMC NIN API Integration	POST to NIMC developer API. Handle: found/not found. Return structured result to Rules Engine. Log non-PII event.
+Azure Face API — Liveness	Create Azure liveness session. Return session token to frontend SDK. Receive liveness result. Pass confidence score to Rules Engine.
+Azure Face API — Face Match	POST live selfie + NIMC photo to Azure Face verify endpoint. Return confidence score to Rules Engine. Delete both images immediately.
+PII Purge	After Rules Engine decision: delete NIN string, selfie bytes, DOB, name from memory. Log purge timestamp.
+Claim Extractor	From Rules Engine output, extract boolean claims: nin_verified, face_matched, liveness_passed, is_over_18, is_human_verified, pii_not_stored, consent_recorded, verification_level.
+
+2.2 Rules Engine
+Component	Specification
+Input Schema	nin_api_result (found, DOB, photo_retrieved) + face_match_result (confidence, distance, threshold 0.60) + liveness_result (confidence, decision, threshold 0.95) + selected_frameworks
+Decision Logic	NIN found -> PASS | face distance <= 0.60 -> PASS | liveness confidence >= 0.95 + realface -> PASS | DOB -> calculate is_over_18 | all checks PASS -> issue attestation
+Framework Registry	JSON file — CBN_KYC_2023, NDPA_2023, NITDA_COP_2022, SEC_2024. Each framework defines required_claims. Engine checks claims against selected frameworks.
+Failure Codes	NIN_NOT_FOUND | FACE_MATCH_FAILED | LIVENESS_FAILED | AGE_BELOW_18 | MAX_RETRIES_EXCEEDED | NIN_ALREADY_ATTESTED | CONSENT_DENIED
+Audit Log	Every decision logged: event_id, wallet_address, AI confidence scores, rules engine result, error_code, frameworks_checked. Stored in Vector DB. No PII.
+
+2.3 API Endpoints
+Endpoint	Specification
+POST /api/verify/start	Initiates verification session. Returns session_id and Azure liveness session token.
+POST /api/verify/submit	Receives wallet_address, NIN, selfie, consent_signature, frameworks[]. Runs full pipeline. Returns attestation or error code.
+GET /api/attestation/:wallet	Returns attestation object for a given wallet address (no PII, claims only).
+POST /api/check-name-match	AML use case. Receives wallet_address + user-provided name. Returns {match: true/false} only.
+GET /api/dashboard/compliance	Returns Compliance Officer Dashboard data for a given platform_id. All aggregate, no PII.
+GET /api/dashboard/regulator	Returns Regulator SupTech Dashboard data. Ecosystem-wide aggregate. No PII.
+POST /api/extension/analyze	Chrome Extension endpoint. Receives site URL + policy text. Returns AI risk analysis JSON.
+
+2.4 Vector DB Schema
+Used as the backend database for verification records. No PII stored anywhere.
+
+// Verification Record (per event)
+{
+  wallet_address: string,
+  attestation_id: string,
+  framework_satisfied: string[],
+  claims: {
+    nin_verified: boolean,
+    face_matched: boolean,
+    liveness_passed: boolean,
+    is_over_18: boolean,
+    is_human_verified: boolean,
+    pii_not_stored: boolean,
+    consent_recorded: boolean
+  },
+  verification_level: 1 | 2 | 3,
+  issued_at: number,
+  expires_at: number,
+  platform_id: string,
+  status: 'active' | 'expired' | 'revoked',
+  ai_log: {
+    liveness_confidence: number,
+    face_match_confidence: number,
+    rules_engine_result: 'PASS' | 'FAIL',
+    error_code: string | null
+  }
+}
+ 
+3. Smart Contract Engineer Tasks
+Chain: Sui Testnet. Package ID: 0x2a81ddb98779253bd431e4737caca7c29bcfa8ac8ed57eaddecaf6fc530226e2
+
+Task	Specification
+Suirify_Attestation Object	Soul-bound, non-transferable Sui object. Contains all boolean claims. Contains issued_at, expires_at, verification_level, framework_satisfied array. Zero PII on-chain.
+Required Claims Schema	nin_verified | face_matched | liveness_passed | is_over_18 | is_human_verified | pii_not_stored | consent_recorded | verification_level | verifier_source
+Mint Function	Called by Suirify issuer key only. Receives wallet address + claims struct. Mints attestation to wallet. Emits event.
+isValid() Method	Returns true if attestation exists AND current_time < expires_at AND status != revoked.
+Revocation	Issuer can revoke attestation (e.g. NIN conflict detected). Sets status to revoked. isValid() returns false immediately.
+Expiry & Renewal	expires_at set at mint (default: 1 year). On expiry, isValid() returns false. User can re-verify to mint fresh attestation.
+On-Chain Query for Regulator	Read-only query returning aggregate counts: total_attestations, active_count, expired_count, revoked_count, framework_breakdown. No individual wallet data exposed.
+Attestation Reuse Test	Verify that a second platform querying the same wallet gets attestation status without triggering new verification. SDK getPublicClaims() must work across platforms.
+ 
+4. Build Timeline
+Hackathon Timeline
+Application submitted: 16 April | Onboarding: 17 April | Mentorship in Abuja: 20-21 April | Final Pitch: 22 April
+
+Time	Owner	Goal
+April 20 Morning	All Roles	Backend pipeline stable end-to-end (mock if needed). Smart contract claims confirmed on testnet. Frontend verification flow Steps 1-4 working.
+April 20 Afternoon	Frontend + AI	VerificationProgress.tsx (Step 5) animated and working. VerificationResult.tsx (Step 6) showing success/fail states. Compliance Officer Dashboard live with mock data.
+April 20 Evening	All Roles	Full end-to-end verification flow connected — frontend to backend to smart contract. At least one happy path works completely.
+April 21 Morning	Frontend + AI	Regulator Dashboard live. Chrome Extension popup working with mock analysis. AI analysis endpoint returning structured JSON.
+April 21 Afternoon	All Roles	Full demo rehearsal. All 5 slides polished. All 7 documents uploaded to team drive. Every error state tested.
+April 22 Morning	All Roles	Final polish. Demo environment stable. Pitch rehearsed minimum 3 times.
+April 22	All Roles	PITCH. WIN.
+ 
+5. Demo Flow for the Pitch
+This is the exact sequence the judge sees. Every step must work. Practice this until it is under 2 minutes.
+
+Golden Rule
+If it cannot be demonstrated end-to-end, it does not count as a solution. — DSN Hackathon Guidelines
+
+1.	Open demo.suirify.com — show the landing page. Say: 'This is Suirify — Nigeria's identity compliance infrastructure.'
+2.	Click Verify. Connect mock wallet. Show wallet address. Say: 'One wallet. One identity anchor.'
+3.	Consent modal appears. Sign. Say: 'Cryptographic consent — NDPA Section 36 satisfied before a single byte is collected.'
+4.	Enter mock NIN. Submit. Say: 'NIN routed directly to NIMC API inside our secure enclave.'
+5.	Selfie capture. Say: 'Azure Face API liveness detection — confirming a live human, not a deepfake.'
+6.	VerificationProgress ticks: NIN Check PASS → Face Match PASS (Azure confidence: 0.87) → Liveness PASS (Azure confidence: 0.97) → PII Purge PASS → Rules Engine PASS.
+7.	Attestation confirmed. Show: attestation ID, claims list, 4 frameworks satisfied, expiry date. Say: 'One attestation. Four frameworks. Zero PII.'
+8.	Switch to Compliance Officer Dashboard. Show Amaka's view. Say: 'The compliance officer sees her platform's KYC posture in real time — audit pack ready for CBN in one click.'
+9.	Switch to Regulator Dashboard. Show Director Chidi's view. Say: 'NITDA sees the entire ecosystem. Live signals. Zero PII. This is the SupTech layer Nigeria does not have today.'
+10.	Open Chrome Extension. Visit any website. Show risk score and flagged clauses. Say: 'Suirify verified your identity. Now let Suirify verify the internet back.'
+ 
+Build together. Demo perfectly. Win.
+April 2026 | Suirify | Internal

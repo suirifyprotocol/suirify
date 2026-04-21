@@ -70,6 +70,9 @@ const Dashboard: React.FC = () => {
     { label: "Upgrade to L2", action: () => (window.location.href = "/upgrade"), icon: upgradeIcon },
     { label: "Renew Verification", action: () => (window.location.href = "/renew"), icon: renewIcon },
     { label: "Manage Consent", action: () => (window.location.href = "/consent"), icon: consentIcon },
+    { label: "Compliance Dashboard", action: () => navigate("/dashboard/compliance"), icon: upgradeIcon },
+    { label: "Regulator Dashboard", action: () => navigate("/dashboard/regulator"), icon: renewIcon },
+    { label: "Shield Preview", action: () => navigate("/dashboard/extension"), icon: consentIcon },
   ];
 
   const mobileNavItems = [

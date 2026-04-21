@@ -5,6 +5,7 @@ import CountryIDStep from "./steps/CountryIDStep";
 import FaceVerificationStep from "./steps/FaceVerificationStep";
 import DataFetchStep from "./steps/DataFetchStep";
 import ReviewConsentStep from "./steps/ReviewConsentStep";
+import VerificationProgressStep from "./steps/VerificationProgressStep";
 import MintingStep from "./steps/MintingStep";
 
 export type VerificationForm = {
@@ -63,7 +64,8 @@ const initialFormData: VerificationForm = {
  * 2. Capture & verify face
  * 3. Pull verified data
  * 4. Capture consent
- * 5. Mint the attestation
+ * 5. Run verification checks (NIN, face, liveness, purge, rules)
+ * 6. Mint the attestation
  */
 const VerificationPortal: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(0);
@@ -75,6 +77,7 @@ const VerificationPortal: React.FC = () => {
       { title: "Face Capture", component: FaceVerificationStep },
       { title: "Verified Data", component: DataFetchStep },
       { title: "Consent", component: ReviewConsentStep },
+      { title: "Verification Check", component: VerificationProgressStep },
       { title: "Mint", component: MintingStep },
     ],
     []

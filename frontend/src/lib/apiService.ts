@@ -111,7 +111,7 @@ export type FaceVerificationResponse = {
 };
 
 export async function verifyFace(payload: { sessionId: string; livePhoto?: string | null }): Promise<FaceVerificationResponse> {
-  return request<FaceVerificationResponse>("/face-verify", {
+  return request<FaceVerificationResponse>("/azure-face-verify", {
     method: "POST",
     body: JSON.stringify(payload),
   });

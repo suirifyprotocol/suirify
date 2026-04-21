@@ -1,0 +1,365 @@
+SUIRIFY
+Complete Submission Document
+RegTech AI Hackathon | Microsoft AI Skills Week 2026 |
+
+Submitted by:
+Suirify Team	Date:
+20 April 2026
+
+testnet.suirify.com  |  demo.suirify.com  |  github.com/suirifyprotocol/suirify
+ 
+Document 1: Problem & Persona Definition
+RegTech AI Hackathon | Microsoft AI Skills Week 2026 | Abuja Edition
+
+The Problem: Nigeria's Identity Compliance Gap
+Every Nigerian digital platform fintech, dApp, exchange, or government portal that onboards users faces a significant regulatory obligation to verify identity. This obligation is governed by five simultaneous frameworks:
+
+•	CBN Customer Due Diligence Regulations 2023: Requires NIN, BVN, and biometrics.
+•	NDPA 2023: Classifies biometrics as sensitive data, requiring minimization and non-storage.
+•	NITDA Code of Practice 2022: Mandates user identity authentication.
+•	SEC Digital Assets Rules 2024: Requires KYC for crypto platforms.
+•	NCC Consumer Protection Regulations: Governs SIM-NIN linking.
+
+The Gap
+Currently, each organisation builds its own verification pipeline, leading to several critical issues:
+•	Duplication: Every platform re-verifies the same Nigerian citizen from scratch.
+•	Privacy Violations: Biometric data is stored across hundreds of separate databases.
+•	Compliance Theatre: Lack of auditable evidence trails, relying on annual self-reports.
+•	No Interoperability: A verified user on one platform cannot prove that verification on another.
+
+The Root Cause
+There is no shared, reusable identity compliance infrastructure in Nigeria's digital economy. While the NIMC NIN API, CBN KYC obligations, and NDPA rules exist, there is no layer connecting them in a privacy-preserving, auditable, and reusable way. Suirify is that layer.
+
+Primary Problem Statement 
+Anchored Problem
+Suirify addresses NITDA Problem 2: Support real-time compliance assessment and reporting. On-chain attestations are queryable in real time, removing the dependence on annual self-reports and giving regulators and compliance officers live visibility into verification posture across the ecosystem.
+
+Strategic Personas
+Persona 1: The Compliance Officer (Primary User)
+Amaka, 34, Head of Compliance, Lagos fintech startup
+•	Context: Manages CBN Tier 2 KYC requirements using fragmented third-party APIs and manual spreadsheets.
+•	Pain: Managing multiple vendor relationships, storing PII in multiple systems, and spending two weeks on audit preparation.
+•	Suirify Solution: A single SDK replaces all vendors. On-chain attestations provide always-current, queryable evidence for CBN and NITDA reporting audit pack generated in seconds, not weeks.
+•	Workflow: Integrate SDK → gate platform features → generate automated compliance evidence → export audit pack for CBN submission.
+
+Persona 2: The dApp Developer (Integration User)
+Emeka, 27, Full-stack developer building a DeFi launchpad on Sui
+•	Context: Needs to verify users are 18+ humans with valid Nigerian identity before granting access to token sales.
+•	Pain: Lacks compliance background; integrating KYC from scratch takes weeks and risks NDPA liability.
+•	Suirify Solution: npm install @suirify/suirifysdk three SDK calls, zero PII ever touches his backend. SEC Digital Assets 2024 compliance inherited automatically.
+
+Persona 3: The Regulator (Benefactor)
+Director Chidi, NITDA Compliance Oversight Unit
+•	Context: Oversees annual self-reported compliance filings from hundreds of platforms.
+•	Pain: Reactive oversight with no real-time view of actual verification practices or biometric storage violations.
+•	Suirify Benefit: Real-time visibility through the Sui blockchain to monitor verification counts, framework compliance, and expired attestations — zero PII ever displayed.
+
+Problem–Solution Mapping
+NITDA Problem Statement	Suirify's Answer
+P1: Single compliance interface	One SDK and one attestation satisfy CBN, NDPA, NITDA, and SEC simultaneously.
+P2: Real-time compliance assessment (PRIMARY)	On-chain attestations are queryable in real time, removing the need for annual self-reports.
+P3: Adaptable across frameworks	Framework registry JSON allows adding new regulations (e.g. CBN 2026) by simply adding a JSON object — no code rebuild.
+P4: Regulator visibility	NITDA can query the Sui chain directly for the compliance posture of all platforms using Suirify.
+ 
+Document 2: Policy Pack Clause-Level Mapping
+How Suirify Satisfies Each Regulatory Framework
+The Suirify infrastructure bridges Nigeria's identity compliance gap by providing a privacy-preserving, auditable, and reusable layer for regulatory verification. By mapping specific technical controls to local regulatory clauses, Suirify enables platforms to satisfy multiple frameworks through a single integration.
+
+Framework 1: CBN Customer Due Diligence Regulations 2023
+Issuing Authority: Central Bank of Nigeria
+Applicable To: All financial institutions, fintechs, mobile money operators, digital lenders.
+Non-compliance Penalty: Up to ₦2,000,000 per Tier 1 KYC default; licence revocation risk for persistent violations.
+
+Clause	Obligation	Suirify Control	Evidence Artifact	Assessment Logic
+Reg. 1.5.3 (amended Dec 2023)	All Tier 1-3 accounts must use NIN or BVN as primary onboarding identifier; account opening must start with electronic retrieval from NIMC NIN or NIBSS BVN database.	Suirify's enclave backend calls the NIMC NIN API directly as the first step in every verification flow.	verifier_source: 1 claim in on-chain attestation.	NIN API returns record found: true → PASS, else → FAIL
+Biometric Verification	BVN biometric verification services include fingerprint and facial recognition; institutions must implement multi-layered controls: document + biometric + database.	Suirify's Microsoft Azure Face API layer performs face matching between submitted selfie and NIMC NIN photo.	face_matched: true claim in attestation.	Azure Face API distance ≤ 0.60 → PASS, else → FAIL
+Liveness Detection (2026 Baseline)	Advanced liveness detection required to prevent deepfakes, face swaps, and presentation attacks.	Azure Face API liveness check runs before attestation is issued, detecting spoofs in real time.	liveness_passed: true claim in attestation.	Azure liveness confidence ≥ 0.95 AND spoof_detected = false → PASS, else → FAIL + block
+Remote Onboarding Equivalence	Remote onboarding must offer equivalent assurance to in-person verification.	Full NIN + Azure face match + liveness pipeline in one enclave — no physical presence required.	Complete attestation object.	All three checks PASS → PASS
+Record Retention (MLPA 2022)	Compliance records must be retained for a minimum 5 years.	On-chain attestation is immutable and permanently queryable on Sui blockchain.	Blockchain transaction hash + attestation ID.	Attestation on-chain → PASS (permanent)
+Tiered KYC Limits	Tier 1: BVN or NIN; Tier 2+: NIN + biometric + ID document.	Suirify attestation schema includes tier-appropriate claims that platforms can check before granting access levels.	verification_level field in attestation.	Platform checks verification_level ≥ required tier → PASS
+
+Framework 2: Nigeria Data Protection Act 2023 (NDPA)
+Issuing Authority: Nigeria Data Protection Commission (NDPC)
+Applicable To: All organisations processing personal data of individuals in Nigeria.
+Non-compliance Penalty: Fine up to ₦10,000,000 or 2% of annual gross revenue (whichever is greater).
+
+Clause	Obligation	Suirify Control	Evidence Artifact	Assessment Logic
+Section 65 — Sensitive Personal Data	Genetic and biometric data classified as sensitive personal data; stricter processing grounds required.	Biometrics processed inside Azure Confidential Computing enclave, deleted immediately after face match — never persisted.	No biometric data in Suirify database; enclave attestation log shows deletion timestamp.	PII purge logged within 5s of verification → PASS
+Data Minimisation Principle	Collect only minimum data necessary; store only as long as needed, then delete.	PII (NIN, selfie, DOB) processed in memory only; only boolean claims written on-chain.	On-chain attestation contains zero PII — only sanitised claims.	Zero PII found in DB → PASS
+Section 28 — DPIA for High-Risk Processing	Data controllers must conduct Data Privacy Impact Assessments for high-risk processing (biometrics = automatically high-risk).	Suirify's enclave architecture is a DPIA-grade technical safeguard — privacy-by-design, not privacy-by-policy.	Enclave architecture documentation; no data retention logs.	Architecture audit confirms enclave processing → PASS
+Consent — Section 36	Explicit, informed consent required before processing; organisations must prove consent.	SDK consent handler requires the user to cryptographically sign a consent message (wallet signature).	On-chain consent record with wallet address, timestamp, and scopes approved.	Signed consent record exists → PASS
+Section 41 — Cross-Border Transfer Restriction	Personal data cannot be transferred outside Nigeria without adequate protection.	No PII leaves Nigeria — enclave processes locally; only the on-chain attestation is globally accessible.	Data residency documentation; enclave hosted in Nigerian infrastructure.	Enclave confirmed local → PASS
+Storage Limitation	Store personal data only as long as needed for the purpose.	Suirify stores zero PII — purpose is fulfilled at attestation issuance; data is deleted.	Zero PII in Suirify backend databases.	DB scan finds no PII → PASS
+
+Framework 3: NITDA Code of Practice 2022
+Issuing Authority: National Information Technology Development Agency (NITDA)
+Applicable To: All digital platforms and internet intermediaries operating in Nigeria.
+
+Clause	Obligation	Suirify Control	Evidence Artifact	Assessment Logic
+Part 2 — User Identity	Platforms must comply with all applicable Nigerian laws regarding data protection and privacy relating to user identity.	Platforms integrating Suirify SDK inherit CBN + NDPA-compliant identity verification.	Suirify integration certification; SDK usage logs.	SDK integrated + attestation issued → PASS
+Part 3 — Annual Compliance Report	File annual compliance report with NITDA including user statistics and identity verification status.	Every Suirify attestation is on-chain with timestamp and status; report generation is an automated chain query.	Automated on-chain report generation via Suirify API.	On-chain query returns attestation_count, active_count, revoked_count → PASS
+Part 3 — Child Protection	Platforms must describe how children are protected from harmful content.	is_over_18: true claim enables automatic age-gating at the platform level.	is_over_18 claim in attestation schema.	Platform checks is_over_18 claim before granting access → PASS
+Part 3 — Human Oversight	Large platforms must provide human supervision over automated tools; address bias and discrimination.	Suirify's rules engine makes deterministic decisions; Azure Face API explains, rules engine decides. False rejection rates logged for bias monitoring.	Audit log with AI confidence scores + rules engine pass/fail decision.	Audit log present with traceable reason codes → PASS
+Legal Compliance	All platforms must comply with NITDA Act 2007 and applicable regulations.	Suirify's framework registry maps each attestation claim to specific NITDA, CBN, NDPA, and SEC clauses.	Framework registry JSON file; compliance crosswalk table.	Crosswalk confirms all clauses mapped → PASS
+
+Framework 4: SEC Digital Assets Rules 2024
+Issuing Authority: Securities and Exchange Commission Nigeria
+Applicable To: Digital asset exchanges, token issuers, DeFi platforms, crypto custodians.
+
+Clause	Obligation	Suirify Control	Evidence Artifact	Assessment Logic
+KYC Requirement	All users of regulated digital asset platforms must be KYC-verified before accessing services.	is_human_verified: true + verifier_source: 1 claims gate access to token sales and DeFi pools.	Attestation check in platform smart contract or backend.	is_human_verified: true present → PASS
+Investor Suitability	Platforms must verify investor age and identity for certain token classes.	is_over_18: true claim provides automated age gate for restricted instruments.	is_over_18 claim in attestation.	is_over_18: true present → PASS
+Sybil Resistance	One real person = one account; platforms must prevent synthetic or duplicate identities.	NIN is unique per citizen; Azure Face API liveness detection prevents deepfake-based Sybil attacks.	liveness_passed: true + NIN uniqueness enforced at issuance.	liveness_passed: true + no duplicate NIN → PASS
+AML Compliance	Platforms must implement AML controls including identity verification at onboarding.	Suirify satisfies the identity layer; platforms can combine with sanctions screening using the verified wallet address.	Verified wallet address + attestation as AML evidence artifact.	Attestation + wallet address available for AML screening → PASS
+
+Master Framework Crosswalk
+One attestation. Five frameworks. Zero PII on-chain.
+
+Suirify Claim / Feature	CBN KYC 2023	NDPA 2023	NITDA CoP 2022	SEC 2024	NCC
+verifier_source	✅	✅	✅	✅	✅
+face_matched	✅	✅	—	✅	—
+liveness_passed	✅	✅	—	✅	—
+is_over_18	—	✅	✅	✅	—
+is_human_verified	✅	✅	✅	✅	✅
+PII not stored	—	✅	✅	—	—
+Consent recorded	✅	✅	✅	✅	—
+
+Policy-as-Code: Framework Registry
+Adding a new framework or updating existing ones is achieved by adding a JSON object to the registry, requiring no code rebuild. This directly satisfies NITDA Problem 3: adaptable across different regulatory frameworks.
+
+{
+  "frameworks": [
+    {
+      "id": "CBN_KYC_2023",
+      "name": "CBN Customer Due Diligence Regulations 2023",
+      "version": "2023-05-31",
+      "required_claims": ["nin_verified", "face_matched", "liveness_passed", "is_human_verified"],
+      "optional_claims": ["is_over_18"],
+      "evidence_retention_years": 5
+    },
+    {
+      "id": "NDPA_2023",
+      "name": "Nigeria Data Protection Act 2023",
+      "version": "2023-06-12",
+      "required_claims": ["pii_not_stored", "consent_recorded", "is_human_verified"],
+      "optional_claims": ["is_over_18"],
+      "biometric_handling": "enclave_delete_on_completion"
+    },
+    {
+      "id": "NITDA_COP_2022",
+      "name": "NITDA Code of Practice 2022",
+      "version": "2022-09-26",
+      "required_claims": ["nin_verified", "is_human_verified"],
+      "optional_claims": ["is_over_18"],
+      "annual_report_fields": ["attestation_count", "active_count", "revoked_count"]
+    },
+    {
+      "id": "SEC_DIGITAL_ASSETS_2024",
+      "name": "SEC Nigeria Digital Assets Rules 2024",
+      "version": "2024-01-01",
+      "required_claims": ["nin_verified", "face_matched", "liveness_passed", "is_over_18", "is_human_verified"],
+      "optional_claims": [],
+      "sybil_resistance": true
+    }
+  ]
+}
+ 
+Document 3: Workflow & User Journey
+End-to-End Identity Compliance Flow
+Suirify operates across three distinct journeys running in parallel to bridge Nigeria's identity compliance gap:
+•	Citizen Journey: A Nigerian user verifies once and reuses that verification across the ecosystem.
+•	Platform Journey: A dApp or fintech integrates the Suirify SDK to gate features and satisfy regulatory obligations.
+•	Regulator Journey: Authorities like NITDA or the CBN query compliance posture on-chain in real time.
+
+Journey 1: The Citizen (Verify Once)
+
+1.	Connect Wallet: The user visits the Suirify portal or an integrated platform and connects a Sui-compatible wallet. This wallet address serves as the persistent identity anchor for all future attestations.
+2.	NIN Submission: The user inputs their 11-digit National Identification Number (NIN). This sensitive input is routed immediately to the Suirify Enclave Backend; it never touches a standard database.
+3.	Selfie Capture: The user captures a selfie via the browser. Both the image and the NIN are held only in memory within the enclave and are never written to disk.
+4.	AI Verification Pipeline (inside secure enclave): (a) NIMC API Call retrieves official data (name, DOB, gender, photo) and calculates if the user is over 18. (b) Azure Face API compares the live selfie against the NIMC photo (match threshold: 0.60 cosine distance). (c) Azure Liveness Detection rejects deepfakes, screen replays, or printed photos in real time. (d) PII Deletion once the rules engine makes a decision, all PII (NIN, selfie, DOB) is permanently deleted from memory.
+5.	Attestation Issuance: If all checks pass, Suirify issues a Suirify_Attestation object to the user's wallet on the Sui blockchain. This object includes boolean claims (e.g. is_over_18: true) and identifies which frameworks are satisfied (CBN, NDPA, NITDA, SEC).
+6.	Reuse Anywhere: The verified attestation stays in the user's wallet. Other platforms can query this status without the user ever having to resubmit their NIN or selfie.
+
+Journey 2: The Platform (Integrate Once)
+Developers can secure their platforms in four steps:
+7.	Install SDK: npm install @suirify/suirifysdk
+8.	Initialize: Set up the client with the Sui RPC URL and attestation type.
+9.	Handle Consent: Implement the setConsentHandler to display the consent modal to users.
+10.	Gate Features: Use sdk.getPublicClaims(walletAddress) to verify age or human status before granting access.
+
+Compliance Evidence: Every claim request generates an SDK access log. These logs containing wallet addresses and timestamps but zero PII serve as auditable evidence for CBN or NITDA reporting.
+
+Journey 3: The Regulator (Real-Time Visibility)
+Regulators move away from annual self-reports to real-time oversight using Sui chain queries or the Suirify Regulator Dashboard:
+•	Total verified users across all Suirify-integrated platforms
+•	Framework compliance posture per platform
+•	Expired attestations requiring renewal
+•	Revoked access events and fraud signals
+•	Zero PII ever returned all data is anonymised aggregate signals
+
+Edge Cases & Error Handling
+Scenario	Suirify Response
+NIN Not Found	Verification denied; user prompted to verify NIN details at nimc.gov.ng
+Face Match Fail	Denial; user allowed up to 3 retry attempts with better lighting guidance
+Liveness Fail	Hard denial; flagged for potential fraud/presentation attack review
+Attestation Expired	isValid() returns false; user prompted for one-click re-verification
+NIN Conflict	Alert raised if NIN is already linked to a different wallet; requires manual resolution
+Consent Bypass	CONSENT_DENIED error; verification halted; no data processed
+ 
+Document 4: Solution Architecture
+Architecture Overview: Suirify is designed as a modular, five-layer identity compliance infrastructure deployed on the Sui blockchain. The architecture prioritises isolation of responsibilities, ensuring each layer performs a specific function without unnecessary data exposure.
+
+The 5-Layer Stack
+Layer	Description
+Layer 1: Input Layer	User-facing entry point where wallet addresses, NIN submissions, and selfies are collected alongside cryptographic consent signatures. Built with React, TypeScript, and Vite. No PII stored or logged at this stage.
+Layer 2: SDK / API Layer	Provides the @suirify/suirifysdk npm package — a read-only, consent-first, framework-agnostic interface for developers. Methods: getAttestationForOwner(), getPublicClaims(), isValid().
+Layer 3: AI Processing (Enclave)	Hosted within the Suirify Enclave Backend. Handles NIMC NIN API lookups, Microsoft Azure Face API biometric matching, and Azure liveness detection to prevent anti-spoofing. PII processed ephemerally — never written to disk.
+Layer 4: Rules Engine	Executes pass/fail compliance decisions using policy-as-code (OPA-style). Utilises Framework Registry JSON. Every decision logged with non-PII reason codes. AI (Azure) explains — Rules Engine decides.
+Layer 5: Output Layer	Manages the on-chain Suirify_Attestation object on the Sui Blockchain. Non-transferable, immutable, auditable, and contains zero PII. Permanently queryable for regulator visibility.
+
+Component Breakdown
+1. Frontend Portal
+Built using React, TypeScript, and Vite. Facilitates wallet connection, consent signing, and verification data submission. No PII stored or logged.
+
+2. Suirify Enclave Backend
+Privacy-preserving core running on Node.js and Express within a secure compute enclave. Processes NIN strings and base64 images ephemerally. Key sub-components:
+•	NIMC NIN Lookup: Retrieves identity records via the developer API.
+•	Azure Face API Face Match: Compares selfies against NIMC records with 0.60 cosine distance threshold.
+•	Azure Face API Liveness Detection: Anti-spoofing module classifying images as real or spoofed in real time.
+•	Claim Extractor: Derives boolean claims (e.g. is_over_18) before immediately deleting all PII from memory.
+
+3. Rules Engine
+Uses deterministic decision logic and a JSON framework registry. Framework adaptability requires no code rebuild — adding a new regulation means adding a new JSON entry. Every decision logged with non-PII reason codes for auditing.
+
+4. Sui Smart Contract
+Deployed on Sui Testnet. Package ID: 0x2a81ddb98779253bd431e4737caca7c29bcfa8ac8ed57eaddecaf6fc530226e2
+Properties: Attestations are soul-bound (non-transferable), immutable, revocable by the issuer, and expiry-aware.
+
+5. SDK (@suirify/suirifysdk)
+TypeScript npm package serving as a read-only interface for dApps. Methods: getAttestationForOwner(), getPublicClaims(), isValid().
+
+Security Architecture
+Threat	Mitigation Strategy
+PII Data Breach	PII is never written to disk and is deleted from memory immediately after use.
+Biometric Theft	No biometric database exists; Azure enclave processes and discards data instantly.
+Sybil Attack	NIN uniqueness enforced; one NIN corresponds to one attestation per period.
+Deepfake Attack	Azure Face API liveness detection rejects non-live images in real time.
+Attestation Forgery	Only the Suirify issuer key can mint on-chain attestations.
+Key Compromise	Attester keys secured in a server-side Vault/KMS, never in the SDK.
+
+Deployment Status
+Component	Environment & Status
+Frontend Portal	testnet.suirify.com Live
+Enclave Backend	Render (Node.js) Live
+Smart Contract	Sui Testnet Deployed
+SDK	npm Published
+Demo App	Render Live
+GitHub Repository	github.com/suirifyprotocol/suirify Public
+ 
+Document 5: Rules Engine Logic Explanation
+
+Design Principle: AI Explains, Rules Engine Decides
+Suirify operates on the core principle that while AI handles complex sensory processing, the final compliance determination is reserved for a deterministic rules engine.
+•	Azure Face API: Performs biometric face match and liveness detection, outputting confidence scores.
+•	Rules Engine: Executes the final pass/fail decision based on strict thresholds.
+•	Traceability: Every decision is mapped to a specific regulatory source clause and threshold, ensuring no black-box compliance calls.
+
+Rules Engine Input Schema
+{
+  "nin_api_result": {
+    "found": true,
+    "date_of_birth": "2001-03-15",
+    "photo_retrieved": true
+  },
+  "face_match_result": {
+    "verified": true,
+    "distance": 0.38,
+    "threshold": 0.60,
+    "model": "Azure Face API"
+  },
+  "liveness_result": {
+    "is_real": true,
+    "liveness_confidence": 0.97,
+    "spoof_detected": false,
+    "threshold": 0.95
+  },
+  "selected_frameworks": ["CBN_KYC_2023", "NDPA_2023"]
+}
+
+Decision Flow
+Decision Point	Who Decides	Logic Type
+NIN Record Found?	NIMC API	Deterministic
+Face Match Score	Azure Face API	Probabilistic
+Face Match PASS/FAIL	Rules Engine	Deterministic
+Liveness Score	Azure Face API	Probabilistic
+Liveness PASS/FAIL	Rules Engine	Deterministic
+Age Calculation (is_over_18)	NIMC DOB + Rules Engine	Deterministic
+Attestation Issued?	Rules Engine	Deterministic
+
+Failure Codes & Reason Codes
+Error Code	Meaning	User Guidance
+NIN_NOT_FOUND	NIN not in NIMC database	Verify your NIN at nimc.gov.ng
+FACE_MATCH_FAILED	Selfie does not match NIN photo	Ensure good lighting; face uncovered
+LIVENESS_FAILED	Image flagged as non-live by Azure	Use real camera; do not use photos or screen replays
+AGE_BELOW_18	DOB indicates user is under 18	Platform access requires 18+ verification
+MAX_RETRIES_EXCEEDED	3 failed attempts reached	Contact Suirify support
+NIN_ALREADY_ATTESTED	NIN linked to another wallet	Use original wallet or contact support
+ 
+Document 6: AI Usage Explanation
+
+AI Components
+Suirify utilises AI at three distinct stages in the pipeline to ensure identity integrity.
+
+1. NIMC NIN API Identity Processing
+Retrieves authoritative identity records from Nigeria's national database. Serves as the foundation for document verification under CBN Reg. 1.5.3 (2023). Deterministic either the record is found or it is not.
+
+2. Microsoft Azure Face API Biometric Face Match
+Compares the live selfie against the NIMC NIN passport photo. Uses Azure's face verification model with a 0.60 cosine distance threshold. Azure Face API achieves high accuracy on diverse demographic populations including African faces. Output is a probabilistic confidence score; the Rules Engine makes the final pass/fail determination.
+
+3. Microsoft Azure Face API Liveness Detection
+Employs Microsoft Azure's liveness detection technology to prevent presentation attacks — printed photos, screen replays, and deepfake videos. Azure detects whether the selfie comes from a live, physically present person. Liveness confidence threshold: 0.95. Output is probabilistic; the Rules Engine makes the final pass/fail determination.
+
+Why Microsoft Azure?
+Microsoft Azure Face API is the AI backbone of Suirify's verification pipeline. Azure's enterprise-grade liveness detection and face matching are purpose-built for compliant identity verification at scale — making Suirify the natural RegTech infrastructure partner for Nigeria's digital economy, aligned with Microsoft's AI Skills Week mission.
+
+AI Governance Framework
+Decision Point	Who Decides	Logic Type
+NIN Record Found?	NIMC API	Deterministic
+Face Match Score	Azure Face API	Probabilistic
+Face Match PASS/FAIL	Rules Engine	Deterministic
+Liveness Score	Azure Face API	Probabilistic
+Liveness PASS/FAIL	Rules Engine	Deterministic
+Attestation Issued?	Rules Engine	Deterministic
+
+Bias & Fairness Considerations
+•	Diverse Skin Tones: Azure Face API is validated for performance across diverse demographics, including African faces critical for Nigeria's population.
+•	Ground Truth: Comparisons are made against official NIMC citizen records to ensure accuracy.
+•	Monitoring: False rejection rates are logged by the Rules Engine to identify potential demographic bias for human review atisfying NITDA's human oversight requirement.
+•	Explainability: Every decision includes a reason code and AI confidence score, ensuring full auditability.
+ 
+Document 7: Testing & Validation Cases
+Suirify underwent comprehensive validation across 10 critical test cases to ensure compliance and security.
+
+Test Suite Summary
+ID	Test Scenario	Expected Result	Actual Result	Status
+TC-001	Happy Path valid NIN, real face, live user	Full verification pass, attestation minted	PASS	✅
+TC-002	Invalid NIN	NIN_NOT_FOUND error returned	NIN_NOT_FOUND	✅
+TC-003	Face Mismatch selfie does not match NIN photo	FACE_MATCH_FAILED error returned	FACE_MATCH_FAILED	✅
+TC-004	Liveness Attack printed photo submitted	LIVENESS_FAILED error, verification blocked	LIVENESS_FAILED	✅
+TC-005	Minor user under 18	AGE_BELOW_18 error returned	AGE_BELOW_18	✅
+TC-006	Attestation Reuse second platform, same wallet	Successful reuse, no re-verification	PASS	✅
+TC-007	Expired Attestation	ATTESTATION_EXPIRED, renewal prompted	ATTESTATION_EXPIRED	✅
+TC-008	PII Non-Retention DB scan post-verification	Zero PII found in any database	Zero PII found	✅
+TC-009	Framework Crosswalk single attestation	All 4 frameworks satisfied simultaneously	All 4 PASS	✅
+TC-010	Consent Bypass user skips consent	CONSENT_DENIED error, no data processed	CONSENT_DENIED	✅
+
+Compliance Validation: TC-009 Framework Crosswalk
+The system successfully validated that a single attestation satisfies the multi-layered requirements of all four regulatory frameworks simultaneously: CBN KYC 2023, NDPA 2023, NITDA CoP 2022, and SEC Digital Assets 2024. This is the core technical claim of Suirify verified through end-to-end testing on the Sui Testnet.
+
+TC-004 Highlight: Azure Liveness Detection in Action
+A printed photo of a valid NIN-holder's face was submitted during testing. Azure Face API's liveness detection correctly identified the image as non-live (liveness_confidence: 0.12, below threshold of 0.95). The Rules Engine returned LIVENESS_FAILED and blocked attestation issuance. No data was stored. This test validates Suirify's resistance to the deepfake and presentation attack vectors identified in CBN's 2026 Baseline Standards.
+ 
+One attestation. Five frameworks. Zero PII on-chain.
+Suirify is the identity layer Nigeria's digital economy has been waiting for.
+testnet.suirify.com  |  demo.suirify.com  |  github.com/suirifyprotocol/suirify
+© 2026 Suirify Team | RegTech AI Hackathon | Microsoft AI Skills Week 2026
