@@ -2082,8 +2082,7 @@ async function startIndexer() {
 
       console.log(`GraphQL reachable, chain=${warmupData?.data?.chainIdentifier || 'unknown'}`);
     } catch (warmupErr) {
-      console.warn('Indexer disabled: GraphQL is unreachable:', warmupErr && warmupErr.message ? warmupErr.message : warmupErr);
-      return;
+      console.warn('GraphQL warmup failed; continuing with retrying indexer poll:', warmupErr && warmupErr.message ? warmupErr.message : warmupErr);
     }
 
     const pollIndexer = async () => {
