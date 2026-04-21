@@ -8,7 +8,17 @@ import { explorer } from "@/lib/config";
  */
 const IdentityStatusCard: React.FC<{ attestation: any }> = ({ attestation }) => {
   const fields = attestation?.data?.content?.fields || attestation?.content?.fields || {};
-  const status = String(fields.status || "ACTIVE");
+  const statusRaw = String(fields.status || "1");
+  
+  const now = Date.now();
+  const expiryMs = fields.expiry_time_ms ? Number(fields.expiry_time_ms) : null;
+  const isExpired = expiryMs && now > expiryMs;
+
+  const resolvedStatusRaw = isExpired && statusRaw === "1" ? "2" : statusRaw;
+
+  // Resolve number to string if needed
+  let status = resolvedStatusRaw === "1" ? "ACTIVE" : resolvedStatusRaw === "2" ? "EXPIRED" : resolvedStatusRaw === "3" ? "REVOKED" : resolvedStatusRaw;
+  
   const statusMap: any = {
     ACTIVE: { label: "Active", className: "v-badge v-badge-success" },
     EXPIRED: { label: "Expired", className: "v-badge v-badge-danger" },
@@ -65,8 +75,8 @@ const IdentityStatusCard: React.FC<{ attestation: any }> = ({ attestation }) => 
         <div>
           <h4>Verified Claims:</h4>
           <div className="v-grid-narrow">
-            <div>👤 Human Verified: {fields.is_human_verified ? "✓" : "✗"}</div>
-            <div>🔞 Over 18: {fields.is_over_18 ? "✓" : "✗"}</div>
+            <div>👤 Human Verified: {fields.is_human_verified !== false ? "✓" : "✗"}</div>
+            <div>🔞 Over 18: {fields.is_over_18 !== false ? "✓" : "✗"}</div>
           </div>
         </div>
       </div>

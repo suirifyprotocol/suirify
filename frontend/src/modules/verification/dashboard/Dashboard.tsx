@@ -44,15 +44,22 @@ const STATUS_CODE_TO_LABEL: Record<number, string> = {
 
 const normalizeStatusLabel = (value: unknown): string => {
   if (value === null || value === undefined) return "Active";
-  if (typeof value === "number") {
-    return STATUS_CODE_TO_LABEL[value] || `Code ${value}`;
+  
+  // Handle both number and string representations of numbers
+  const numericValue = Number(value);
+  if (!Number.isNaN(numericValue) && STATUS_CODE_TO_LABEL[numericValue]) {
+    return STATUS_CODE_TO_LABEL[numericValue];
   }
+
   const str = String(value).trim();
   if (!str) return "Active";
   const upper = str.toUpperCase();
   if (upper === "ACTIVE") return "Active";
   if (upper === "EXPIRED") return "Expired";
   if (upper === "REVOKED") return "Revoked";
+  if (upper === "1") return "Active";
+  if (upper === "2") return "Expired";
+  if (upper === "3") return "Revoked";
   return str;
 };
 
@@ -170,19 +177,6 @@ const Dashboard: React.FC = () => {
         return;
       }
 
-      let backendHasAttestation = false;
-
-      try {
-        const fallback = await fetchAttestation(account.address);
-        if (fallback.hasAttestation && fallback.data) {
-          setAttestation(mapBackendAttestation(fallback.data));
-          backendHasAttestation = true;
-          setLoading(false);
-        }
-      } catch {
-        // Backend lookup is best-effort; defer to chain data next.
-      }
-
       try {
         const attestations = await client.getOwnedObjects({
           owner: account.address,
@@ -194,33 +188,17 @@ const Dashboard: React.FC = () => {
           const first = attestations.data[0];
           if (first && !first.error) {
             setAttestation(first as AttestationLike);
-            backendHasAttestation = true;
-            setLoading(false);
-          } else if (!backendHasAttestation) {
+          } else {
             setAttestation(null);
           }
-        } else if (!backendHasAttestation) {
+        } else {
           setAttestation(null);
         }
-      } catch {
-        if (!backendHasAttestation) {
-          try {
-            const fallback = await fetchAttestation(account.address);
-            if (fallback.hasAttestation && fallback.data) {
-              setAttestation(mapBackendAttestation(fallback.data));
-              backendHasAttestation = true;
-              setLoading(false);
-            } else {
-              setAttestation(null);
-            }
-          } catch {
-            setAttestation(null);
-          }
-        }
+      } catch (e) {
+        console.error("Failed to load attestations", e);
+        setAttestation(null);
       } finally {
-        if (!backendHasAttestation) {
-          setLoading(false);
-        }
+        setLoading(false);
       }
     };
 
@@ -240,7 +218,18 @@ const Dashboard: React.FC = () => {
   }
 
   const fields = attestation?.data?.content?.fields || attestation?.content?.fields || {};
-  const status = normalizeStatusLabel(fields.status || "ACTIVE").toUpperCase();
+  
+  // Calculate dynamically if it has expired (blockchain doesn't dynamically change status u8 when time passes)
+  const now = Date.now();
+  const expiryMs = fields.expiry_time_ms ? Number(fields.expiry_time_ms) : null;
+  const isExpired = expiryMs && now > expiryMs;
+  
+  // Determine raw status (1=active, 2=expired, 3=revoked) with dynamic expiration fallback
+  const fallbackStatus = String(fields.status || "1");
+  const rawStatus = isExpired && fallbackStatus === "1" ? "2" : fields.status || "1";
+  
+  const status = normalizeStatusLabel(rawStatus).toUpperCase();
+  
   const level = fields.verification_level ?? 1;
   const issueDate = formatDate(fields.issue_time_ms);
   const expiryDays = fields.expiry_time_ms ? calculateDaysUntilExpiry(fields.expiry_time_ms) : null;
@@ -248,7 +237,8 @@ const Dashboard: React.FC = () => {
   const objectId = attestation?.data?.objectId || attestation?.objectId || "";
   const attestationLink = objectId ? explorer.object(objectId) : null;
   const isHuman = fields.is_human_verified !== false;
-  const isAdult = fields.is_over_18 === true;
+  // Default to true for blockchain minted attestations since verification enforces 18+
+  const isAdult = fields.is_over_18 !== false;
 
   const shellClassName = ["sd-shell", sidebarOpen && isDesktop ? "sd-shell--sidebar-open" : ""].filter(Boolean).join(" ");
   const sidebarClassName = ["sd-sidebar", sidebarOpen ? "sd-sidebar--open" : ""].join(" ");
