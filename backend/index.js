@@ -385,10 +385,10 @@ function toLegacyObjectSummary(graphqlObject) {
 function getMoveObjectFields(objectNode) {
   return objectNode?.asMoveObject?.contents?.json || null;
 }
-const PACKAGE_ID = process.env.PACKAGE_ID;
-const ADMIN_CAP_ID = process.env.ADMIN_CAP_ID;
-const PROTOCOL_CONFIG_ID = process.env.PROTOCOL_CONFIG_ID;
-const ATTESTATION_REGISTRY_ID = process.env.ATTESTATION_REGISTRY_ID;
+const PACKAGE_ID = process.env.PACKAGE_ID ? process.env.PACKAGE_ID.trim() : '' ;
+const ADMIN_CAP_ID = process.env.ADMIN_CAP_ID ? process.env.ADMIN_CAP_ID.trim() : '';
+const PROTOCOL_CONFIG_ID = process.env.PROTOCOL_CONFIG_ID ? process.env.PROTOCOL_CONFIG_ID.trim() : '';
+const ATTESTATION_REGISTRY_ID = process.env.ATTESTATION_REGISTRY_ID ? process.env.ATTESTATION_REGISTRY_ID.trim() : '';
 const JURISDICTION_POLICY_ID = process.env.JURISDICTION_POLICY_ID;
 const ADMIN_PRIVATE_KEY = process.env.ADMIN_PRIVATE_KEY || process.env.SPONSOR_PRIVATE_KEY || null;
 const STATIC_MINT_FEE = process.env.MINT_FEE || null;
@@ -724,14 +724,30 @@ async function getExistingAttestation(walletAddress) {
   if (!hasSuiRpcSupport() || !PACKAGE_ID || !walletAddress) return null;
   try {
     const ownedObjects = await withSuiClient('attestation.lookup', async (client) => {
-      if (!client?.core || typeof client.core.getOwnedObjects !== 'function') {
-        return null;
+      const typeFilter = `${PACKAGE_ID.trim()}::protocol::Suirify_Attestation`;
+      try {
+        if (client?.core && typeof client.core.getOwnedObjects === 'function') {
+          return await client.core.getOwnedObjects({
+            address: walletAddress,
+            type: typeFilter,
+            limit: 1,
+          });
+        } else if (typeof client.getOwnedObjects === 'function') {
+          const res = await client.getOwnedObjects({
+            owner: walletAddress,
+            filter: { StructType: typeFilter },
+            options: { showContent: false },
+          });
+          return {
+            objects: res.data.map(d => ({ id: d.data?.objectId || d.objectId || d.data?.id || d.id }))
+          };
+        } else {
+          return { objects: [] };
+        }
+      } catch (err) {
+        console.error('getOwnedObjects lookup failed:', err.message);
+        return { objects: [] };
       }
-      return client.core.getOwnedObjects({
-        address: walletAddress,
-        type: `${PACKAGE_ID}::protocol::Suirify_Attestation`,
-        limit: 1,
-      });
     });
 
     const firstObject = ownedObjects?.objects?.[0] || null;
