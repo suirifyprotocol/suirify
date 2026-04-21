@@ -2,6 +2,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const crypto = require('crypto');
 const os = require('os');
+const dns = require('dns');
 require('dotenv').config();
 const { govLookup, normalizeCountryKey } = require('./mockDB');
 const { getIsoCode, getCountryList } = require('./countryCodes');
@@ -26,6 +27,10 @@ try {
   // If Jimp isn't installed or fails to load, keep app running with a clear warning.
   console.warn('Jimp not available:', err && err.message ? err.message : err);
   Jimp = null;
+}
+
+if (dns && typeof dns.setDefaultResultOrder === 'function') {
+  dns.setDefaultResultOrder('ipv4first');
 }
 
 let activeGraphqlIndex = 0;
@@ -156,20 +161,7 @@ app.get('/health', (req, res) => res.json({ ok: true, time: Date.now() }));
 const PORT = Number.parseInt(process.env.PORT, 10) || 4000;
 const SECRET_PEPPER = process.env.SECRET_PEPPER || '';
 const SUI_NETWORK = process.env.SUI_NETWORK || 'testnet';
-const DEFAULT_GRPC_BY_NETWORK = {
-  devnet: 'https://fullnode.devnet.sui.io:443',
-  testnet: 'https://fullnode.testnet.sui.io:443',
-  mainnet: 'https://fullnode.mainnet.sui.io:443',
-  localnet: 'http://127.0.0.1:9000',
-};
-const networkFallbackGrpc = DEFAULT_GRPC_BY_NETWORK[SUI_NETWORK] || DEFAULT_GRPC_BY_NETWORK.testnet;
-const SUI_GRPC = process.env.SUI_GRPC || process.env.SUI_RPC || (typeof getFullnodeUrl === 'function' ? getFullnodeUrl(SUI_NETWORK) : networkFallbackGrpc);
-const DEFAULT_GRAPHQL_BY_NETWORK = {
-  devnet: '',
-  testnet: '',
-  mainnet: '',
-  localnet: 'http://127.0.0.1:9125/graphql',
-};
+const SUI_GRPC = (process.env.SUI_GRPC || process.env.SUI_RPC || '').trim() || (typeof getFullnodeUrl === 'function' ? getFullnodeUrl(SUI_NETWORK) : '');
 
 const parseEndpointList = (value) => {
   if (!value || typeof value !== 'string') return [];
@@ -193,24 +185,8 @@ const dedupeEndpointList = (entries) => {
 const configuredGraphql = parseEndpointList(
   process.env.SUI_GRAPHQL || process.env.SUI_GRAPHQL_RPC || process.env.SUI_GRAPHQL_LIST || ''
 );
-const networkDefaultGraphql = DEFAULT_GRAPHQL_BY_NETWORK[SUI_NETWORK] || '';
-const SUI_GRAPHQL_CANDIDATES = dedupeEndpointList([...configuredGraphql, networkDefaultGraphql]);
+const SUI_GRAPHQL_CANDIDATES = dedupeEndpointList([...configuredGraphql]);
 const SUI_GRAPHQL = SUI_GRAPHQL_CANDIDATES[0] || '';
-const FALLBACK_GRPC_BY_NETWORK = {
-  devnet: [
-    'https://fullnode.devnet.sui.io:443',
-    'https://sui-devnet.gateway.tatum.io/',
-  ],
-  testnet: [
-    'https://fullnode.testnet.sui.io:443',
-    'https://sui-testnet.gateway.tatum.io/',
-  ],
-  mainnet: [
-    'https://fullnode.mainnet.sui.io:443',
-    'https://sui-mainnet.chainode.tech/',
-  ],
-  localnet: ['http://127.0.0.1:9000'],
-};
 
 const parseRpcList = (value) => {
   if (!value || typeof value !== 'string') return [];
@@ -234,11 +210,12 @@ const dedupeRpcList = (list) => {
 };
 
 const configuredGrpcFallbacks = parseRpcList(process.env.SUI_GRPC_LIST || process.env.SUI_RPC_LIST || process.env.SUI_GRPC_FALLBACKS || process.env.SUI_RPC_FALLBACKS || '');
-const builtinFallbacks = FALLBACK_GRPC_BY_NETWORK[SUI_NETWORK] || [];
-const rpcCandidateInput = [SUI_GRPC, ...configuredGrpcFallbacks, ...builtinFallbacks, networkFallbackGrpc];
+const rpcCandidateInput = [SUI_GRPC, ...configuredGrpcFallbacks].filter(Boolean);
 const SUI_RPC_CANDIDATES = dedupeRpcList(rpcCandidateInput);
 if (!SUI_RPC_CANDIDATES.length) {
-  SUI_RPC_CANDIDATES.push(networkFallbackGrpc);
+  if (SUI_GRPC) {
+    SUI_RPC_CANDIDATES.push(SUI_GRPC);
+  }
 }
 
 function looksLikeHttpUrl(value) {
@@ -276,7 +253,7 @@ function buildSuiClientForUrl(rpcUrl) {
   return null;
 }
 
-async function queryGraphQL(query, variables = {}) {
+async function queryGraphQL(query, variables = {}, retries = 2) {
   if (!SUI_GRAPHQL_CANDIDATES.length) {
     throw new Error('GraphQL endpoint is not configured. Set SUI_GRAPHQL or SUI_GRAPHQL_LIST in env.');
   }
@@ -284,38 +261,44 @@ async function queryGraphQL(query, variables = {}) {
   let lastError = null;
   const total = SUI_GRAPHQL_CANDIDATES.length;
 
-  for (let offset = 0; offset < total; offset += 1) {
-    const idx = (activeGraphqlIndex + offset) % total;
-    const endpoint = SUI_GRAPHQL_CANDIDATES[idx];
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    for (let offset = 0; offset < total; offset += 1) {
+      const idx = (activeGraphqlIndex + offset) % total;
+      const endpoint = SUI_GRAPHQL_CANDIDATES[idx];
 
-    try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-sui-rpc-version': '1',
-        },
-        body: JSON.stringify({ query, variables }),
-      });
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-sui-rpc-version': '1',
+          },
+          body: JSON.stringify({ query, variables }),
+        });
 
-      if (!res.ok) {
-        throw new Error(`GraphQL request failed with status ${res.status}`);
+        if (!res.ok) {
+          throw new Error(`GraphQL request failed with status ${res.status}`);
+        }
+
+        const body = await res.json();
+
+        if (body.errors && body.errors.length) {
+          throw new Error(body.errors.map((err) => err.message).join('; '));
+        }
+
+        if (idx !== activeGraphqlIndex) {
+          activeGraphqlIndex = idx;
+          console.warn(`Switched active GraphQL endpoint to ${endpoint}`);
+        }
+
+        return body;
+      } catch (err) {
+        lastError = err;
       }
+    }
 
-      const body = await res.json();
-
-      if (body.errors && body.errors.length) {
-        throw new Error(body.errors.map((err) => err.message).join('; '));
-      }
-
-      if (idx !== activeGraphqlIndex) {
-        activeGraphqlIndex = idx;
-        console.warn(`Switched active GraphQL endpoint to ${endpoint}`);
-      }
-
-      return body;
-    } catch (err) {
-      lastError = err;
+    if (attempt < retries) {
+      await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
     }
   }
 
@@ -2189,8 +2172,28 @@ async function startIndexer() {
       }
     };
 
-    await pollIndexer();
-    setInterval(pollIndexer, 15000);
+    let indexerFailCount = 0;
+
+    const wrappedPoll = async () => {
+      try {
+        await pollIndexer();
+        indexerFailCount = 0;
+      } catch (err) {
+        indexerFailCount += 1;
+        console.warn(`Indexer poll failed (${indexerFailCount}):`, err && err.message ? err.message : err);
+      }
+    };
+
+    const scheduleNextPoll = () => {
+      const delay = Math.min(15000 * Math.pow(1.5, Math.min(indexerFailCount, 4)), 60000);
+      setTimeout(async () => {
+        await wrappedPoll();
+        scheduleNextPoll();
+      }, delay);
+    };
+
+    await wrappedPoll();
+    scheduleNextPoll();
     console.log('Indexer polling started using GraphQL events.');
   } catch (error) {
     console.error('Failed to start event indexer:', error);
