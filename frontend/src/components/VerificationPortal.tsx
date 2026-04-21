@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import ProgressIndicator from "./common/ProgressIndicator";
 import CountryIDStep from "./steps/CountryIDStep.tsx";
 import DataFetchStep from "./steps/DataFetchStep.tsx";
-import FaceVerificationStep from "./steps/FaceVerificationStep.tsx";
+import LivenessCheck from "./steps/LivenessCheck.tsx";
 import ReviewConsentStep from "./steps/ReviewConsentStep.tsx";
 import MintingStep from "./steps/MintingStep.tsx";
 
@@ -45,7 +45,7 @@ const VerificationPortal: React.FC = () => {
   const steps = [
     { component: CountryIDStep, title: "Country & ID" },
     { component: DataFetchStep, title: "Data Verification" },
-    { component: FaceVerificationStep, title: "Face Check" },
+    { component: LivenessCheck, title: "Azure Liveness" },
     { component: ReviewConsentStep, title: "Review & Consent" },
     { component: MintingStep, title: "Minting" },
   ];

@@ -15,7 +15,7 @@ const { fromHex } = require('@mysten/sui/utils');
 
 // Configuration
 // Connect to a local TCP port on the Parent OS, which tunnels to the Enclave
-const PROXY_PORT = process.env.ENCLAVE_PROXY_PORT || PROXY_PORT; 
+const PROXY_PORT = process.env.ENCLAVE_PROXY_PORT || 3000; 
 const PROXY_HOST = process.env.ENCLAVE_PROXY_HOST || '127.0.0.1';
 
 // Parse the Policy Map from Environment
@@ -1553,6 +1553,106 @@ async function resolvePhotoReference(photoRef) {
   }
   return null;
 }
+
+
+// ==========================================
+// AZURE FACE API: LIVENESS DETECTION
+// ==========================================
+const AZURE_FACE_ENDPOINT = process.env.AZURE_FACE_ENDPOINT || 'https://surifyliveness.cognitiveservices.azure.com';
+const AZURE_FACE_KEY = process.env.AZURE_FACE_KEY || ''; // Must be set in .env
+
+app.post('/create-session', async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+    if (!sessionId) {
+      return res.status(400).json({ success: false, error: 'sessionId is required' });
+    }
+
+    const sessionData = verificationSessionStore.get(sessionId);
+    if (!sessionData) {
+      return res.status(404).json({ success: false, error: 'Verification session not found' });
+    }
+
+    // Call Azure Face API to create a liveness session
+    const azureUrl = `${AZURE_FACE_ENDPOINT}/face/v1.1-preview.1/detectliveness/singlemodal/sessions`;
+    const response = await fetch(azureUrl, {
+      method: 'POST',
+      headers: {
+        'Ocp-Apim-Subscription-Key': AZURE_FACE_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        livenessOperationMode: "Passive",
+        deviceCorrelationId: sessionId,
+        sendResultsToClient: true
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      console.error('Azure Face API Error (create):', err);
+      return res.status(500).json({ success: false, error: 'Failed to create Azure liveness session' });
+    }
+
+    const data = await response.json();
+    
+    // data.sessionId is the Azure-specific session ID. data.authToken is for the frontend.
+    res.json({ 
+      success: true, 
+      azureSessionId: data.sessionId, 
+      authToken: data.authToken 
+    });
+
+  } catch (error) {
+    console.error('create-session error:', error.message);
+    res.status(500).json({ success: false, error: 'Internal server error during liveness creation' });
+  }
+});
+
+app.get('/session-result/:azureSessionId', async (req, res) => {
+  try {
+    const { azureSessionId } = req.params;
+    const { internalSessionId } = req.query; // to map back to our internal store
+
+    const azureUrl = `${AZURE_FACE_ENDPOINT}/face/v1.1-preview.1/detectliveness/singlemodal/sessions/${azureSessionId}`;
+    const response = await fetch(azureUrl, {
+      method: 'GET',
+      headers: {
+        'Ocp-Apim-Subscription-Key': AZURE_FACE_KEY
+      }
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      console.error('Azure Face API Error (result):', err);
+      return res.status(500).json({ success: false, error: 'Failed to fetch Azure liveness result' });
+    }
+
+    const data = await response.json();
+    const status = data.status; // e.g., 'Succeeded', 'Failed'
+    const livenessDecision = data.result ? data.result.livenessDecision : null; // 'realface', 'spoofface', etc.
+
+    if (status === 'Succeeded' && livenessDecision === 'realface') {
+      // Mark our internal session as successfully face-verified
+      if (internalSessionId) {
+        const sessionData = verificationSessionStore.get(internalSessionId);
+        if (sessionData) {
+          sessionData.faceVerification = { match: true, similarity: 1, provider: 'azure_liveness' };
+          verificationSessionStore.set(internalSessionId, sessionData);
+        }
+      }
+      return res.json({ success: true, decision: livenessDecision, message: 'Liveness check passed.' });
+    } else {
+      return res.json({ success: false, decision: livenessDecision || status, message: 'Liveness check failed or incomplete.' });
+    }
+
+  } catch (error) {
+    console.error('session-result error:', error.message);
+    res.status(500).json({ success: false, error: 'Internal server error during liveness result check' });
+  }
+});
+// ==========================================
+
 
 app.post('/face-verify', async (req, res) => {
   const { sessionId, livePhoto } = req.body;

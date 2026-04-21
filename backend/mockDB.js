@@ -103,7 +103,7 @@ const govMockDB = {
             barcodeData: 'barcode_suirify_testnet',
             additionalNotes: 'Internal record for automated testing'
         },
-        'NGA-00000000005': {
+        'NGA-00000000005': { 
             country: 'Nigeria',
             documentType: 'national_id',
             idNumber: 'NGA-00000000005',
@@ -258,7 +258,7 @@ const govMockDB = {
             issuanceDate: '2020-03-05',
             expiryDate: null,
             // Use a hosted avatar as the reference photo so the backend can fetch it
-            photoReference: '/reference_photos/NGA-11223344556.png',
+            photoReference: '/reference_photos/NGA-11223344556.jpg',
             biometricHash: 'hash_example_3',
             mrz: null,
             barcodeData: 'barcode_ng_112',

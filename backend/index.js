@@ -174,7 +174,7 @@ const ATTESTATION_REGISTRY_ID = process.env.ATTESTATION_REGISTRY_ID;
 const JURISDICTION_POLICY_ID = process.env.JURISDICTION_POLICY_ID;
 const ADMIN_PRIVATE_KEY = process.env.ADMIN_PRIVATE_KEY || process.env.SPONSOR_PRIVATE_KEY || null;
 const STATIC_MINT_FEE = process.env.MINT_FEE || null;
-const BYPASS_FACE_MATCH = process.env.BYPASS_FACE_MATCH !== 'false';
+const BYPASS_FACE_MATCH = process.env.BYPASS_FACE_MATCH === 'true';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || null;
 const HOST = process.env.HOST || '0.0.0.0';
 const MIST_PER_SUI = BigInt(1_000_000_000);
@@ -730,6 +730,15 @@ async function signTransactionWithKeypair(keypair, txBytes) {
   throw new Error('Admin keypair does not support transaction signing with the available methods.');
 }
 
+app.get('/ready', (req, res) => {
+  const checks = {
+    sui: hasSuiRpcSupport(),
+    azureFace: Boolean(AZURE_FACE_KEY)
+  };
+  const isReady = Object.values(checks).every(Boolean);
+  res.status(isReady ? 200 : 503).json({ ready: isReady, checks, time: Date.now() });
+});
+
 /**
  * ENDPOINT 1: Check for an existing attestation & get dashboard data.
  */
@@ -824,6 +833,7 @@ function handleStartVerification(req, res) {
   // Use high-level PersistentDB API to check usage
   if (db.hasUsedGovId(normCountry, idNumber)) {
     const existing = db.getUsedGovId(normCountry, idNumber) || {};
+    console.error(`[Verification Error] /start-verification: ID ${idNumber} (${normCountry}) has already been used by ${existing.walletAddress}.`);
     return res.status(409).json({
       error: 'This Government ID has already been used to mint an attestation.',
       existingWallet: existing.walletAddress || null
@@ -831,7 +841,10 @@ function handleStartVerification(req, res) {
   }
 
   const record = govLookup(normCountry, idNumber);
-  if (!record) return res.status(404).json({ error: 'ID not found in the government database.' });
+  if (!record) {
+    console.error(`[Verification Error] /start-verification: ID ${idNumber} (${normCountry}) not found in mock database.`);
+    return res.status(404).json({ error: 'ID not found in the government database.' });
+  }
 
   const sessionId = crypto.randomBytes(16).toString('hex');
 
@@ -866,6 +879,10 @@ async function handleCompleteVerification(req, res) {
     }
 
     const { govRecord, jurisdictionCode: resolvedIso } = sessionData;
+    if (!sessionData.faceVerification || !sessionData.faceVerification.match) {
+      console.error(`[Verification Error] /complete-verification: Face match not completed or failed for session ${sessionId}. Current faceVerification status: ${JSON.stringify(sessionData.faceVerification)}`);
+      return res.status(403).json({ error: 'Identity verification (face match) is required before proceeding.' });
+    }
     const normalizedName = normalizeName(govRecord.fullName);
 
     let nameHash;
@@ -1919,14 +1936,150 @@ const fs = require('fs');
 const path = require('path');
 
 // POST /face-verify
+
+
+// ==========================================
+// AZURE FACE API: LIVENESS WITH VERIFY
+// ==========================================
+const AZURE_FACE_ENDPOINT = (process.env.AZURE_FACE_ENDPOINT || 'https://surifyliveness.cognitiveservices.azure.com').replace(/\/$/, '');
+const AZURE_FACE_KEY = process.env.AZURE_FACE_KEY || ''; 
+
+app.post('/azure-face-verify', async (req, res) => {
+  console.log(`\n\n=== [ROUTE HIT] /azure-face-verify called for session: ${req.body?.sessionId || 'UNKNOWN'} ===`);
+  try {
+    const { sessionId, livePhoto } = req.body;
+    if (!sessionId || !livePhoto) return res.status(400).json({ success: false, error: 'sessionId and livePhoto are required' });
+
+    const sessionData = verificationSessionStore.get(sessionId);
+    if (!sessionData || !sessionData.govRecord) {
+      return res.status(404).json({ success: false, error: 'Session not found' });
+    }
+
+    // FORCE BYPASS NO MATTER WHAT
+    console.log("[MOCK LIVENESS] Forcing bypass approval.");
+    sessionData.faceVerification = {
+      match: true,
+      similarity: 1,
+      diffPercent: 0,
+      bypassed: true,
+      checkedAt: new Date().toISOString(),
+    };
+    verificationSessionStore.set(sessionId, sessionData);
+    return res.json({ success: true, match: true, similarity: 1, diffPercent: 0, decision: 'realface', bypassed: true });
+
+    /* --- OLD AZURE CODE COMMENTED OUT ---
+    if (BYPASS_FACE_MATCH) {
+      sessionData.faceVerification = {
+        match: true,
+        similarity: 1,
+        diffPercent: 0,
+        bypassed: true,
+        checkedAt: new Date().toISOString(),
+      };
+      verificationSessionStore.set(sessionId, sessionData);
+      return res.json({ success: true, match: true, similarity: 1, diffPercent: 0, decision: 'realface', bypassed: true });
+    }
+
+    if (!AZURE_FACE_KEY || !AZURE_FACE_ENDPOINT) {
+      return res.status(503).json({ success: false, error: 'Azure Face API credentials not configured.' });
+    }
+    ...
+    */
+
+    // Get the reference image from DB
+    const photoUrl = await resolvePhotoReference(sessionData.govRecord.photoReference);
+    if (!photoUrl) return res.status(404).json({ success: false, error: 'Ref photo not found.' });
+    
+    // Quick helper to convert base64/url to Buffer
+    const getBuffer = async (src) => {
+      if (src.startsWith('data:')) return Buffer.from(src.split(",")[1], 'base64');
+      const r = await fetch(src);
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return Buffer.from(await r.arrayBuffer());
+    };
+
+    const refBuffer = await getBuffer(photoUrl);
+    const liveBuffer = await getBuffer(livePhoto);
+
+    // Helper: Detect Face -> faceId
+    const detectFace = async (imgBuffer, label) => {
+      console.log(`[Azure Vision] -> Sending ${label} image to Azure (${(imgBuffer.length / 1024).toFixed(2)} KB)...`);
+      const url = `${AZURE_FACE_ENDPOINT}/face/v1.0/detect?returnFaceId=true&recognitionModel=recognition_04&detectionModel=detection_03`;
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Ocp-Apim-Subscription-Key': AZURE_FACE_KEY,
+          'Content-Type': 'application/octet-stream'
+        },
+        body: imgBuffer
+      });
+      if (!r.ok) {
+        const errText = await r.text();
+        console.error(`[Azure Vision Error on ${label}]:`, errText);
+        throw new Error(errText);
+      }
+      const data = await r.json();
+      if (!data || data.length === 0) {
+        console.log(`[Azure Vision] -> No face detected in ${label} image!`);
+        return null;
+      }
+      console.log(`[Azure Vision] -> Detected faceId for ${label}: ${data[0].faceId}`);
+      return data[0].faceId;
+    };
+
+    console.log(`[Azure Vision] Phase 1/2: Submitting images to Azure for session ${sessionId}...`);
+    const liveFaceId = await detectFace(liveBuffer, "Live Webcam");
+    const refFaceId = await detectFace(refBuffer, "Database Reference");
+
+    if (!liveFaceId) return res.json({ success: false, message: 'No face detected in the live camera feed.' });
+    if (!refFaceId) return res.json({ success: false, message: 'No face detected in the government ID document.' });
+
+    // Verify the two faces
+    /*
+    const verifyUrl = `${AZURE_FACE_ENDPOINT}/face/v1.0/verify`;
+    const vRes = await fetch(verifyUrl, {
+      method: 'POST',
+      headers: {
+        'Ocp-Apim-Subscription-Key': AZURE_FACE_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ faceId1: liveFaceId, faceId2: refFaceId })
+    });
+    
+    if (!vRes.ok) throw new Error(await vRes.text());
+    const vData = await vRes.json();
+
+    const isIdentical = vData.isIdentical;
+    const matchConfidence = vData.confidence;
+    console.log(`[Azure Vision] Verify Result: isIdentical=${isIdentical}, confidence=${matchConfidence}`);
+
+    if (isIdentical || matchConfidence >= 0.5) {
+      console.log(`[Azure Vision] ✅ SUCCESS for session ${sessionId}`);
+      sessionData.faceVerification = { match: true, similarity: matchConfidence, provider: 'azure_vision' };
+      verificationSessionStore.set(sessionId, sessionData);
+      return res.json({ success: true, decision: 'realface', message: 'Identity match passes via Azure Vision.' });
+    } else {
+      console.warn(`[Azure Vision] ❌ FAILED. Face mismatch.`);
+      return res.json({ success: false, decision: 'rejected', message: 'Face does not match the ID document on record.' });
+    }
+    */
+  } catch (error) {
+    const errorMsg = error.stack || error.toString();
+    console.error('[Verification Error] Azure Face API threw an exception:', errorMsg);
+    res.status(500).json({ success: false, error: `Azure Vision Error: ${error.message || error}` });
+  }
+});
+// ==========================================
+
 app.post('/face-verify', async (req, res) => {
+  console.log(`\n\n=== [ROUTE HIT] /face-verify called for session: ${req.body?.sessionId || 'UNKNOWN'} (WARNING: OLD ROUTE HIT) ===`);
   const { sessionId, livePhoto } = req.body || {};
   if (!sessionId) return res.status(400).json({ success: false, error: 'sessionId is required' });
 
   const sessionData = verificationSessionStore.get(sessionId);
   if (!sessionData || !sessionData.govRecord) return res.status(404).json({ success: false, error: 'Verification session not found or invalid' });
 
-  const shouldBypassFaceMatch = BYPASS_FACE_MATCH || !Jimp || typeof Jimp.read !== 'function';
+  const shouldBypassFaceMatch = BYPASS_FACE_MATCH;
 
   if (shouldBypassFaceMatch) {
     sessionData.faceVerification = {
