@@ -1,0 +1,271 @@
+SUIRIFY
+Co-Pilot Development Briefing
+Everything your co-pilot needs to understand before writing a single line of code
+
+How To Use This Document
+Paste the full co-pilot prompt at the end of this document into your IDE co-pilot at the start of every session. This gives it the full project context, technical architecture, regulatory background, and your exact role — so it never builds something out of context.
+
+April 2026  |  For Co-Pilot Use
+ 
+1. The Story — Why This Exists
+Nigeria has over 100 million people who interact with digital services every day. Every bank app, every crypto exchange, every government portal, every DeFi protocol that wants to onboard a Nigerian user must verify their identity. This is not optional — it is mandated by law across five simultaneous regulatory frameworks: CBN, NDPA, NITDA, SEC, and NCC.
+
+The current system is broken in a specific and devastating way. Every single platform builds its own KYC pipeline from scratch. The same Nigerian citizen uploads their NIN to Kuda. Then to OPay. Then to Binance. Then to a DeFi protocol. Then to a government portal. The same document. The same biometrics. Over and over. Every platform stores this sensitive data on their own servers — creating hundreds of separate breach surfaces across the Nigerian digital economy.
+
+This is not just a user experience problem. It is a compliance crisis. Platforms face penalties up to NGN 10,000,000 under NDPA for improper biometric storage. CBN fines institutions NGN 2,000,000 per KYC default. NITDA requires annual compliance reports that most platforms cannot properly generate. The entire system relies on manual spreadsheets, fragmented APIs, and annual self-reports that nobody verifies.
+
+The Root Cause
+There is no shared, reusable identity compliance infrastructure in Nigeria's digital economy. The NIMC NIN API exists. The CBN KYC rules exist. The NDPA exists. But there is no layer connecting them in a privacy-preserving, auditable, and reusable way. That layer is Suirify.
+
+2. What Suirify Is
+Suirify is Nigeria's AI-powered identity compliance infrastructure — a protocol that lets a Nigerian user verify their identity once and reuse that verification across every digital platform they will ever use, without ever re-exposing their personal data.
+
+Think of it like this: Stripe is to payments what Suirify is to identity. Every website eventually needs a payment layer — they plug in Stripe. Every Nigerian digital service eventually needs a compliant identity layer — they will plug in Suirify.
+
+What Happens	How	Result
+User verifies once	NIN + selfie + liveness check. 60 seconds. One time only.	Never re-uploads documents again.
+Suirify mints an Attestation	Soulbound on-chain credential on Sui blockchain. Contains boolean claims only — no PII.	is_human_verified: true. is_over_18: true. face_matched: true.
+User reuses everywhere	Any platform with Suirify SDK checks wallet for valid attestation. No re-verification needed.	CBN compliant. NDPA compliant. NITDA compliant. SEC compliant.
+ 
+3. The Technical Architecture
+Suirify has five layers. Understanding all five is essential before writing any code.
+
+Layer	What It Does
+Layer 1 — Input	React + TypeScript + Vite frontend. Collects wallet address, NIN, selfie. Handles consent signing. No PII stored here.
+Layer 2 — SDK / API	@suirify/suirifysdk npm package. Read-only. Consent-first. Framework-agnostic. Methods: getAttestationForOwner(), getPublicClaims(), isValid().
+Layer 3 — AI Processing (Enclave)	Node.js backend inside Azure Confidential Computing enclave. NIMC NIN API lookup. Azure Face API — biometric face match + liveness detection. PII deleted from memory immediately after use.
+Layer 4 — Rules Engine	Deterministic pass/fail logic. JSON Framework Registry (CBN/NDPA/NITDA/SEC). AI explains (Azure). Rules Engine decides. Every result traceable to a regulation clause.
+Layer 5 — Sui Blockchain	Suirify_Attestation object. Soul-bound, non-transferable, immutable. Contains zero PII. Permanently queryable for regulator visibility.
+
+3.1 The AI Pipeline
+This is the intelligence core of Suirify. Two Azure Face API calls + one NIMC API call. Nothing more.
+
+1.	NIMC NIN API: Retrieves official identity record (name hash, DOB, gender, photo). Deterministic.
+2.	Azure Face API — Face Match: Compares live selfie to NIMC photo. Returns confidence score (0-1). Distance threshold: 0.60.
+3.	Azure Face API — Liveness Detection: Confirms user is physically present. Rejects deepfakes, printed photos, screen replays. Confidence threshold: 0.95.
+4.	Rules Engine: Takes all three outputs. Makes final PASS/FAIL. Maps to framework requirements.
+5.	PII Purge: NIN, selfie, DOB, name — deleted from memory. Only boolean claims written to blockchain.
+
+3.2 The Attestation Object
+This is what lives on-chain after a successful verification. It contains zero PII. It is the user's reusable compliance credential.
+
+Suirify_Attestation {
+  owner: wallet_address,         // identity anchor
+  nin_verified: true,            // NIN validated against NIMC
+  face_matched: true,            // Azure Face API: selfie matches NIMC photo
+  liveness_passed: true,         // Azure Face API: live human confirmed
+  is_over_18: true,              // calculated from NIMC DOB
+  is_human_verified: true,       // all checks passed
+  pii_not_stored: true,          // NDPA compliance signal
+  consent_recorded: true,        // cryptographic consent signature on record
+  verification_level: 2,         // CBN Tier 2
+  verifier_source: 1,            // NIMC NIN API
+  framework_satisfied: [         // all frameworks this attestation satisfies
+    'CBN_KYC_2023',
+    'NDPA_2023',
+    'NITDA_COP_2022',
+    'SEC_2024'
+  ],
+  issued_at: 1713600000000,
+  expires_at: 1745136000000,     // 1 year default
+  status: 'active'
+}
+ 
+4. The People We Are Building For
+
+4.1 Primary Persona — Amaka (Compliance Officer)
+Amaka is 34. She is Head of Compliance at a Lagos fintech. She manages CBN Tier 2 KYC requirements using a patchwork of third-party APIs, manual spreadsheets, and legal opinions. Every quarter she spends two weeks manually preparing audit packs for CBN. She stores user PII across multiple vendor systems and lies awake worrying about NDPA violations. She has no single dashboard showing her platform's compliance posture. She wants one tool that replaces all her vendors, gives her always-current audit evidence, and removes her PII liability.
+
+Everything you build for the Compliance Officer Dashboard must answer Amaka's questions: Are my users verified? Which frameworks are satisfied? What failed today and why? Can I export this for CBN right now?
+
+4.2 Benefactor — Director Chidi (Regulator)
+Director Chidi leads the Compliance Oversight Unit at NITDA. He oversees annual self-reported compliance filings from hundreds of digital platforms. He has no real-time visibility into actual verification practices. He cannot tell which platforms are storing biometrics illegally. He cannot see which platforms have zero verified users. His entire oversight is reactive — he only knows about violations after they have happened.
+
+The Regulator Dashboard gives Director Chidi something he does not have today: live visibility across the entire Suirify ecosystem. Platform-by-platform compliance posture. AI fraud signals. Expiring attestations. All in real time. Zero PII ever displayed.
+
+4.3 Secondary User — Emeka (Developer)
+Emeka is 27. He is building a DeFi launchpad on Sui. He needs to verify his users are 18+ Nigerians before he can let them access token sales. He has no compliance background. He does not want to build KYC from scratch. He needs the SDK to be so simple that compliance feels like a feature, not a burden. Three lines of code. Done.
+ 
+5. Why We Are At This Hackathon
+The RegTech AI Hackathon is part of Microsoft AI Skills Week 2026, organised by Data Science Nigeria (DSN) and Microsoft Nigeria. It runs in Abuja on April 20-22, 2026. The challenge: build AI-powered solutions for Nigeria's regulatory compliance gap.
+
+Suirify is not a prototype built for this hackathon. It is a real protocol with a live testnet (testnet.suirify.com), a deployed smart contract on Sui Testnet, a published npm SDK, and a working demo at demo.suirify.com. We are entering this hackathon because Suirify is exactly the solution the hackathon is asking for — and winning gives us regulator exposure, Microsoft partnership potential, and national-level visibility.
+
+Primary Problem Statement — NITDA P2
+Suirify anchors on NITDA Problem 2: Support real-time compliance assessment and reporting. On-chain attestations are queryable in real time. Annual self-reports become automated chain queries. Regulators get live posture. Platforms get always-current audit evidence.
+
+The hackathon judges include industry leaders and regulators. When they see the Regulator Dashboard, they are not watching a demo — they are seeing a tool built for people like them. That is why the SupTech layer matters. That is why the Zero PII badge must be visible at all times.
+ 
+6. The Chrome Extension — Why It Exists
+Most people interact with websites and apps every day without reading a single line of the Terms & Conditions or Privacy Policy. These documents are deliberately long, complex, and written in legal language that ordinary Nigerians cannot parse. People accept them blindly. They have no idea what data is being collected, who it is shared with, or whether it violates NDPA 2023.
+
+The Suirify Chrome Extension — Suirify Shield — solves this. When a user visits any website, the extension automatically fetches the T&C and Privacy Policy, runs it through an AI analysis against NDPA and NITDA rules, and gives the user a plain-English (or Pidgin or Yoruba) summary with a risk score and flagged clauses.
+
+This is not a separate product. It is a natural extension of Suirify's core mission. Suirify verifies your identity. Suirify Shield verifies the internet back. Together they create the full data sovereignty stack: you control your identity, and you understand what you are consenting to.
+
+The Positioning Line
+'You verified your identity with Suirify. Now let Suirify verify the internet back.'
+ 
+7. Co-Pilot Prompt — Paste This Into Your IDE
+Copy everything in the box below and paste it into your IDE co-pilot at the start of every session. Do not summarise it. Paste the whole thing.
+
+=== SUIRIFY CO-PILOT BRIEFING — READ THIS FULLY BEFORE WRITING ANY CODE ===
+
+PROJECT NAME: Suirify
+TAGLINE: Verify your identity. Guard your data. Understand what you sign.
+MISSION: Nigeria's AI-powered identity compliance infrastructure.
+
+THE CONTEXT:
+We are at the RegTech AI Hackathon, Microsoft AI Skills Week 2026, Abuja.
+The hackathon asks teams to build AI-powered solutions for Nigeria's compliance gap.
+Suirify is a live protocol — testnet.suirify.com is live, smart contract is deployed on Sui Testnet,
+SDK is published on npm as @suirify/suirifysdk.
+We are NOT building from scratch. We are extending an existing working codebase.
+Final pitch is on April 22, 2026. We have until April 21 end of day to finish everything.
+
+THE PROBLEM WE SOLVE:
+Every Nigerian digital platform (fintech, dApp, exchange, government portal) must verify
+user identity under 5 simultaneous regulatory frameworks:
+  - CBN Customer Due Diligence Regulations 2023 (NIN + biometrics + liveness)
+  - NDPA 2023 (biometrics are sensitive data — cannot be stored)
+  - NITDA Code of Practice 2022 (identity authentication mandated)
+  - SEC Digital Assets Rules 2024 (KYC for crypto platforms)
+  - NCC Consumer Protection Regulations (SIM-NIN linking)
+Currently every platform builds its own pipeline from scratch. The same Nigerian citizen
+re-uploads their NIN to every app they use. Biometrics are stored across hundreds of
+separate servers. Compliance is annual self-reports with no real-time verification.
+Suirify fixes this with one SDK, one attestation, one verification — reused everywhere.
+
+HOW IT WORKS (THE FULL PIPELINE):
+1. User connects Sui wallet
+2. Cryptographic consent signed (NDPA Section 36)
+3. User submits 11-digit NIN + selfie
+4. Suirify Enclave Backend (Azure Confidential Computing):
+   a. NIMC NIN API lookup — retrieves name hash, DOB, photo, gender
+   b. Azure Face API — biometric face match (selfie vs NIMC photo, threshold: 0.60 cosine distance)
+   c. Azure Face API — liveness detection (threshold: 0.95 confidence, rejects deepfakes)
+   d. Rules Engine — deterministic PASS/FAIL per framework
+   e. PII PURGE — NIN, selfie, DOB deleted from memory immediately
+5. If all PASS: Suirify_Attestation minted to user wallet on Sui blockchain
+   Contains only boolean claims — ZERO PII on-chain
+6. User reuses attestation across any Suirify-integrated platform — no re-verification
+
+THE ATTESTATION OBJECT (what lives on-chain):
+{
+  nin_verified: boolean,
+  face_matched: boolean,
+  liveness_passed: boolean,
+  is_over_18: boolean,
+  is_human_verified: boolean,
+  pii_not_stored: boolean,
+  consent_recorded: boolean,
+  verification_level: 1|2|3,
+  framework_satisfied: string[],
+  issued_at: number,
+  expires_at: number,
+  status: 'active'|'expired'|'revoked'
+}
+
+MY ROLE ON THIS PROJECT:
+I am the Frontend Engineer AND the AI Engineer.
+I own: verification flow UI, both dashboards, Chrome Extension,
+Azure Face API integration, T&C AI analysis backend, SDK documentation.
+I do NOT own: Enclave backend, NIMC API, Rules Engine, Vector DB, Smart Contract.
+
+TECH STACK:
+  Frontend: React + TypeScript + Vite (you already know this)
+  AI: Azure Face API (liveness + face match), Azure OpenAI or Claude API (T&C analysis)
+  Extension: Chrome Extension Manifest V3, React compiled popup
+  Chain: Sui Testnet
+  SDK: @suirify/suirifysdk (TypeScript npm package)
+
+DATA — CRITICAL:
+  ALL backend data is currently mocked. No live APIs yet.
+  Build every component against mock data.
+  When backend is ready, only the mock data calls get replaced.
+  ZERO PII must appear in any UI component, ever.
+  The Vector DB stores verification records — see schema below.
+
+MOCK DATA SHAPE (use this everywhere):
+Verification Record: {
+  wallet_address: string,
+  attestation_id: string,
+  framework_satisfied: ['CBN_KYC_2023','NDPA_2023','NITDA_COP_2022','SEC_2024'],
+  claims: { nin_verified, face_matched, liveness_passed, is_over_18,
+            is_human_verified, pii_not_stored, consent_recorded: all boolean },
+  verification_level: 1|2|3,
+  issued_at: number, expires_at: number,
+  platform_id: string, status: 'active'|'expired'|'revoked'
+}
+
+THE THREE PERSONAS:
+1. Amaka (Primary) — Compliance Officer, Lagos fintech. She uses the Compliance Dashboard.
+   Her pain: manual KYC, PII liability, 2 weeks to prepare audit packs.
+   Her solution: one SDK, on-chain audit evidence, one-click export for CBN.
+2. Director Chidi (Benefactor) — NITDA regulator. He uses the Regulator Dashboard.
+   His pain: no real-time oversight, only annual self-reports.
+   His solution: live ecosystem-wide visibility. Zero PII. Always current.
+3. Emeka (Secondary) — Developer building on Sui. He reads the SDK docs.
+   His pain: compliance is complex and risky.
+   His solution: 3 SDK calls. Done.
+
+WHAT YOU ARE HELPING ME BUILD (in priority order):
+1. VerificationProgress.tsx — animated AI pipeline checklist (Step 5 of verification flow)
+   Shows: NIN Check -> Face Match (Azure) -> Liveness (Azure) -> PII Purge -> Rules Engine
+   Each step: animated tick PASS or red X FAIL with reason code + Azure confidence score
+
+2. VerificationResult.tsx — success/fail result screen (Step 6)
+   SUCCESS: attestation ID, all claims listed as green ticks, frameworks satisfied, expiry
+   FAIL: error code, user-friendly message, guidance, retry button
+
+3. Compliance Officer Dashboard (/dashboard/compliance)
+   Widgets: KYC Rate stat, Active/Expired attestations, Failed verifications,
+   Azure AI confidence monitoring, Monthly volume chart, Framework crosswalk table,
+   Recent failures log with Azure confidence scores, Audit Pack Export button
+
+4. Regulator SupTech Dashboard (/dashboard/regulator)
+   Widgets: Ecosystem stats (48,291 users, 23 platforms, 91.7% compliance, 47 fraud signals),
+   Platform heatmap, Live AI fraud signals feed (auto-update every 5s),
+   Expiring attestations alert, Framework compliance summary, Zero PII badge everywhere
+
+5. Chrome Extension — Suirify Shield
+   Manifest V3, React popup, content script detects T&C links,
+   AI analysis returns risk score (0-100) + flagged clauses + NDPA references,
+   Language toggle: EN | Pidgin | Yoruba, Suirify gap box, Powered by Azure badge
+
+6. ConsentModal.tsx — cryptographic consent before any data is collected
+
+7. SDK Documentation — /docs page or markdown
+   3 methods: getAttestationForOwner | getPublicClaims | isValid
+
+ERROR CODES (all need UI states):
+  NIN_NOT_FOUND | FACE_MATCH_FAILED | LIVENESS_FAILED | AGE_BELOW_18
+  MAX_RETRIES_EXCEEDED | NIN_ALREADY_ATTESTED | CONSENT_DENIED
+
+BRANDING RULES:
+  - 'Powered by Microsoft Azure' badge: verification screen + extension popup
+  - 'Zero PII | NDPA Compliant' badge: Regulator Dashboard header and footer
+  - Regulator Dashboard: NEVER show individual wallet addresses or names
+  - Every AI decision must show: model used + confidence score + rules engine result
+
+THE CHROME EXTENSION STORY:
+Most Nigerians accept T&C blindly. They do not know what they are signing.
+Suirify Shield reads and analyses T&C automatically. AI flags risky clauses against NDPA.
+Plain English (+ Pidgin + Yoruba) summary shown in the popup.
+Positioning: 'You verified your identity with Suirify. Now let Suirify verify the internet back.'
+
+WHEN I ASK YOU TO BUILD SOMETHING:
+  - One component at a time
+  - TypeScript with proper interfaces — no any types
+  - Mock data only — no live API calls yet
+  - Named exports for all components
+  - No external UI libraries unless I specify
+  - Every AI-related component must show confidence scores visibly
+  - Every error state must have a corresponding UI component
+  - Accessibility: all interactive elements must have aria-labels
+
+=== END OF SUIRIFY CO-PILOT BRIEFING ===
+ 
+Now your co-pilot knows exactly what it is building and why.
+Start with VerificationProgress.tsx. That is your demo's wow moment.
+April 2026 | Suirify | For Co-Pilot Use

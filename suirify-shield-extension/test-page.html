@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Page - Suirify Shield Extension</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #0a1419;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .instruction {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #2196F3;
+        }
+        .instruction h3 {
+            margin-top: 0;
+            color: #1976D2;
+        }
+        .step {
+            margin: 15px 0;
+            padding-left: 30px;
+            position: relative;
+        }
+        .step::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #4CAF50;
+            font-weight: bold;
+            font-size: 20px;
+        }
+        .policy-links {
+            margin: 30px 0;
+            padding: 20px;
+            background: #fff3cd;
+            border-radius: 8px;
+            border-left: 4px solid #ffc107;
+        }
+        .policy-links h3 {
+            margin-top: 0;
+            color: #856404;
+        }
+        a {
+            color: #5eb3d4;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #5eb3d4;
+            color: white;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin: 5px;
+        }
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .expected {
+            background: #d4edda;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+            border-left: 4px solid #28a745;
+        }
+        .expected strong {
+            color: #155724;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛡️ Suirify Shield Extension Test Page</h1>
+        <p class="subtitle">Use this page to test the enhanced Suirify Shield Chrome Extension</p>
+
+        <div class="instruction">
+            <h3>📋 How to Load the Extension</h3>
+            <div class="step">Open Chrome and go to <code>chrome://extensions/</code></div>
+            <div class="step">Enable "Developer mode" (toggle in top-right corner)</div>
+            <div class="step">Click "Load unpacked" button</div>
+            <div class="step">Navigate to: <code>c:\Users\HP\Desktop\SUIRIFYPROTOCOL\suirify\suirify-shield-extension</code></div>
+            <div class="step">Click "Select Folder"</div>
+            <div class="step">Extension should now appear in your toolbar!</div>
+        </div>
+
+        <div class="test-section">
+            <h3>🚦 Test 1: Traffic Light Indicator</h3>
+            <p>Look at the extension icon in your Chrome toolbar (top-right):</p>
+            <div class="expected">
+                <strong>Expected:</strong> You should see a colored badge on the extension icon:
+                <ul>
+                    <li>🟢 Green with "✓" = Safe site</li>
+                    <li>🟡 Yellow with "!" = Caution</li>
+                    <li>🔴 Red with "⚠" = Risky site</li>
+                </ul>
+            </div>
+            <p><em>Note: This test page should show Yellow (!) since it's a local file.</em></p>
+        </div>
+
+        <div class="test-section">
+            <h3>🎨 Test 2: Popup Design</h3>
+            <p>Click the Suirify Shield extension icon in your toolbar:</p>
+            <div class="expected">
+                <strong>Expected:</strong> Popup should open with:
+                <ul>
+                    <li>Dark background (#0a1419)</li>
+                    <li>Suirify blue accents (#5eb3d4)</li>
+                    <li>Mint green "Analyze This Site" button</li>
+                    <li>Language selector (EN/Pidgin/Yoruba)</li>
+                    <li>"Powered by Microsoft Azure" badge</li>
+                    <li>"NDPA Compliant" badge</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔍 Test 3: Analysis Feature</h3>
+            <p>With the popup open, click "Analyze This Site" button:</p>
+            <div class="expected">
+                <strong>Expected:</strong> You should see:
+                <ul>
+                    <li>Loading animation with "Analyzing policy with Azure AI..."</li>
+                    <li>After 2 seconds, results appear</li>
+                    <li>Risk score (0-100) displayed prominently</li>
+                    <li>Risk badge (SAFE/CAUTION/RISKY)</li>
+                    <li>Summary text</li>
+                    <li>Flagged clauses with severity levels</li>
+                    <li>Suirify gap analysis</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🌍 Test 4: Language Toggle</h3>
+            <p>In the popup, change the language selector:</p>
+            <div class="expected">
+                <strong>Expected:</strong> When you select:
+                <ul>
+                    <li><strong>Pidgin:</strong> Text changes to Nigerian Pidgin English</li>
+                    <li><strong>Yoruba:</strong> Text changes to Yoruba language</li>
+                    <li><strong>English:</strong> Text changes back to English</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="policy-links">
+            <h3>📄 Mock Policy Links (for testing detection)</h3>
+            <p>These links help test the extension's policy detection feature:</p>
+            <p>
+                <a href="#privacy">Privacy Policy</a> |
+                <a href="#terms">Terms of Service</a> |
+                <a href="#cookies">Cookie Policy</a> |
+                <a href="#data">Data Protection</a> |
+                <a href="#legal">Legal Information</a>
+            </p>
+            <p><em>The extension should detect these as policy-related links.</em></p>
+        </div>
+
+        <div class="test-section">
+            <h3>✅ Success Checklist</h3>
+            <p>Extension is working correctly if:</p>
+            <div style="margin-left: 20px;">
+                <div class="step">Badge appears on extension icon</div>
+                <div class="step">Badge color matches risk level</div>
+                <div class="step">Popup opens when icon is clicked</div>
+                <div class="step">Popup design matches Suirify branding</div>
+                <div class="step">Analyze button works</div>
+                <div class="step">Results display after analysis</div>
+                <div class="step">Language selector changes text</div>
+                <div class="step">No console errors (press F12 to check)</div>
+            </div>
+        </div>
+
+        <div class="instruction">
+            <h3>🌐 Test on Real Websites</h3>
+            <p>Try visiting these sites to see different risk levels:</p>
+            <ul>
+                <li><strong>github.com</strong> - Should show Green ✓ (Safe)</li>
+                <li><strong>google.com</strong> - Should show Green ✓ (Safe)</li>
+                <li><strong>microsoft.com</strong> - Should show Green ✓ (Safe)</li>
+                <li><strong>Any unknown site</strong> - Should show Yellow ! (Caution)</li>
+            </ul>
+        </div>
+
+        <div style="margin-top: 40px; padding: 20px; background: #e8f5e9; border-radius: 8px;">
+            <h3 style="color: #2e7d32; margin-top: 0;">🎉 Ready to Test!</h3>
+            <p>Follow the steps above to load and test your enhanced Suirify Shield extension.</p>
+            <p><strong>Need help?</strong> Check the documentation files in the extension folder:</p>
+            <ul>
+                <li><code>QUICK-START.md</code> - 5-minute test guide</li>
+                <li><code>README-ENHANCED.md</code> - Full documentation</li>
+                <li><code>INTEGRATION-GUIDE.md</code> - Troubleshooting</li>
+            </ul>
+        </div>
+
+        <div style="margin-top: 30px; text-align: center; color: #666; font-size: 14px;">
+            <p>Built with ❤️ for Suirify</p>
+            <p><em>Verify your identity. Guard your data. Understand what you sign.</em></p>
+        </div>
+    </div>
+</body>
+</html>

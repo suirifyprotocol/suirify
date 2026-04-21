@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import type { StepComponentProps } from "../VerificationPortal";
-import { fetchCountries, startVerification, type CountryOption } from "@/lib/apiService";
+import { fetchCountries, type CountryOption } from "@/lib/apiService";
+import { startVerificationWithFallback } from "@/lib/hackathonDataService";
 import { toUserFacingMessage } from "@/lib/errorMessages";
 
 type CountryConfig = {
@@ -170,7 +171,7 @@ const CountryIDStep: React.FC<StepComponentProps> = ({ formData, setFormData, on
     const trimmedId = idNumber.trim();
 
     try {
-      const response = await startVerification({ country, idNumber: trimmedId });
+      const response = await startVerificationWithFallback({ country, idNumber: trimmedId });
       setFormData((prev) => ({
         ...prev,
         sessionId: response.sessionId,

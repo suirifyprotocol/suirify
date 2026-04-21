@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Suirify Shield</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="popup-shell">
+      <header class="popup-header">
+        <h1>Suirify Shield</h1>
+        <p>
+          You verified your identity with Suirify. Now let Suirify verify the
+          internet back.
+        </p>
+        <div class="badge-row">
+          <span class="chip">Powered by Microsoft Azure</span>
+          <span class="chip">NDPA-aware</span>
+        </div>
+      </header>
+
+      <section class="controls">
+        <label for="language" class="label">Language</label>
+        <select id="language" aria-label="Select analysis language">
+          <option value="EN">EN</option>
+          <option value="PIDGIN">Pidgin</option>
+          <option value="YORUBA">Yoruba</option>
+        </select>
+        <button id="analyzeButton" aria-label="Analyze current website policy">
+          Analyze This Site
+        </button>
+      </section>
+
+      <section class="result" id="result" hidden>
+        <div class="risk-row">
+          <span class="badge">Risk Score</span>
+          <strong id="riskScore">0</strong>
+        </div>
+
+        <div class="site-row" id="siteRow"></div>
+
+        <p class="summary" id="summary"></p>
+
+        <div>
+          <h2>Flagged Clauses</h2>
+          <ul id="flags" class="flags"></ul>
+        </div>
+
+        <div class="gap">
+          <h3>Suirify gap</h3>
+          <div id="gap"></div>
+        </div>
+
+        <div class="meta" id="meta"></div>
+      </section>
+
+      <footer class="popup-footer">
+        <span class="azure-badge">Powered by Microsoft Azure</span>
+      </footer>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

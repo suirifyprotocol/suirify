@@ -63,6 +63,29 @@ const Index = () => {
           </p>
 
           <VerifyDropdown />
+
+          <div
+            style={{
+              marginTop: 16,
+              display: "flex",
+              gap: 8,
+              justifyContent: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <a href="/dashboard/compliance" className="nav-link" aria-label="Open compliance dashboard">
+              Compliance Dashboard
+            </a>
+            <a href="/dashboard/regulator" className="nav-link" aria-label="Open regulator dashboard">
+              Regulator Dashboard
+            </a>
+            <a href="/dashboard/extension" className="nav-link" aria-label="Open shield preview">
+              Shield Preview
+            </a>
+            <a href="/dashboard/qa" className="nav-link" aria-label="Open verification QA harness">
+              QA Harness
+            </a>
+          </div>
         </main>
       </div>
 

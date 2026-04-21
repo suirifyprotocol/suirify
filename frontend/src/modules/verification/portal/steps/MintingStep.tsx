@@ -6,8 +6,19 @@ import { useCurrentAccount, useSignAndExecuteTransaction, useSuiClient } from "@
 import { fetchMintConfig, finalizeMint, lookupMintRequest } from "@/lib/apiService";
 import { Transaction } from "@mysten/sui/transactions";
 import { toUserFacingMessage } from "@/lib/errorMessages";
+import { VerificationResultCard } from "@/modules/verification/components";
+import { VERIFICATION_ERROR_CODES, type VerificationErrorCode } from "@/types/verification";
+import { ERROR_CODE_GUIDANCE } from "@/modules/verification/constants/errorCodes";
 
 type MintStatus = "idle" | "configuring" | "requesting" | "finalizing" | "success" | "error";
+
+function extractErrorCode(message: string | null | undefined): VerificationErrorCode | null {
+  if (!message) return null;
+  for (const code of VERIFICATION_ERROR_CODES) {
+    if (message.includes(code)) return code;
+  }
+  return null;
+}
 
 const MintingStep: React.FC<StepComponentProps> = ({ formData, setFormData, onBack }) => {
   const account = useCurrentAccount();
@@ -230,22 +241,27 @@ const MintingStep: React.FC<StepComponentProps> = ({ formData, setFormData, onBa
   }
 
   if (status === "error") {
+    const errorCode = extractErrorCode(error);
     return (
       <div className="v-grid">
         <h2 className="v-section-title">Mint Attestation</h2>
-        <div className="v-error">{error || "Minting failed."}</div>
+        <VerificationResultCard
+          result={{
+            kind: "failure",
+            errorCode: errorCode || "MAX_RETRIES_EXCEEDED",
+            message: error || "Minting failed.",
+            guidance: errorCode ? ERROR_CODE_GUIDANCE[errorCode] : "Retry minting. If this persists, contact support.",
+            retryable: true,
+            rulesEngineResult: "FAIL",
+          }}
+          onRetry={() => {
+            resetError();
+            setStatus("idle");
+          }}
+        />
         <div className="v-row v-margin-top">
           <button onClick={onBack} className="v-btn-secondary">
             Back
-          </button>
-          <button
-            onClick={() => {
-              resetError();
-              setStatus("idle");
-            }}
-            className="v-btn-primary"
-          >
-            Retry Minting
           </button>
         </div>
       </div>
@@ -264,9 +280,28 @@ const MintingStep: React.FC<StepComponentProps> = ({ formData, setFormData, onBa
   return (
     <div className="v-grid">
       <h2 className="v-section-title">Verification Complete 🎉</h2>
-      <p className="v-muted">
-  Your Suirify attestation has been minted successfully. It should appear in your wallet momentarily.
-      </p>
+      <p className="v-muted">Your Suirify attestation has been minted successfully.</p>
+
+      <VerificationResultCard
+        result={{
+          kind: "success",
+          attestationId: digest,
+          frameworkSatisfied: ["CBN_KYC_2023", "NDPA_2023", "NITDA_COP_2022", "SEC_2024"],
+          verificationLevel: 2,
+          issuedAt: Date.now(),
+          expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000,
+          claims: {
+            nin_verified: true,
+            face_matched: true,
+            liveness_passed: true,
+            is_over_18: true,
+            is_human_verified: true,
+            pii_not_stored: true,
+            consent_recorded: true,
+          },
+        }}
+        onContinue={() => window.open("/dashboard", "_self")}
+      />
 
       <div className="v-card v-margin-top">
         <div className="v-margin-bottom">
@@ -290,7 +325,7 @@ const MintingStep: React.FC<StepComponentProps> = ({ formData, setFormData, onBa
         <a href={explorer.tx(digest)} target="_blank" rel="noreferrer" className="v-link">
           View on Sui Explorer
         </a>
-        <button className="v-btn-secondary" onClick={() => window.open("/dashboard", "_self") }>
+        <button className="v-btn-secondary" onClick={() => window.open("/dashboard", "_self")}>
           Go to Dashboard
         </button>
       </div>

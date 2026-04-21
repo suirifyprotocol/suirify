@@ -809,7 +809,7 @@ app.get('/countries', (req, res) => {
 /**
  * ENDPOINT 2: Start the verification process with uniqueness check.
  */
-app.post('/start-verification', (req, res) => {
+function handleStartVerification(req, res) {
   const { country, idNumber } = req.body;
   if (!country || !idNumber) return res.status(400).json({ error: 'Country and idNumber are required.' });
 
@@ -845,12 +845,15 @@ app.post('/start-verification', (req, res) => {
   // store resolved iso code and policyId so later steps don't need to re-resolve
   verificationSessionStore.set(sessionId, { govRecord: record, country: normCountry, idNumber, jurisdictionCode: iso, policyId });
   res.json({ success: true, sessionId });
-});
+}
+
+app.post('/start-verification', handleStartVerification);
+app.post('/api/verify/start', handleStartVerification);
 
 /**
  * ENDPOINT 3: Complete verification after successful face scan.
  */
-app.post('/complete-verification', async (req, res) => {
+async function handleCompleteVerification(req, res) {
   try {
     const { sessionId, walletAddress } = req.body;
     if (!sessionId || !walletAddress) {
@@ -904,6 +907,212 @@ app.post('/complete-verification', async (req, res) => {
     console.error('complete-verification error:', message);
     return res.status(500).json({ error: 'Failed to complete verification.' });
   }
+}
+
+app.post('/complete-verification', handleCompleteVerification);
+app.post('/api/verify/submit', handleCompleteVerification);
+
+app.get('/api/dashboard/compliance', (req, res) => {
+  const now = Date.now();
+  return res.json({
+    platformId: req.query.platform_id || 'suirify_launchpad_demo',
+    kycRate: 0.917,
+    activeAttestations: 1824,
+    expiredAttestations: 136,
+    failedVerifications: 47,
+    avgFaceMatchConfidence: 0.89,
+    avgLivenessConfidence: 0.96,
+    monthlyVolume: [
+      { month: 'Nov', verifiedCount: 290, failedCount: 7 },
+      { month: 'Dec', verifiedCount: 335, failedCount: 10 },
+      { month: 'Jan', verifiedCount: 322, failedCount: 9 },
+      { month: 'Feb', verifiedCount: 351, failedCount: 8 },
+      { month: 'Mar', verifiedCount: 344, failedCount: 6 },
+      { month: 'Apr', verifiedCount: 182, failedCount: 7 },
+    ],
+    frameworkCoverage: [
+      {
+        frameworkId: 'CBN_KYC_2023',
+        requiredClaims: ['nin_verified', 'face_matched', 'liveness_passed', 'is_human_verified'],
+        passRate: 0.93,
+      },
+      {
+        frameworkId: 'NDPA_2023',
+        requiredClaims: ['pii_not_stored', 'consent_recorded', 'is_human_verified'],
+        passRate: 0.98,
+      },
+      {
+        frameworkId: 'NITDA_COP_2022',
+        requiredClaims: ['nin_verified', 'is_human_verified'],
+        passRate: 0.95,
+      },
+      {
+        frameworkId: 'SEC_2024',
+        requiredClaims: ['nin_verified', 'face_matched', 'liveness_passed', 'is_over_18'],
+        passRate: 0.91,
+      },
+    ],
+    recentFailures: [
+      {
+        id: 'fail_001',
+        timestamp: now - 2 * 60 * 1000,
+        platformId: 'suirify_launchpad_demo',
+        errorCode: 'LIVENESS_FAILED',
+        faceMatchConfidence: 0.79,
+        livenessConfidence: 0.54,
+        rulesEngineResult: 'FAIL',
+      },
+      {
+        id: 'fail_002',
+        timestamp: now - 8 * 60 * 1000,
+        platformId: 'suirify_launchpad_demo',
+        errorCode: 'FACE_MATCH_FAILED',
+        faceMatchConfidence: 0.42,
+        livenessConfidence: 0.98,
+        rulesEngineResult: 'FAIL',
+      },
+      {
+        id: 'fail_003',
+        timestamp: now - 20 * 60 * 1000,
+        platformId: 'suirify_launchpad_demo',
+        errorCode: 'CONSENT_DENIED',
+        rulesEngineResult: 'FAIL',
+      },
+    ],
+    auditPackReady: true,
+    generatedAt: now,
+  });
+});
+
+app.get('/api/dashboard/regulator', (_req, res) => {
+  const now = Date.now();
+  return res.json({
+    ecosystem: {
+      totalVerifiedUsers: 48291,
+      integratedPlatforms: 23,
+      complianceRate: 0.917,
+      fraudSignals: 47,
+    },
+    platformCompliance: [
+      {
+        platformId: 'fintech_alpha',
+        verificationCount: 12030,
+        complianceScore: 0.95,
+        activeAttestations: 10984,
+        expiredAttestations: 902,
+        fraudSignals: 8,
+      },
+      {
+        platformId: 'defi_beta',
+        verificationCount: 9044,
+        complianceScore: 0.9,
+        activeAttestations: 7880,
+        expiredAttestations: 1044,
+        fraudSignals: 16,
+      },
+      {
+        platformId: 'wallet_gamma',
+        verificationCount: 6188,
+        complianceScore: 0.93,
+        activeAttestations: 5710,
+        expiredAttestations: 390,
+        fraudSignals: 5,
+      },
+    ],
+    liveFraudSignals: [
+      {
+        id: 'signal_001',
+        timestamp: now - 30 * 1000,
+        platformId: 'defi_beta',
+        signalType: 'deepfake_attempt',
+        severity: 'high',
+        confidence: 0.98,
+      },
+      {
+        id: 'signal_002',
+        timestamp: now - 90 * 1000,
+        platformId: 'fintech_alpha',
+        signalType: 'duplicate_nin',
+        severity: 'medium',
+        confidence: 0.88,
+      },
+      {
+        id: 'signal_003',
+        timestamp: now - 4 * 60 * 1000,
+        platformId: 'wallet_gamma',
+        signalType: 'consent_bypass',
+        severity: 'low',
+        confidence: 0.74,
+      },
+    ],
+    expiringAlerts: [
+      { platformId: 'fintech_alpha', expiringInDays: 7, count: 120 },
+      { platformId: 'defi_beta', expiringInDays: 14, count: 92 },
+      { platformId: 'wallet_gamma', expiringInDays: 30, count: 41 },
+    ],
+    frameworkSummary: {
+      CBN_KYC_2023: 0.92,
+      NDPA_2023: 0.97,
+      NITDA_COP_2022: 0.94,
+      SEC_2024: 0.9,
+    },
+    zeroPiiBadgeText: 'Zero PII | NDPA Compliant',
+    generatedAt: now,
+  });
+});
+
+app.post('/api/extension/analyze', (req, res) => {
+  const { url, language } = req.body || {};
+  const lang = String(language || 'EN').toUpperCase();
+  const byLanguage = {
+    EN: {
+      summary:
+        'This policy includes broad third-party sharing language and unclear retention timelines for personal data.',
+      suirifyGap:
+        'Policy does not clearly state biometric processing controls or explicit NDPA consent proof requirements.',
+    },
+    PIDGIN: {
+      summary:
+        'Dis policy fit share user data with third parties and e no clear talk how long dem go keep your personal data.',
+      suirifyGap:
+        'Dem never explain well how dem handle biometric data and consent proof under NDPA.',
+    },
+    YORUBA: {
+      summary:
+        'Ilana yi ni ipin data pelu awon egbe keta, ati pe ko salaye akoko ipamo data ni kedere.',
+      suirifyGap:
+        'Ko si alaye kedere lori bi won se n tọju data biometrics ati eri iforuko-inu NDPA.',
+    },
+  };
+
+  const selected = byLanguage[lang] || byLanguage.EN;
+  return res.json({
+    url: url || 'https://example.com/privacy',
+    riskScore: 71,
+    summary: selected.summary,
+    language: lang,
+    flaggedClauses: [
+      {
+        id: 'clause_001',
+        clauseTitle: 'Third-Party Data Sharing',
+        excerpt: 'We may share user information with trusted partners for analytics, advertising, and operational services.',
+        riskLevel: 'HIGH',
+        ndpaReference: 'NDPA 2023 - Lawful Basis and Data Minimization',
+        recommendation: 'Limit sharing to explicit consent scopes and list partner categories clearly.',
+      },
+      {
+        id: 'clause_002',
+        clauseTitle: 'Retention Period',
+        excerpt: 'We retain data as long as needed to provide services and for business purposes.',
+        riskLevel: 'MEDIUM',
+        ndpaReference: 'NDPA 2023 - Storage Limitation',
+        recommendation: 'Add fixed retention windows and deletion timelines for each data category.',
+      },
+    ],
+    suirifyGap: selected.suirifyGap,
+    poweredBy: 'Microsoft Azure',
+    analyzedAt: Date.now(),
+  });
 });
 
 /**

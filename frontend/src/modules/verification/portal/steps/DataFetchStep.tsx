@@ -3,7 +3,7 @@ import type { StepComponentProps } from "../VerificationPortal";
 import LoadingSpinner from "@/modules/verification/ui/LoadingSpinner";
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { calculateAge } from "@/lib/identityUtils";
-import { completeVerification } from "@/lib/apiService";
+import { submitVerificationWithFallback } from "@/lib/hackathonDataService";
 import { toUserFacingMessage } from "@/lib/errorMessages";
 
 /**
@@ -33,7 +33,10 @@ const DataFetchStep: React.FC<StepComponentProps> = ({ formData, setFormData, on
     setError(null);
     setSuccess(null);
     try {
-      const result = await completeVerification({ sessionId: formData.sessionId, walletAddress: account.address });
+      const result = await submitVerificationWithFallback({
+        sessionId: formData.sessionId,
+        walletAddress: account.address,
+      });
       const consent = result.consentData;
       setFormData((prev) => ({
         ...prev,
