@@ -2,6 +2,7 @@ import { useCurrentAccount, useSuiClient } from "@mysten/dapp-kit";
 import type { ObjectResponseError, SuiObjectResponse } from "@mysten/sui/client";
 import { STRUCT_ATTESTATION } from "../lib/config";
 import { fetchAttestation } from "../lib/apiService";
+import { loadFirstOwnedAttestation } from "../lib/suiOwnedAttestation";
 
 export type VerificationCheck = {
   hasAttestation: boolean;
@@ -58,18 +59,11 @@ export const useVerificationStatus = () => {
     }
 
     try {
-      const attestations = await client.getOwnedObjects({
-        owner: walletAddress,
-        filter: { StructType: STRUCT_ATTESTATION },
-        options: { showContent: true },
-      });
-
-      if (attestations.data.length > 0) {
-        const att = attestations.data.find((item) => item && !("error" in item && item.error));
-        if (att) {
-          const isValid = checkAttestationValidity(att);
-          return { hasAttestation: true, isValid, attestation: att };
-        }
+      const att = await loadFirstOwnedAttestation(client as any, walletAddress, STRUCT_ATTESTATION);
+      if (att && !("error" in (att as Record<string, unknown>))) {
+        const castAtt = att as SuiObjectResponse;
+        const isValid = checkAttestationValidity(castAtt);
+        return { hasAttestation: true, isValid, attestation: castAtt };
       }
 
       return backendResult;

@@ -1,4 +1,5 @@
 const fetch = globalThis.fetch || require('node-fetch');
+require('dotenv').config();
 
 let SuiGrpcClient = null;
 let SuiClient = null;

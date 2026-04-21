@@ -3,6 +3,7 @@ import { ConnectButton, useCurrentAccount, useSuiClient } from "@mysten/dapp-kit
 import LoadingSpinner from "../ui/LoadingSpinner";
 import { STRUCT_ATTESTATION, explorer } from "@/lib/config";
 import { fetchAttestation, type AttestationSummary } from "@/lib/apiService";
+import { loadFirstOwnedAttestation } from "@/lib/suiOwnedAttestation";
 import type { AttestationLike } from "@/types/attestation";
 import { calculateDaysUntilExpiry } from "@/lib/identityUtils";
 import { useVerificationUI } from "@/modules/verification/context/VerificationUIContext";
@@ -177,28 +178,41 @@ const Dashboard: React.FC = () => {
         return;
       }
 
-      try {
-        const attestations = await client.getOwnedObjects({
-          owner: account.address,
-          filter: { StructType: STRUCT_ATTESTATION },
-          options: { showContent: true },
-        });
+      let backendHasAttestation = false;
 
-        if (attestations.data.length > 0) {
-          const first = attestations.data[0];
-          if (first && !first.error) {
-            setAttestation(first as AttestationLike);
-          } else {
-            setAttestation(null);
-          }
-        } else {
+      try {
+        const fallback = await fetchAttestation(account.address);
+        if (fallback.hasAttestation && fallback.data) {
+          setAttestation(mapBackendAttestation(fallback.data));
+          backendHasAttestation = true;
+          setLoading(false);
+        }
+      } catch {
+        // Ignore backend failures and continue with direct chain lookup.
+      }
+
+      try {
+        const first = await loadFirstOwnedAttestation(
+          client as any,
+          account.address,
+          STRUCT_ATTESTATION,
+        );
+        if (first && !("error" in (first as Record<string, unknown>))) {
+          setAttestation(first as unknown as AttestationLike);
+          backendHasAttestation = true;
+          setLoading(false);
+        } else if (!backendHasAttestation) {
           setAttestation(null);
         }
       } catch (e) {
         console.error("Failed to load attestations", e);
-        setAttestation(null);
+        if (!backendHasAttestation) {
+          setAttestation(null);
+        }
       } finally {
-        setLoading(false);
+        if (!backendHasAttestation) {
+          setLoading(false);
+        }
       }
     };
 

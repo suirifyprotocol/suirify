@@ -28,18 +28,10 @@ try {
   Jimp = null;
 }
 
-// Replace placeholder vars with actual resolution from installed sui package (with fallback)
-let SuiClient = null;
-let SuiGrpcClient = null;
-let SuiGraphQLClient = null;
-let GrpcTransport = null;
-let ChannelCredentials = null;
-let getFullnodeUrl = null;
-let TransactionBlock = null;
-let Ed25519Keypair = null;
-let grpcClientCache = new Map();
-let graphqlClient = null;
 let activeGraphqlIndex = 0;
+
+// Runtime SDK handles (constructors/utilities) are loaded from installed packages.
+// Environment-specific values such as network, RPC URLs, IDs, and keys come from `.env` below.
 
 function normalizeTransactionBlockModule(mod) {
   if (!mod) return null;
@@ -71,63 +63,77 @@ function normalizeTransactionBlockModule(mod) {
   return null;
 }
 
-try {
-  const sui = require('@mysten/sui');
+function loadSuiSdkRuntime() {
+  const runtime = {
+    SuiClient: null,
+    SuiGrpcClient: null,
+    SuiGraphQLClient: null,
+    getFullnodeUrl: null,
+    TransactionBlock: null,
+    Ed25519Keypair: null,
+  };
+
+  // CommonJS dynamic require is intentional here to support mixed SDK export shapes.
   try {
-    ({ SuiGrpcClient } = require('@mysten/sui/grpc'));
-  } catch (_e) {
-    SuiGrpcClient = null;
-  }
-  try {
-    ({ SuiGraphQLClient } = require('@mysten/sui/graphql'));
-  } catch (_e) {
-    SuiGraphQLClient = null;
-  }
-  SuiClient = sui.SuiClient || (sui.client && sui.client.SuiClient) || null;
-  getFullnodeUrl = sui.getFullnodeUrl || (sui.client && sui.client.getFullnodeUrl) || null;
-  TransactionBlock =
-    sui.TransactionBlock ||
-    sui.Transaction ||
-    (sui.transactions && (sui.transactions.TransactionBlock || sui.transactions.Transaction)) ||
-    null;
-  Ed25519Keypair = sui.Ed25519Keypair || (sui.keypairs && sui.keypairs.Ed25519Keypair) || null;
-  console.log('Loaded @mysten/sui exports.');
-} catch (e1) {
-  try {
-    ({ SuiClient, getFullnodeUrl } = require('@mysten/sui/client'));
+    const sui = require('@mysten/sui');
     try {
-      ({ SuiGrpcClient } = require('@mysten/sui/grpc'));
+      ({ SuiGrpcClient: runtime.SuiGrpcClient } = require('@mysten/sui/grpc'));
     } catch (_e) {
-      SuiGrpcClient = null;
+      runtime.SuiGrpcClient = null;
     }
     try {
-      ({ SuiGraphQLClient } = require('@mysten/sui/graphql'));
+      ({ SuiGraphQLClient: runtime.SuiGraphQLClient } = require('@mysten/sui/graphql'));
     } catch (_e) {
-      SuiGraphQLClient = null;
+      runtime.SuiGraphQLClient = null;
     }
-    const transactionsModule = require('@mysten/sui/transactions');
-    TransactionBlock =
-      transactionsModule.TransactionBlock ||
-      transactionsModule.Transaction ||
-      transactionsModule.default ||
-      transactionsModule;
-    ({ Ed25519Keypair } = require('@mysten/sui/keypairs/ed25519'));
-    console.log('Loaded @mysten/sui.js subpath exports.');
-  } catch (e2) {
-    console.warn('Sui client packages not found. On-chain features disabled. To enable run:');
-    console.warn('  cd suirify-backend && npm install @mysten/sui');
+    runtime.SuiClient = sui.SuiClient || (sui.client && sui.client.SuiClient) || null;
+    runtime.getFullnodeUrl = sui.getFullnodeUrl || (sui.client && sui.client.getFullnodeUrl) || null;
+    runtime.TransactionBlock =
+      sui.TransactionBlock ||
+      sui.Transaction ||
+      (sui.transactions && (sui.transactions.TransactionBlock || sui.transactions.Transaction)) ||
+      null;
+    runtime.Ed25519Keypair = sui.Ed25519Keypair || (sui.keypairs && sui.keypairs.Ed25519Keypair) || null;
+    console.log('Loaded @mysten/sui exports.');
+  } catch (_e1) {
+    try {
+      ({ SuiClient: runtime.SuiClient, getFullnodeUrl: runtime.getFullnodeUrl } = require('@mysten/sui/client'));
+      try {
+        ({ SuiGrpcClient: runtime.SuiGrpcClient } = require('@mysten/sui/grpc'));
+      } catch (_e) {
+        runtime.SuiGrpcClient = null;
+      }
+      try {
+        ({ SuiGraphQLClient: runtime.SuiGraphQLClient } = require('@mysten/sui/graphql'));
+      } catch (_e) {
+        runtime.SuiGraphQLClient = null;
+      }
+      const transactionsModule = require('@mysten/sui/transactions');
+      runtime.TransactionBlock =
+        transactionsModule.TransactionBlock ||
+        transactionsModule.Transaction ||
+        transactionsModule.default ||
+        transactionsModule;
+      ({ Ed25519Keypair: runtime.Ed25519Keypair } = require('@mysten/sui/keypairs/ed25519'));
+      console.log('Loaded @mysten/sui.js subpath exports.');
+    } catch (_e2) {
+      console.warn('Sui client packages not found. On-chain features disabled. To enable run:');
+      console.warn('  cd backend && npm install @mysten/sui');
+    }
   }
+
+  runtime.TransactionBlock = normalizeTransactionBlockModule(runtime.TransactionBlock);
+  return runtime;
 }
 
-try {
-  ({ GrpcTransport } = require('@protobuf-ts/grpc-transport'));
-  ({ ChannelCredentials } = require('@grpc/grpc-js'));
-} catch (_e) {
-  GrpcTransport = null;
-  ChannelCredentials = null;
-}
-
-TransactionBlock = normalizeTransactionBlockModule(TransactionBlock);
+const {
+  SuiClient,
+  SuiGrpcClient,
+  SuiGraphQLClient,
+  getFullnodeUrl,
+  TransactionBlock,
+  Ed25519Keypair,
+} = loadSuiSdkRuntime();
 
 const app = express();
 const BODY_LIMIT = process.env.REQUEST_BODY_LIMIT || '25mb';
@@ -145,7 +151,8 @@ app.use((req, res, next) => {
 
 app.get('/health', (req, res) => res.json({ ok: true, time: Date.now() }));
 
-// compute SUI_GRPC now that getFullnodeUrl may be defined
+// Environment configuration is owned by `.env`; do not hardcode deployment values below.
+// `getFullnodeUrl` from the loaded SDK is used only as a fallback when env endpoints are absent.
 const PORT = Number.parseInt(process.env.PORT, 10) || 4000;
 const SECRET_PEPPER = process.env.SECRET_PEPPER || '';
 const SUI_NETWORK = process.env.SUI_NETWORK || 'testnet';
@@ -233,41 +240,32 @@ const SUI_RPC_CANDIDATES = dedupeRpcList(rpcCandidateInput);
 if (!SUI_RPC_CANDIDATES.length) {
   SUI_RPC_CANDIDATES.push(networkFallbackGrpc);
 }
+
+function looksLikeHttpUrl(value) {
+  return typeof value === 'string' && /^https?:\/\//i.test(value.trim());
+}
+
+function logSuiEnvDiagnostics() {
+  if (!looksLikeHttpUrl(SUI_GRPC)) {
+    console.warn(`SUI_GRPC appears malformed: "${SUI_GRPC}". Expected an http(s) URL in .env.`);
+  }
+  if (!SUI_GRAPHQL_CANDIDATES.length) {
+    console.warn('No GraphQL endpoint configured in .env (SUI_GRAPHQL or SUI_GRAPHQL_LIST). GraphQL fallback is disabled.');
+  }
+}
+
+logSuiEnvDiagnostics();
 console.log('Sui gRPC candidates:', SUI_RPC_CANDIDATES.join(', '));
 console.log(`Sui GraphQL endpoints: ${SUI_GRAPHQL_CANDIDATES.length ? SUI_GRAPHQL_CANDIDATES.join(', ') : 'not configured'}`);
 
-function normalizeGrpcBaseUrl(rpcUrl) {
-  if (!rpcUrl || typeof rpcUrl !== 'string') return null;
-  try {
-    const parsed = new URL(rpcUrl);
-    return parsed.host;
-  } catch (_e) {
-    return rpcUrl.replace(/^https?:\/\//i, '');
-  }
-}
-
-function buildNativeGrpcTransport(rpcUrl) {
-  if (!GrpcTransport || !ChannelCredentials || !rpcUrl) return null;
-  try {
-    const parsed = new URL(rpcUrl);
-    return new GrpcTransport({
-      host: parsed.host,
-      channelCredentials: parsed.protocol === 'https:' ? ChannelCredentials.createSsl() : ChannelCredentials.createInsecure(),
-    });
-  } catch (err) {
-    console.warn('Native gRPC transport unavailable for', rpcUrl, err && err.message ? err.message : err);
-    return null;
-  }
-}
-
 function buildSuiClientForUrl(rpcUrl) {
   if (!rpcUrl || !hasSuiRpcSupport()) return null;
-  const transport = buildNativeGrpcTransport(rpcUrl);
   try {
     if (SuiGrpcClient) {
-      return transport
-        ? new SuiGrpcClient({ network: SUI_NETWORK, transport })
-        : new SuiGrpcClient({ baseUrl: rpcUrl, network: SUI_NETWORK });
+      return new SuiGrpcClient({
+        network: SUI_NETWORK,
+        baseUrl: rpcUrl,
+      });
     }
     if (SuiClient) {
       return new SuiClient({ url: rpcUrl });
@@ -291,24 +289,20 @@ async function queryGraphQL(query, variables = {}) {
     const endpoint = SUI_GRAPHQL_CANDIDATES[idx];
 
     try {
-      if (!graphqlClient && SuiGraphQLClient) {
-        graphqlClient = new SuiGraphQLClient({ url: endpoint, network: SUI_NETWORK });
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-sui-rpc-version': '1',
+        },
+        body: JSON.stringify({ query, variables }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`GraphQL request failed with status ${res.status}`);
       }
 
-      let body;
-      if (graphqlClient && typeof graphqlClient.query === 'function') {
-        body = await graphqlClient.query({ query, variables });
-      } else {
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query, variables }),
-        });
-        if (!res.ok) {
-          throw new Error(`GraphQL request failed with status ${res.status}`);
-        }
-        body = await res.json();
-      }
+      const body = await res.json();
 
       if (body.errors && body.errors.length) {
         throw new Error(body.errors.map((err) => err.message).join('; '));
@@ -316,14 +310,12 @@ async function queryGraphQL(query, variables = {}) {
 
       if (idx !== activeGraphqlIndex) {
         activeGraphqlIndex = idx;
-        graphqlClient = SuiGraphQLClient ? new SuiGraphQLClient({ url: endpoint, network: SUI_NETWORK }) : null;
         console.warn(`Switched active GraphQL endpoint to ${endpoint}`);
       }
 
       return body;
     } catch (err) {
       lastError = err;
-      graphqlClient = null;
     }
   }
 
@@ -361,6 +353,18 @@ const EVENT_QUERY = `
   }
 `;
 
+const OWNED_OBJECTS_QUERY = `
+  query OwnedObjects($owner: SuiAddress!, $type: String) {
+    address(address: $owner) {
+      objects(filter: { type: $type }, first: 8) {
+        nodes {
+          address
+        }
+      }
+    }
+  }
+`;
+
 async function fetchGraphQLObject(objectId) {
   if (!objectId) return null;
   try {
@@ -385,483 +389,572 @@ function toLegacyObjectSummary(graphqlObject) {
 function getMoveObjectFields(objectNode) {
   return objectNode?.asMoveObject?.contents?.json || null;
 }
-const PACKAGE_ID = process.env.PACKAGE_ID ? process.env.PACKAGE_ID.trim() : '' ;
-const ADMIN_CAP_ID = process.env.ADMIN_CAP_ID ? process.env.ADMIN_CAP_ID.trim() : '';
-const PROTOCOL_CONFIG_ID = process.env.PROTOCOL_CONFIG_ID ? process.env.PROTOCOL_CONFIG_ID.trim() : '';
-const ATTESTATION_REGISTRY_ID = process.env.ATTESTATION_REGISTRY_ID ? process.env.ATTESTATION_REGISTRY_ID.trim() : '';
-const JURISDICTION_POLICY_ID = process.env.JURISDICTION_POLICY_ID;
-const ADMIN_PRIVATE_KEY = process.env.ADMIN_PRIVATE_KEY || process.env.SPONSOR_PRIVATE_KEY || null;
-const STATIC_MINT_FEE = process.env.MINT_FEE || null;
-const BYPASS_FACE_MATCH = process.env.BYPASS_FACE_MATCH === 'true';
-const ADMIN_API_KEY = process.env.ADMIN_API_KEY || null;
-const HOST = process.env.HOST || '0.0.0.0';
-const MIST_PER_SUI = BigInt(1_000_000_000);
 
-const STATUS_CODE_ACTIVE = 1;
-const STATUS_CODE_EXPIRED = 2;
-const STATUS_CODE_REVOKED = 3;
-
-const STATUS_CODE_TO_NAME = {
-  [STATUS_CODE_ACTIVE]: 'ACTIVE',
-  [STATUS_CODE_EXPIRED]: 'EXPIRED',
-  [STATUS_CODE_REVOKED]: 'REVOKED',
-};
-
-const STATUS_NAME_TO_CODE = {
-  ACTIVE: STATUS_CODE_ACTIVE,
-  EXPIRED: STATUS_CODE_EXPIRED,
-  REVOKED: STATUS_CODE_REVOKED,
-};
-
-function toBigIntOrNull(value) {
-  if (value === null || value === undefined) return null;
-  try {
-    return BigInt(value);
-  } catch (_err) {
-    return null;
-  }
-}
-
-function formatSuiFromMist(mistValue) {
-  try {
-    const mist = BigInt(mistValue);
-    const whole = mist / MIST_PER_SUI;
-    const remainder = mist % MIST_PER_SUI;
-    if (remainder === BigInt(0)) {
-      return whole.toString();
-    }
-    const remainderStr = remainder.toString().padStart(9, '0').replace(/0+$/, '');
-    return `${whole.toString()}.${remainderStr}`;
-  } catch (_err) {
-    return null;
-  }
-}
-
-if (BYPASS_FACE_MATCH) {
-  console.warn('Face verification bypass mode enabled — similarity checks will be skipped.');
-}
-
-console.log(`Sui network configured: ${SUI_NETWORK} (grpc: ${SUI_GRPC})`);
-
-let suiClient;
-let adminKeypair;
-let activeRpcIndex = 0;
-const suiClientCache = new Map();
-const RETRYABLE_RPC_ERROR_CODES = new Set([
-  'UND_ERR_CONNECT_TIMEOUT',
-  'UND_ERR_HEADERS_TIMEOUT',
-  'UND_ERR_SOCKET',
-  'UND_ERR_BODY_TIMEOUT',
-  'UND_ERR_RESPONSE_STATUS_CODE',
-  'UND_ERR_ABORTED',
-  'ECONNRESET',
-  'ECONNREFUSED',
-  'ETIMEDOUT',
-  'EHOSTUNREACH',
-  'ENETUNREACH',
-]);
-
-const ActiveSuiClientCtor = SuiGrpcClient || SuiClient;
-const hasSuiRpcSupport = () => typeof ActiveSuiClientCtor === 'function' && SUI_RPC_CANDIDATES.length > 0;
-
-function getOrCreateSuiClientForUrl(rpcUrl) {
-  if (!rpcUrl || !hasSuiRpcSupport()) return null;
-  if (suiClientCache.has(rpcUrl)) {
-    return suiClientCache.get(rpcUrl);
-  }
-  try {
-    const client = buildSuiClientForUrl(rpcUrl);
-    suiClientCache.set(rpcUrl, client);
-    console.log(`Sui client instantiated (${SuiGrpcClient ? 'grpc' : 'rpc'}=${rpcUrl}).`);
-    return client;
-  } catch (err) {
-    console.error(`Failed to instantiate Sui client for ${rpcUrl}:`, err && err.message ? err.message : err);
-    return null;
-  }
-}
-
-const describeRpcError = (error) => {
-  if (!error) return 'unknown error';
-  const parts = [];
-  const root = error.cause || error;
-  if (root.code) parts.push(root.code);
-  if (error.message) {
-    parts.push(error.message);
-  } else if (root.message) {
-    parts.push(root.message);
-  }
-  return parts.length ? parts.join(' — ') : String(error);
-};
-
-function isRetryableRpcError(error) {
-  if (!error) return false;
-  const root = error.cause || error;
-  if (root && root.code && RETRYABLE_RPC_ERROR_CODES.has(root.code)) {
-    return true;
-  }
-  const message = (root && root.message ? root.message : error.message || '').toLowerCase();
-  if (!message) return false;
-  return (
-    message.includes('fetch failed') ||
-    message.includes('timeout') ||
-    message.includes('network') ||
-    message.includes('connect') ||
-    message.includes('socket')
-  );
-}
-
-async function withSuiClient(operationName, handler) {
-  if (!hasSuiRpcSupport()) {
-    throw new Error('Sui client is not configured.');
-  }
-
-  let lastError = null;
-  const total = SUI_RPC_CANDIDATES.length;
-  for (let offset = 0; offset < total; offset += 1) {
-    const candidateIndex = (activeRpcIndex + offset) % total;
-    const rpcUrl = SUI_RPC_CANDIDATES[candidateIndex];
-    const client = getOrCreateSuiClientForUrl(rpcUrl);
-    if (!client) {
-      lastError = new Error(`Unable to instantiate Sui client for ${rpcUrl}`);
-      continue;
-    }
-    try {
-      const result = await handler(client, rpcUrl);
-      suiClient = client;
-      if (candidateIndex !== activeRpcIndex) {
-        console.log(`Switched active Sui RPC to ${rpcUrl} for ${operationName}.`);
-        activeRpcIndex = candidateIndex;
-      }
-      return result;
-    } catch (err) {
-      lastError = err;
-      if (!isRetryableRpcError(err) || total === 1) {
-        throw err;
-      }
-      console.warn(`[${operationName}] RPC ${rpcUrl} failed (${describeRpcError(err)}). Trying next endpoint...`);
-    }
-  }
-
-  throw lastError || new Error('All configured Sui RPC endpoints failed.');
-}
-
-// Instantiate Sui client when available; load admin signer only if provided.
-try {
-  if (hasSuiRpcSupport()) {
-    const initialClient = getOrCreateSuiClientForUrl(SUI_RPC_CANDIDATES[0]);
-    if (initialClient) {
-      suiClient = initialClient;
-      activeRpcIndex = 0;
-    } else {
-      console.error('Failed to instantiate initial Sui client. Will attempt again on demand.');
-    }
-  } else {
-    console.warn('Sui client constructor not found in @mysten/sui exports. On-chain features disabled.');
-  }
-
-	if (ADMIN_PRIVATE_KEY) {
-    if (Ed25519Keypair && typeof Ed25519Keypair.fromSecretKey === 'function') {
-      try {
-        const tryLoadAdminKeypair = (rawValue) => {
-          try {
-            return Ed25519Keypair.fromSecretKey(rawValue);
-          } catch (err1) {
-            try {
-              const decoded = Buffer.from(rawValue, 'base64');
-              let secretBytes;
-              if (decoded.length === 33 && decoded[0] === 0) {
-                secretBytes = decoded.slice(1, 33);
-              } else if (decoded.length === 64) {
-                secretBytes = decoded.slice(0, 32);
-              } else if (decoded.length === 65) {
-                secretBytes = decoded.slice(1, 33);
-              } else if (decoded.length >= 32) {
-                secretBytes = decoded.slice(0, 32);
-              } else {
-                secretBytes = decoded;
-              }
-              return Ed25519Keypair.fromSecretKey(secretBytes);
-            } catch (err2) {
-              throw err1;
-            }
-          }
-        };
-        adminKeypair = tryLoadAdminKeypair(ADMIN_PRIVATE_KEY);
-        console.log(`Admin signer loaded: ${adminKeypair.getPublicKey().toSuiAddress()}`);
-      } catch (e) {
-        console.error('Failed to load ADMIN_PRIVATE_KEY. Provide either a sui encoded secret key (suiprivkey...) or a base64 seed.', e);
-        adminKeypair = null;
-      }
-		} else {
-			console.warn('ADMIN_PRIVATE_KEY provided but Ed25519Keypair helper not available. On-chain mint finalization disabled.');
-		}
-	} else {
-		console.info('No ADMIN_PRIVATE_KEY provided. Transactions will require manual signing.');
-	}
-
-	if (!PACKAGE_ID) {
-		console.warn('PACKAGE_ID not set. On-chain mint operations will fail until PACKAGE_ID is configured.');
-	}
-	if (!ADMIN_CAP_ID || !PROTOCOL_CONFIG_ID || !ATTESTATION_REGISTRY_ID) {
-		console.warn('One or more protocol env IDs (ADMIN_CAP_ID, PROTOCOL_CONFIG_ID, ATTESTATION_REGISTRY_ID) are not set. Some on-chain calls may fail.');
-	}
-  if (ADMIN_API_KEY) {
-    console.log('Admin API key configured — admin endpoints enabled.');
-  } else {
-    console.warn('ADMIN_API_KEY not set. Admin maintenance endpoints will be disabled.');
-  }
-} catch (outerErr) {
-	console.error('Unexpected error during Sui client / admin initialization:', outerErr);
-	suiClient = null;
-	adminKeypair = null;
-}
-
-const verificationSessionStore = new Map();
-const pendingMints = new Map();
-const consumedMintRequests = new Set();
-let attestationIndexerCursor = null;
-
-function summarizeAttestationObject(attestationObject) {
-  if (!attestationObject || attestationObject.error) return null;
-  const data = attestationObject.data || {};
-  const content = data.content || {};
-  const fields = content.fields || null;
-  if (!fields || !data.objectId) return null;
-
-  const toNumberOrNull = (value) => {
-    if (value === null || value === undefined) return null;
-    const num = Number(value);
-    return Number.isFinite(num) ? num : null;
-  };
-
-  const issueDateMs = toNumberOrNull(fields.issue_time_ms);
-  const expiryDateMs = toNumberOrNull(fields.expiry_time_ms);
-  const rawStatus = fields.status;
-  const numericStatus = rawStatus !== undefined && rawStatus !== null ? Number(rawStatus) : null;
-  const revoked = Boolean(fields.revoked);
-  let statusCode = Number.isFinite(numericStatus) ? numericStatus : null;
-  let status = null;
-  if (statusCode && STATUS_CODE_TO_NAME[statusCode]) {
-    status = STATUS_CODE_TO_NAME[statusCode];
-  } else if (rawStatus !== undefined && rawStatus !== null) {
-    status = String(rawStatus).toUpperCase();
-  }
-  if (revoked) {
-    status = 'REVOKED';
-    statusCode = STATUS_CODE_REVOKED;
-  }
-  if (!status) {
-    status = 'ACTIVE';
-  }
-  if (!statusCode && STATUS_NAME_TO_CODE[status]) {
-    statusCode = STATUS_NAME_TO_CODE[status];
-  }
-  const statusLabel = status === 'ACTIVE' ? 'Active' : status === 'REVOKED' ? 'Revoked' : status === 'EXPIRED' ? 'Expired' : status;
-  const isExpired = expiryDateMs !== null && Date.now() > expiryDateMs;
-  const isValid = status === 'ACTIVE' && !isExpired;
-  const jurisdictionCode = toNumberOrNull(fields.jurisdiction_code);
-  const verificationLevel = toNumberOrNull(fields.verification_level);
-
-  return {
-    objectId: data.objectId,
-    jurisdictionCode,
-    verificationLevel,
-    issueDateMs,
-    expiryDateMs,
-    status,
-    statusLabel,
-    statusCode,
-    revoked,
-    isValid,
-  };
-}
-
-function summarizeStoredAttestation(walletAddress) {
-  if (!db || typeof db.getAttestationSummaryForWallet !== 'function') return null;
-  const stored = db.getAttestationSummaryForWallet(walletAddress);
-  if (!stored || !stored.record) return null;
-  const statusCode = stored.statusCode ?? (stored.status ? STATUS_NAME_TO_CODE[String(stored.status).toUpperCase()] : null);
-  const status = stored.status ? String(stored.status).toUpperCase() : (statusCode && STATUS_CODE_TO_NAME[statusCode]) || 'ACTIVE';
-  const statusLabel = stored.statusLabel || (status === 'ACTIVE' ? 'Active' : status === 'REVOKED' ? 'Revoked' : status === 'EXPIRED' ? 'Expired' : status);
-  const issueDateMs = stored.issueDateMs ?? null;
-  const expiryDateMs = stored.expiryDateMs ?? null;
-  const isExpired = expiryDateMs !== null && Date.now() > expiryDateMs;
-  const isValid = status === 'ACTIVE' && !isExpired;
-
-  return {
-    objectId: stored.attestationId || null,
-    jurisdictionCode: stored.jurisdictionCode ?? null,
-    verificationLevel: stored.verificationLevel ?? null,
-    issueDateMs,
-    expiryDateMs,
-    status,
-    statusLabel,
-    statusCode: statusCode ?? (STATUS_NAME_TO_CODE[status] || null),
-    revoked: status === 'REVOKED',
-    isValid,
-    source: 'db',
-  };
-}
-
-async function extractAttestationFromChanges(objectChanges) {
-  if (!Array.isArray(objectChanges)) return null;
-  for (const change of objectChanges) {
-    if (!change || typeof change !== 'object') continue;
-    const objectId = change.id || change.objectId || null;
-    if (!objectId) continue;
-    const graphqlObject = await fetchGraphQLObject(objectId);
-    const objectType = graphqlObject?.asMoveObject?.contents?.type?.repr || null;
-    if (!objectType || objectType !== `${PACKAGE_ID}::protocol::Suirify_Attestation`) continue;
-    const summary = summarizeAttestationObject(toLegacyObjectSummary(graphqlObject));
-    if (summary) {
-      return summary;
-    }
+function extractObjectIdFromOwnedEntry(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+  if (typeof entry.objectId === 'string' && entry.objectId) return entry.objectId;
+  if (typeof entry.id === 'string' && entry.id) return entry.id;
+  if (entry.data && typeof entry.data === 'object') {
+    if (typeof entry.data.objectId === 'string' && entry.data.objectId) return entry.data.objectId;
+    if (typeof entry.data.id === 'string' && entry.data.id) return entry.data.id;
   }
   return null;
 }
 
-async function getExistingAttestation(walletAddress) {
-  if (!hasSuiRpcSupport() || !PACKAGE_ID || !walletAddress) return null;
-  try {
-    const ownedObjects = await withSuiClient('attestation.lookup', async (client) => {
-      const typeFilter = `${PACKAGE_ID.trim()}::protocol::Suirify_Attestation`;
-      try {
-        if (client?.core && typeof client.core.getOwnedObjects === 'function') {
-          return await client.core.getOwnedObjects({
-            address: walletAddress,
-            type: typeFilter,
-            limit: 1,
-          });
-        } else if (typeof client.getOwnedObjects === 'function') {
-          const res = await client.getOwnedObjects({
-            owner: walletAddress,
-            filter: { StructType: typeFilter },
-            options: { showContent: false },
-          });
-          return {
-            objects: res.data.map(d => ({ id: d.data?.objectId || d.objectId || d.data?.id || d.id }))
-          };
-        } else {
-          return { objects: [] };
-        }
-      } catch (err) {
-        console.error('getOwnedObjects lookup failed:', err.message);
-        return { objects: [] };
-      }
-    });
+function normalizeOwnedObjectIds(payload) {
+  const candidates = [];
+  if (Array.isArray(payload)) {
+    candidates.push(...payload);
+  } else if (payload && typeof payload === 'object') {
+    if (Array.isArray(payload.objects)) candidates.push(...payload.objects);
+    if (Array.isArray(payload.data)) candidates.push(...payload.data);
+  }
 
-    const firstObject = ownedObjects?.objects?.[0] || null;
-    if (!firstObject || !firstObject.id) return null;
+  const ids = [];
+  const seen = new Set();
+  for (const item of candidates) {
+    const objectId = extractObjectIdFromOwnedEntry(item);
+    if (!objectId || seen.has(objectId)) continue;
+    seen.add(objectId);
+    ids.push(objectId);
+  }
+  return ids;
+}
 
-    const graphqlObject = await fetchGraphQLObject(firstObject.id);
-    const summary = summarizeAttestationObject(toLegacyObjectSummary(graphqlObject));
-    if (!summary) {
-      return {
-        objectId: firstObject.id,
-        jurisdictionCode: null,
-        verificationLevel: null,
-        issueDateMs: null,
-        expiryDateMs: null,
-        status: 'ACTIVE',
-        statusLabel: 'Active',
-        statusCode: STATUS_CODE_ACTIVE,
-        revoked: false,
-        isValid: true,
-        source: 'chain-minimal',
-      };
+async function fetchOwnedAttestationObjectIdsFromClient(client, walletAddress, typeFilter) {
+  if (!client || !walletAddress || !typeFilter) return [];
+
+  if (client?.stateService && typeof client.stateService.listOwnedObjects === 'function') {
+    try {
+      const { response } = await client.stateService.listOwnedObjects({
+        owner: walletAddress,
+        objectType: typeFilter,
+        pageSize: 8,
+      });
+      return normalizeOwnedObjectIds(response?.objects || []);
+    } catch (err) {
+      console.warn('gRPC listOwnedObjects failed:', err && err.message ? err.message : err);
     }
-    return {
-      objectId: summary.objectId,
-      jurisdictionCode: summary.jurisdictionCode,
-      verificationLevel: summary.verificationLevel,
-      issueDateMs: summary.issueDateMs,
-      expiryDateMs: summary.expiryDateMs,
-      status: summary.status,
-      statusLabel: summary.statusLabel,
-      statusCode: summary.statusCode,
-      revoked: summary.revoked,
-      isValid: summary.isValid,
-      source: 'chain',
-    };
+  }
+
+  if (client?.core && typeof client.core.getOwnedObjects === 'function') {
+    try {
+      const response = await client.core.getOwnedObjects({
+        address: walletAddress,
+        objectType: typeFilter,
+        options: { showContent: false },
+        limit: 8,
+      });
+      return normalizeOwnedObjectIds(response);
+    } catch (err) {
+      console.warn('core.getOwnedObjects failed:', err && err.message ? err.message : err);
+    }
+  }
+
+  if (typeof client.getOwnedObjects === 'function') {
+    try {
+      const response = await client.getOwnedObjects({
+        owner: walletAddress,
+        filter: { StructType: typeFilter },
+        options: { showContent: false },
+      });
+      return normalizeOwnedObjectIds(response);
+    } catch (err) {
+      console.warn('getOwnedObjects failed:', err && err.message ? err.message : err);
+    }
+  }
+
+  return [];
+}
+
+async function fetchOwnedAttestationObjectIdsFromGraphQL(walletAddress, typeFilter) {
+  if (!walletAddress || !typeFilter || !SUI_GRAPHQL_CANDIDATES.length) return [];
+  try {
+    const response = await queryGraphQL(OWNED_OBJECTS_QUERY, {
+      owner: walletAddress,
+      type: typeFilter,
+    });
+    const nodes = response?.data?.address?.objects?.nodes || [];
+    return nodes.map((n) => n.address).filter(Boolean);
   } catch (err) {
-    console.error('Failed to load existing attestation for wallet', walletAddress, err);
-    return null;
+    console.warn('GraphQL owned-object lookup failed:', err && err.message ? err.message : err);
+    return [];
   }
 }
 
-async function getLatestPendingMintRequest(walletAddress, limit = 20, preferredRequestId = null) {
-  if (!hasSuiRpcSupport() || !PACKAGE_ID || !walletAddress) return null;
-  try {
-    const normalizedWallet = typeof walletAddress === 'string' ? walletAddress.trim() : walletAddress;
-    if (!normalizedWallet) {
+    const PACKAGE_ID = process.env.PACKAGE_ID ? process.env.PACKAGE_ID.trim() : '' ;
+    const ADMIN_CAP_ID = process.env.ADMIN_CAP_ID ? process.env.ADMIN_CAP_ID.trim() : '';
+    const PROTOCOL_CONFIG_ID = process.env.PROTOCOL_CONFIG_ID ? process.env.PROTOCOL_CONFIG_ID.trim() : '';
+    const ATTESTATION_REGISTRY_ID = process.env.ATTESTATION_REGISTRY_ID ? process.env.ATTESTATION_REGISTRY_ID.trim() : '';
+    const JURISDICTION_POLICY_ID = process.env.JURISDICTION_POLICY_ID;
+    const ADMIN_PRIVATE_KEY = process.env.ADMIN_PRIVATE_KEY || process.env.SPONSOR_PRIVATE_KEY || null;
+    const STATIC_MINT_FEE = process.env.MINT_FEE || null;
+    const BYPASS_FACE_MATCH = process.env.BYPASS_FACE_MATCH === 'true';
+    const ADMIN_API_KEY = process.env.ADMIN_API_KEY || null;
+    const HOST = process.env.HOST || '0.0.0.0';
+    const MIST_PER_SUI = BigInt(1_000_000_000);
+
+    const STATUS_CODE_ACTIVE = 1;
+    const STATUS_CODE_EXPIRED = 2;
+    const STATUS_CODE_REVOKED = 3;
+
+    const STATUS_CODE_TO_NAME = {
+      [STATUS_CODE_ACTIVE]: 'ACTIVE',
+      [STATUS_CODE_EXPIRED]: 'EXPIRED',
+      [STATUS_CODE_REVOKED]: 'REVOKED',
+    };
+
+    const STATUS_NAME_TO_CODE = {
+      ACTIVE: STATUS_CODE_ACTIVE,
+      EXPIRED: STATUS_CODE_EXPIRED,
+      REVOKED: STATUS_CODE_REVOKED,
+    };
+
+    function toBigIntOrNull(value) {
+      if (value === null || value === undefined) return null;
+      try {
+        return BigInt(value);
+      } catch (_err) {
+        return null;
+      }
+    }
+
+    function formatSuiFromMist(mistValue) {
+      try {
+        const mist = BigInt(mistValue);
+        const whole = mist / MIST_PER_SUI;
+        const remainder = mist % MIST_PER_SUI;
+        if (remainder === BigInt(0)) {
+          return whole.toString();
+        }
+        const remainderStr = remainder.toString().padStart(9, '0').replace(/0+$/, '');
+        return `${whole.toString()}.${remainderStr}`;
+      } catch (_err) {
+        return null;
+      }
+    }
+
+    if (BYPASS_FACE_MATCH) {
+      console.warn('Face verification bypass mode enabled — similarity checks will be skipped.');
+    }
+
+    console.log(`Sui network configured: ${SUI_NETWORK} (grpc: ${SUI_GRPC})`);
+
+    let suiClient;
+    let adminKeypair;
+    let activeRpcIndex = 0;
+    const suiClientCache = new Map();
+    const RETRYABLE_RPC_ERROR_CODES = new Set([
+      'UND_ERR_CONNECT_TIMEOUT',
+      'UND_ERR_HEADERS_TIMEOUT',
+      'UND_ERR_SOCKET',
+      'UND_ERR_BODY_TIMEOUT',
+      'UND_ERR_RESPONSE_STATUS_CODE',
+      'UND_ERR_ABORTED',
+      'ECONNRESET',
+      'ECONNREFUSED',
+      'ETIMEDOUT',
+      'EHOSTUNREACH',
+      'ENETUNREACH',
+    ]);
+
+    const ActiveSuiClientCtor = SuiGrpcClient || SuiClient;
+    const hasSuiRpcSupport = () => typeof ActiveSuiClientCtor === 'function' && SUI_RPC_CANDIDATES.length > 0;
+
+    function getSuiSdkModeSummary() {
+      const primary = SuiGrpcClient ? 'grpc' : SuiClient ? 'legacy-rpc' : 'none';
+      const fallback = SuiGraphQLClient && SUI_GRAPHQL_CANDIDATES.length > 0 ? 'graphql-enabled' : 'graphql-disabled';
+      return `primary=${primary}, fallback=${fallback}`;
+    }
+
+    console.log(`Sui SDK mode: ${getSuiSdkModeSummary()}`);
+
+    function getOrCreateSuiClientForUrl(rpcUrl) {
+      if (!rpcUrl || !hasSuiRpcSupport()) return null;
+      if (suiClientCache.has(rpcUrl)) {
+        return suiClientCache.get(rpcUrl);
+      }
+      try {
+        const client = buildSuiClientForUrl(rpcUrl);
+        suiClientCache.set(rpcUrl, client);
+        console.log(`Sui client instantiated (${SuiGrpcClient ? 'grpc' : 'rpc'}=${rpcUrl}).`);
+        return client;
+      } catch (err) {
+        console.error(`Failed to instantiate Sui client for ${rpcUrl}:`, err && err.message ? err.message : err);
+        return null;
+      }
+    }
+
+    const describeRpcError = (error) => {
+      if (!error) return 'unknown error';
+      const parts = [];
+      const root = error.cause || error;
+      if (root.code) parts.push(root.code);
+      if (error.message) {
+        parts.push(error.message);
+      } else if (root.message) {
+        parts.push(root.message);
+      }
+      return parts.length ? parts.join(' — ') : String(error);
+    };
+
+    function isRetryableRpcError(error) {
+      if (!error) return false;
+      const root = error.cause || error;
+      if (root && root.code && RETRYABLE_RPC_ERROR_CODES.has(root.code)) {
+        return true;
+      }
+      const message = (root && root.message ? root.message : error.message || '').toLowerCase();
+      if (!message) return false;
+      return (
+        message.includes('fetch failed') ||
+        message.includes('timeout') ||
+        message.includes('network') ||
+        message.includes('connect') ||
+        message.includes('socket')
+      );
+    }
+
+    async function withSuiClient(operationName, handler) {
+      if (!hasSuiRpcSupport()) {
+        throw new Error('Sui client is not configured.');
+      }
+
+      let lastError = null;
+      const total = SUI_RPC_CANDIDATES.length;
+      for (let offset = 0; offset < total; offset += 1) {
+        const candidateIndex = (activeRpcIndex + offset) % total;
+        const rpcUrl = SUI_RPC_CANDIDATES[candidateIndex];
+        const client = getOrCreateSuiClientForUrl(rpcUrl);
+        if (!client) {
+          lastError = new Error(`Unable to instantiate Sui client for ${rpcUrl}`);
+          continue;
+        }
+        try {
+          const result = await handler(client, rpcUrl);
+          suiClient = client;
+          if (candidateIndex !== activeRpcIndex) {
+            console.log(`Switched active Sui RPC to ${rpcUrl} for ${operationName}.`);
+            activeRpcIndex = candidateIndex;
+          }
+          return result;
+        } catch (err) {
+          lastError = err;
+          if (!isRetryableRpcError(err) || total === 1) {
+            throw err;
+          }
+          console.warn(`[${operationName}] RPC ${rpcUrl} failed (${describeRpcError(err)}). Trying next endpoint...`);
+        }
+      }
+
+      throw lastError || new Error('All configured Sui RPC endpoints failed.');
+    }
+
+    // Instantiate Sui client when available; load admin signer only if provided.
+    try {
+      if (hasSuiRpcSupport()) {
+        const initialClient = getOrCreateSuiClientForUrl(SUI_RPC_CANDIDATES[0]);
+        if (initialClient) {
+          suiClient = initialClient;
+          activeRpcIndex = 0;
+        } else {
+          console.error('Failed to instantiate initial Sui client. Will attempt again on demand.');
+        }
+      } else {
+        console.warn('Sui client constructor not found in @mysten/sui exports. On-chain features disabled.');
+      }
+
+    	if (ADMIN_PRIVATE_KEY) {
+        if (Ed25519Keypair && typeof Ed25519Keypair.fromSecretKey === 'function') {
+          try {
+            const tryLoadAdminKeypair = (rawValue) => {
+              try {
+                return Ed25519Keypair.fromSecretKey(rawValue);
+              } catch (err1) {
+                try {
+                  const decoded = Buffer.from(rawValue, 'base64');
+                  let secretBytes;
+                  if (decoded.length === 33 && decoded[0] === 0) {
+                    secretBytes = decoded.slice(1, 33);
+                  } else if (decoded.length === 64) {
+                    secretBytes = decoded.slice(0, 32);
+                  } else if (decoded.length === 65) {
+                    secretBytes = decoded.slice(1, 33);
+                  } else if (decoded.length >= 32) {
+                    secretBytes = decoded.slice(0, 32);
+                  } else {
+                    secretBytes = decoded;
+                  }
+                  return Ed25519Keypair.fromSecretKey(secretBytes);
+                } catch (err2) {
+                  throw err1;
+                }
+              }
+            };
+            adminKeypair = tryLoadAdminKeypair(ADMIN_PRIVATE_KEY);
+            console.log(`Admin signer loaded: ${adminKeypair.getPublicKey().toSuiAddress()}`);
+          } catch (e) {
+            console.error('Failed to load ADMIN_PRIVATE_KEY. Provide either a sui encoded secret key (suiprivkey...) or a base64 seed.', e);
+            adminKeypair = null;
+          }
+    		} else {
+    			console.warn('ADMIN_PRIVATE_KEY provided but Ed25519Keypair helper not available. On-chain mint finalization disabled.');
+    		}
+    	} else {
+    		console.info('No ADMIN_PRIVATE_KEY provided. Transactions will require manual signing.');
+    	}
+
+    	if (!PACKAGE_ID) {
+    		console.warn('PACKAGE_ID not set. On-chain mint operations will fail until PACKAGE_ID is configured.');
+    	}
+    	if (!ADMIN_CAP_ID || !PROTOCOL_CONFIG_ID || !ATTESTATION_REGISTRY_ID) {
+    		console.warn('One or more protocol env IDs (ADMIN_CAP_ID, PROTOCOL_CONFIG_ID, ATTESTATION_REGISTRY_ID) are not set. Some on-chain calls may fail.');
+    	}
+      if (ADMIN_API_KEY) {
+        console.log('Admin API key configured — admin endpoints enabled.');
+      } else {
+        console.warn('ADMIN_API_KEY not set. Admin maintenance endpoints will be disabled.');
+      }
+    } catch (outerErr) {
+    	console.error('Unexpected error during Sui client / admin initialization:', outerErr);
+    	suiClient = null;
+    	adminKeypair = null;
+    }
+
+    const verificationSessionStore = new Map();
+    const pendingMints = new Map();
+    const consumedMintRequests = new Set();
+    let attestationIndexerCursor = null;
+
+    function summarizeAttestationObject(attestationObject) {
+      if (!attestationObject || attestationObject.error) return null;
+      const data = attestationObject.data || {};
+      const content = data.content || {};
+      const fields = content.fields || null;
+      if (!fields || !data.objectId) return null;
+
+      const toNumberOrNull = (value) => {
+        if (value === null || value === undefined) return null;
+        const num = Number(value);
+        return Number.isFinite(num) ? num : null;
+      };
+
+      const issueDateMs = toNumberOrNull(fields.issue_time_ms);
+      const expiryDateMs = toNumberOrNull(fields.expiry_time_ms);
+      const rawStatus = fields.status;
+      const numericStatus = rawStatus !== undefined && rawStatus !== null ? Number(rawStatus) : null;
+      const revoked = Boolean(fields.revoked);
+      let statusCode = Number.isFinite(numericStatus) ? numericStatus : null;
+      let status = null;
+      if (statusCode && STATUS_CODE_TO_NAME[statusCode]) {
+        status = STATUS_CODE_TO_NAME[statusCode];
+      } else if (rawStatus !== undefined && rawStatus !== null) {
+        status = String(rawStatus).toUpperCase();
+      }
+      if (revoked) {
+        status = 'REVOKED';
+        statusCode = STATUS_CODE_REVOKED;
+      }
+      if (!status) {
+        status = 'ACTIVE';
+      }
+      if (!statusCode && STATUS_NAME_TO_CODE[status]) {
+        statusCode = STATUS_NAME_TO_CODE[status];
+      }
+      const statusLabel = status === 'ACTIVE' ? 'Active' : status === 'REVOKED' ? 'Revoked' : status === 'EXPIRED' ? 'Expired' : status;
+      const isExpired = expiryDateMs !== null && Date.now() > expiryDateMs;
+      const isValid = status === 'ACTIVE' && !isExpired;
+      const jurisdictionCode = toNumberOrNull(fields.jurisdiction_code);
+      const verificationLevel = toNumberOrNull(fields.verification_level);
+
+      return {
+        objectId: data.objectId,
+        jurisdictionCode,
+        verificationLevel,
+        issueDateMs,
+        expiryDateMs,
+        status,
+        statusLabel,
+        statusCode,
+        revoked,
+        isValid,
+      };
+    }
+
+    function summarizeStoredAttestation(walletAddress) {
+      if (!db || typeof db.getAttestationSummaryForWallet !== 'function') return null;
+      const stored = db.getAttestationSummaryForWallet(walletAddress);
+      if (!stored || !stored.record) return null;
+      const statusCode = stored.statusCode ?? (stored.status ? STATUS_NAME_TO_CODE[String(stored.status).toUpperCase()] : null);
+      const status = stored.status ? String(stored.status).toUpperCase() : (statusCode && STATUS_CODE_TO_NAME[statusCode]) || 'ACTIVE';
+      const statusLabel = stored.statusLabel || (status === 'ACTIVE' ? 'Active' : status === 'REVOKED' ? 'Revoked' : status === 'EXPIRED' ? 'Expired' : status);
+      const issueDateMs = stored.issueDateMs ?? null;
+      const expiryDateMs = stored.expiryDateMs ?? null;
+      const isExpired = expiryDateMs !== null && Date.now() > expiryDateMs;
+      const isValid = status === 'ACTIVE' && !isExpired;
+
+      return {
+        objectId: stored.attestationId || null,
+        jurisdictionCode: stored.jurisdictionCode ?? null,
+        verificationLevel: stored.verificationLevel ?? null,
+        issueDateMs,
+        expiryDateMs,
+        status,
+        statusLabel,
+        statusCode: statusCode ?? (STATUS_NAME_TO_CODE[status] || null),
+        revoked: status === 'REVOKED',
+        isValid,
+        source: 'db',
+      };
+    }
+
+    async function extractAttestationFromChanges(objectChanges) {
+      if (!Array.isArray(objectChanges)) return null;
+      for (const change of objectChanges) {
+        if (!change || typeof change !== 'object') continue;
+        const objectId = change.id || change.objectId || null;
+        if (!objectId) continue;
+        const graphqlObject = await fetchGraphQLObject(objectId);
+        const objectType = graphqlObject?.asMoveObject?.contents?.type?.repr || null;
+        if (!objectType || objectType !== `${PACKAGE_ID}::protocol::Suirify_Attestation`) continue;
+        const summary = summarizeAttestationObject(toLegacyObjectSummary(graphqlObject));
+        if (summary) {
+          return summary;
+        }
+      }
       return null;
     }
-    const response = await queryGraphQL(EVENT_QUERY, {
-      type: `${PACKAGE_ID}::protocol::MintRequestCreated`,
-      first: Math.min(Math.max(limit, 1), 100),
-      after: null,
-    });
-    const events = Array.isArray(response?.data?.events?.nodes) ? response.data.events.nodes.slice() : [];
-    events.sort((a, b) => {
-      const aTs = a?.timestamp ? new Date(a.timestamp).getTime() : 0;
-      const bTs = b?.timestamp ? new Date(b.timestamp).getTime() : 0;
-      return bTs - aTs;
-    });
 
-  let fallbackMatch = null;
-  const preferLower = typeof preferredRequestId === 'string' ? preferredRequestId.toLowerCase() : null;
+    async function getExistingAttestation(walletAddress) {
+      if (!hasSuiRpcSupport() || !PACKAGE_ID || !walletAddress) return null;
+      try {
+        const typeFilter = `${PACKAGE_ID.trim()}::protocol::Suirify_Attestation`;
 
-  for (const event of events) {
-      const parsed = event?.contents?.json || {};
-      const requestId = parsed.request_id || parsed.requestId || null;
-      const requester = parsed.requester || parsed.requester_address || parsed.recipient || null;
-      if (!requestId || typeof requestId !== 'string' || !requester) continue;
-  if (requester.toLowerCase() !== normalizedWallet.toLowerCase()) continue;
-      if (isRequestConsumed(requestId)) continue;
+        let ownedObjectIds = [];
+        try {
+          ownedObjectIds = await withSuiClient('attestation.lookup', async (client) => (
+            fetchOwnedAttestationObjectIdsFromClient(client, walletAddress, typeFilter)
+          ));
+        } catch (rpcErr) {
+          console.warn('RPC owned-object lookup failed; trying GraphQL fallback:', rpcErr && rpcErr.message ? rpcErr.message : rpcErr);
+        }
 
-      const digest = event?.transaction?.digest || event?.transactionDigest || event?.digest || null;
-      const eventSeq = event?.sequenceNumber !== undefined ? event.sequenceNumber : null;
+        if (!ownedObjectIds.length) {
+          ownedObjectIds = await fetchOwnedAttestationObjectIdsFromGraphQL(walletAddress, typeFilter);
+        }
 
-      const record = {
-        requestId,
-        requestTxDigest: digest,
-        eventSequence: eventSeq,
-        timestampMs: event?.timestamp || null,
-        requester,
-      };
+        const firstObjectId = ownedObjectIds[0] || null;
+        if (!firstObjectId) return null;
 
-      if (preferLower && requestId.toLowerCase() === preferLower) {
-        return record;
-      }
-
-      if (!fallbackMatch) {
-        fallbackMatch = record;
+        const graphqlObject = await fetchGraphQLObject(firstObjectId);
+        const summary = summarizeAttestationObject(toLegacyObjectSummary(graphqlObject));
+        if (!summary) {
+          return {
+            objectId: firstObjectId,
+            jurisdictionCode: null,
+            verificationLevel: null,
+            issueDateMs: null,
+            expiryDateMs: null,
+            status: 'ACTIVE',
+            statusLabel: 'Active',
+            statusCode: STATUS_CODE_ACTIVE,
+            revoked: false,
+            isValid: true,
+            source: 'chain-minimal',
+          };
+        }
+        return {
+          objectId: summary.objectId,
+          jurisdictionCode: summary.jurisdictionCode,
+          verificationLevel: summary.verificationLevel,
+          issueDateMs: summary.issueDateMs,
+          expiryDateMs: summary.expiryDateMs,
+          status: summary.status,
+          statusLabel: summary.statusLabel,
+          statusCode: summary.statusCode,
+          revoked: summary.revoked,
+          isValid: summary.isValid,
+          source: 'chain',
+        };
+      } catch (err) {
+        console.error('Failed to load existing attestation for wallet', walletAddress, err);
+        return null;
       }
     }
-    if (fallbackMatch) {
-      return fallbackMatch;
-    }
-  } catch (error) {
-    console.error('Failed to lookup pending mint request for wallet', walletAddress, error);
-  }
-  return null;
-}
 
-if (typeof db.getAllConsumedMintRequests === 'function') {
-  try {
-    const existingConsumed = db.getAllConsumedMintRequests();
-    existingConsumed.forEach((entry) => {
-      if (entry && entry.requestId) {
-        consumedMintRequests.add(entry.requestId.toLowerCase());
+    async function getLatestPendingMintRequest(walletAddress, limit = 20, preferredRequestId = null) {
+      if (!hasSuiRpcSupport() || !PACKAGE_ID || !walletAddress) return null;
+      try {
+        const normalizedWallet = typeof walletAddress === 'string' ? walletAddress.trim() : walletAddress;
+        if (!normalizedWallet) {
+          return null;
+        }
+        const response = await queryGraphQL(EVENT_QUERY, {
+          type: `${PACKAGE_ID}::protocol::MintRequestCreated`,
+          first: Math.min(Math.max(limit, 1), 100),
+          after: null,
+        });
+        const events = Array.isArray(response?.data?.events?.nodes) ? response.data.events.nodes.slice() : [];
+        events.sort((a, b) => {
+          const aTs = a?.timestamp ? new Date(a.timestamp).getTime() : 0;
+          const bTs = b?.timestamp ? new Date(b.timestamp).getTime() : 0;
+          return bTs - aTs;
+        });
+
+      let fallbackMatch = null;
+      const preferLower = typeof preferredRequestId === 'string' ? preferredRequestId.toLowerCase() : null;
+
+      for (const event of events) {
+          const parsed = event?.contents?.json || {};
+          const requestId = parsed.request_id || parsed.requestId || null;
+          const requester = parsed.requester || parsed.requester_address || parsed.recipient || null;
+          if (!requestId || typeof requestId !== 'string' || !requester) continue;
+      if (requester.toLowerCase() !== normalizedWallet.toLowerCase()) continue;
+          if (isRequestConsumed(requestId)) continue;
+
+          const digest = event?.transaction?.digest || event?.transactionDigest || event?.digest || null;
+          const eventSeq = event?.sequenceNumber !== undefined ? event.sequenceNumber : null;
+
+          const record = {
+            requestId,
+            requestTxDigest: digest,
+            eventSequence: eventSeq,
+            timestampMs: event?.timestamp || null,
+            requester,
+          };
+
+          if (preferLower && requestId.toLowerCase() === preferLower) {
+            return record;
+          }
+
+          if (!fallbackMatch) {
+            fallbackMatch = record;
+          }
+        }
+        if (fallbackMatch) {
+          return fallbackMatch;
+        }
+      } catch (error) {
+        console.error('Failed to lookup pending mint request for wallet', walletAddress, error);
       }
-    });
-    if (existingConsumed.length) {
-      console.log(`Loaded ${existingConsumed.length} consumed mint request(s) from persistent storage.`);
+      return null;
     }
-  } catch (err) {
-    console.error('Failed to hydrate consumed mint requests from persistent storage:', err);
-  }
-}
+
+    if (typeof db.getAllConsumedMintRequests === 'function') {
+      try {
+        const existingConsumed = db.getAllConsumedMintRequests();
+        existingConsumed.forEach((entry) => {
+          if (entry && entry.requestId) {
+            consumedMintRequests.add(entry.requestId.toLowerCase());
+          }
+        });
+        if (existingConsumed.length) {
+          console.log(`Loaded ${existingConsumed.length} consumed mint request(s) from persistent storage.`);
+        }
+      } catch (_err) {
+        // ignore preload errors
+      }
+    }
 
 const ADMIN_HEADER_KEY = 'x-admin-key';
 
@@ -995,7 +1088,12 @@ app.get('/ready', (req, res) => {
     azureFace: Boolean(AZURE_FACE_KEY)
   };
   const isReady = Object.values(checks).every(Boolean);
-  res.status(isReady ? 200 : 503).json({ ready: isReady, checks, time: Date.now() });
+  res.status(isReady ? 200 : 503).json({
+    ready: isReady,
+    checks,
+    suiSdkMode: getSuiSdkModeSummary(),
+    time: Date.now(),
+  });
 });
 
 /**
@@ -1980,7 +2078,26 @@ async function startIndexer() {
   console.log('Starting event indexer...');
   try {
     try {
-      await queryGraphQL('{ chainIdentifier }', {});
+      const warmupEndpoint = SUI_GRAPHQL_CANDIDATES[0];
+      const warmupRes = await fetch(warmupEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-sui-rpc-version': '1',
+        },
+        body: JSON.stringify({ query: '{ chainIdentifier }' }),
+      });
+
+      if (!warmupRes.ok) {
+        throw new Error(`HTTP ${warmupRes.status}`);
+      }
+
+      const warmupData = await warmupRes.json();
+      if (warmupData?.errors?.length) {
+        throw new Error(warmupData.errors.map((err) => err?.message || String(err)).join('; '));
+      }
+
+      console.log(`GraphQL reachable, chain=${warmupData?.data?.chainIdentifier || 'unknown'}`);
     } catch (warmupErr) {
       console.warn('Indexer disabled: GraphQL is unreachable:', warmupErr && warmupErr.message ? warmupErr.message : warmupErr);
       return;
@@ -2524,4 +2641,4 @@ function shutdown(signal) {
 
 // existing graceful shutdown code (leave unchanged)
 process.on('SIGINT', () => shutdown('SIGINT'));
-process.on('SIGTERM', () => shutdown('SIGTERM'));process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));

@@ -6,6 +6,7 @@ import { STRUCT_ATTESTATION } from "../lib/config";
 import IdentityStatusCard from "./dashboard/IdentityStatusCard.tsx";
 import QuickActionsPanel from "./dashboard/QuickActionsPanel.tsx";
 import { fetchAttestation } from "../lib/apiService";
+import { loadFirstOwnedAttestation } from "../lib/suiOwnedAttestation";
 import type { AttestationSummary } from "../lib/apiService";
 import type { AttestationLike } from "../types/attestation";
 
@@ -57,20 +58,15 @@ const Dashboard: React.FC = () => {
       }
 
       try {
-        const attestations = await client.getOwnedObjects({
-          owner: account.address,
-          filter: { StructType: STRUCT_ATTESTATION },
-          options: { showContent: true },
-        });
-        if (attestations.data.length > 0) {
-          const first = attestations.data[0];
-          if (first && !first.error) {
-            setAttestation(first as AttestationLike);
-            backendHasAttestation = true;
-            setLoading(false);
-          } else if (!backendHasAttestation) {
-            setAttestation(null);
-          }
+        const first = await loadFirstOwnedAttestation(
+          client as any,
+          account.address,
+          STRUCT_ATTESTATION,
+        );
+        if (first && !("error" in (first as Record<string, unknown>))) {
+          setAttestation(first as unknown as AttestationLike);
+          backendHasAttestation = true;
+          setLoading(false);
         } else if (!backendHasAttestation) {
           setAttestation(null);
         }
