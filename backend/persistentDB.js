@@ -477,6 +477,86 @@ class PersistentDB {
     };
     return result;
   }
+
+  // Attestation status tracking (pending_confirmation → confirmed → indexed)
+  // This ensures attestations persist immediately after on-chain execution,
+  // not just when the event indexer processes the event.
+
+  _attestationStatusKey(attestationId) {
+    if (!attestationId) return null;
+    return `attestationStatus:${String(attestationId).toLowerCase()}`;
+  }
+
+  recordAttestationMinted(attestationId, metadata = {}) {
+    const key = this._attestationStatusKey(attestationId);
+    if (!key) return null;
+    const now = nowIso();
+    const existing = this.get(key) || null;
+    const sanitizedMeta = this._sanitizeGovMetadata(metadata);
+
+    const record = existing ? Object.assign({}, existing) : {
+      attestationId: String(attestationId),
+      createdAt: now,
+      status: 'pending_confirmation',
+      confirmations: [],
+    };
+
+    record.status = sanitizedMeta.status || record.status;
+    record.lastUpdatedAt = now;
+    if (!Array.isArray(record.confirmations)) record.confirmations = [];
+    record.confirmations.push({
+      timestamp: now,
+      status: sanitizedMeta.status || 'recorded',
+      source: sanitizedMeta.source || 'backend',
+      ...sanitizedMeta,
+    });
+
+    if (record.confirmations.length > 50) {
+      record.confirmations = record.confirmations.slice(-50);
+    }
+
+    this.data[key] = record;
+    this._appendLog('attestation.minted', {
+      attestationId,
+      walletAddress: sanitizedMeta.walletAddress || null,
+      eventType: 'minted',
+      source: sanitizedMeta.source || null,
+    });
+    this.save();
+    return record;
+  }
+
+  getAttestationStatus(attestationId) {
+    const key = this._attestationStatusKey(attestationId);
+    if (!key) return null;
+    return this.get(key);
+  }
+
+  updateAttestationStatus(attestationId, newStatus, metadata = {}) {
+    const key = this._attestationStatusKey(attestationId);
+    if (!key) return null;
+    const now = nowIso();
+    const record = this.get(key);
+    if (!record) return null;
+
+    record.status = newStatus;
+    record.lastUpdatedAt = now;
+    if (!Array.isArray(record.confirmations)) record.confirmations = [];
+    record.confirmations.push({
+      timestamp: now,
+      status: newStatus,
+      source: metadata.source || 'backend',
+      ...metadata,
+    });
+
+    if (record.confirmations.length > 50) {
+      record.confirmations = record.confirmations.slice(-50);
+    }
+
+    this.data[key] = record;
+    this.save();
+    return record;
+  }
 }
 
 module.exports = new PersistentDB();

@@ -1358,6 +1358,31 @@ app.post('/finalize-mint', async (req, res) => {
     const attestationSummary = extractAttestationFromChanges(executionResult?.objectChanges);
     const attestationObjectId = attestationSummary?.objectId || null;
 
+    // CRITICAL FIX: Persist attestation immediately after on-chain execution.
+    // This ensures attestations are in the DB even if event indexer fails.
+    // Mark as "pending_confirmation" until event indexer validates.
+    try {
+      if (attestationObjectId) {
+        db.recordAttestationMinted(attestationObjectId, {
+          walletAddress: userWalletAddress,
+          requestId,
+          finalizeDigest: digest,
+          recordedAt: new Date().toISOString(),
+          eventType: 'mint-finalized',
+          source: 'finalize-handler',
+          status: 'pending_confirmation',
+          statusCode: attestationSummary?.statusCode ?? null,
+          statusLabel: attestationSummary?.statusLabel || null,
+          jurisdictionCode: attestationSummary?.jurisdictionCode ?? null,
+          verificationLevel: attestationSummary?.verificationLevel ?? null,
+          issueDateMs: attestationSummary?.issueDateMs ?? null,
+          expiryDateMs: attestationSummary?.expiryDateMs ?? null,
+        });
+      }
+    } catch (recordErr) {
+      console.error('Failed to record attestation immediately after mint:', recordErr);
+    }
+
     if (requestId && typeof requestId === 'string') {
       markRequestConsumed(requestId, {
         finalizedAt: new Date().toISOString(),
@@ -1479,6 +1504,23 @@ async function startIndexer() {
               recipient,
             });
           }
+
+          const attestationIdFromEvent = attestationObjectIdFromEvent || null;
+
+          // Update attestation status from "pending_confirmation" to "confirmed"
+          if (attestationIdFromEvent) {
+            try {
+              db.updateAttestationStatus(attestationIdFromEvent, 'confirmed', {
+                walletAddress: recipient,
+                source: 'event-indexer',
+                indexedAt: new Date().toISOString(),
+                eventType: 'indexer-confirmed',
+              });
+            } catch (statusErr) {
+              console.error('Failed to update attestation status to confirmed:', statusErr);
+            }
+          }
+
           if (!recipient) return;
 
           const pendingMint = pendingMints.get(recipient);
@@ -1491,7 +1533,7 @@ async function startIndexer() {
                 console.error('Indexer failed to load attestation summary:', summaryErr);
               }
             }
-            const attestationIdFromSummary = attSummary?.objectId || pendingMint.attestationId || attestationObjectIdFromEvent || null;
+            const attestationIdFromSummary = attSummary?.objectId || pendingMint.attestationId || attestationIdFromEvent || null;
             try {
               const record = db.markUsedGovId(
                 pendingMint.country,
@@ -1517,9 +1559,9 @@ async function startIndexer() {
                 )
               );
               if (record && record.idHash) {
-                console.log(`✅ SUCCESS: Recorded attestation for wallet ${recipient} (country=${pendingMint.country}, idHash=${record.idHash.slice(0, 12)}…).`);
+                console.log(`✅ SUCCESS: Indexed attestation for wallet ${recipient} (country=${pendingMint.country}, idHash=${record.idHash.slice(0, 12)}…).`);
               } else {
-                console.log(`✅ SUCCESS: Recorded attestation for wallet ${recipient} (country=${pendingMint.country}).`);
+                console.log(`✅ SUCCESS: Indexed attestation for wallet ${recipient} (country=${pendingMint.country}).`);
               }
             } catch (e) {
               console.error('Failed to mark gov id as used in persistent DB:', e);
