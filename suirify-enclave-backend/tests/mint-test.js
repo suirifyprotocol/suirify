@@ -2,6 +2,12 @@
 require('dotenv').config({ path: 'test.env' });
 const axios = require('axios');
 const { getFullnodeUrl, SuiClient } = require('@mysten/sui/client');
+let SuiGrpcClient = null;
+try {
+    ({ SuiGrpcClient } = require('@mysten/sui/grpc'));
+} catch (_e) {
+    SuiGrpcClient = null;
+}
 const { Ed25519Keypair } = require('@mysten/sui/keypairs/ed25519');
 const { decodeSuiPrivateKey } = require('@mysten/sui/cryptography');
 const { Transaction } = require('@mysten/sui/transactions');
@@ -15,8 +21,12 @@ if (!USER_PRIVATE_KEY) {
     process.exit(1);
 }
 
-// Setup Sui Client
-const client = new SuiClient({ url: getFullnodeUrl('testnet') });
+// Setup Sui client (gRPC first, then legacy JSON-RPC client fallback)
+const network = process.env.SUI_NETWORK || 'testnet';
+const grpcUrl = process.env.SUI_GRPC || process.env.SUI_RPC || getFullnodeUrl(network);
+const client = SuiGrpcClient
+    ? new SuiGrpcClient({ baseUrl: grpcUrl, network })
+    : new SuiClient({ url: grpcUrl });
 
 // Load keypair
 let keypair;

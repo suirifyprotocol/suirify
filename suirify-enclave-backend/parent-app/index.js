@@ -75,6 +75,10 @@ try {
 
 // Replace placeholder vars with actual resolution from installed sui package (with fallback)
 let SuiClient = null;
+let SuiGrpcClient = null;
+let SuiGraphQLClient = null;
+let GrpcTransport = null;
+let ChannelCredentials = null;
 let getFullnodeUrl = null;
 let TransactionBlock = null;
 let Ed25519Keypair = null;
@@ -111,7 +115,25 @@ function normalizeTransactionBlockModule(mod) {
 }
 
 try {
+  ({ GrpcTransport } = require('@protobuf-ts/grpc-transport'));
+  ({ ChannelCredentials } = require('@grpc/grpc-js'));
+} catch (_e) {
+  GrpcTransport = null;
+  ChannelCredentials = null;
+}
+
+try {
   const sui = require('@mysten/sui');
+  try {
+    ({ SuiGrpcClient } = require('@mysten/sui/grpc'));
+  } catch (_e) {
+    SuiGrpcClient = null;
+  }
+  try {
+    ({ SuiGraphQLClient } = require('@mysten/sui/graphql'));
+  } catch (_e) {
+    SuiGraphQLClient = null;
+  }
   SuiClient = sui.SuiClient || (sui.client && sui.client.SuiClient) || null;
   getFullnodeUrl = sui.getFullnodeUrl || (sui.client && sui.client.getFullnodeUrl) || null;
   WebsocketClient = sui.WebsocketClient || (sui.client && sui.client.WebsocketClient) || null;
@@ -125,6 +147,16 @@ try {
 } catch (e1) {
   try {
     ({ SuiClient, getFullnodeUrl, WebsocketClient } = require('@mysten/sui/client'));
+    try {
+      ({ SuiGrpcClient } = require('@mysten/sui/grpc'));
+    } catch (_e) {
+      SuiGrpcClient = null;
+    }
+    try {
+      ({ SuiGraphQLClient } = require('@mysten/sui/graphql'));
+    } catch (_e) {
+      SuiGraphQLClient = null;
+    }
     const transactionsModule = require('@mysten/sui/transactions');
     TransactionBlock =
       transactionsModule.TransactionBlock ||
@@ -188,18 +220,50 @@ app.use((req, res, next) => {
 
 app.get('/health', (req, res) => res.json({ ok: true, time: Date.now() }));
 
-// compute SUI_RPC now that getFullnodeUrl may be defined
+// compute SUI_GRPC now that getFullnodeUrl may be defined
 const PORT = process.env.PORT || 4000;
 const SECRET_PEPPER = process.env.SECRET_PEPPER || '';
 const SUI_NETWORK = process.env.SUI_NETWORK || 'testnet';
-const DEFAULT_RPC_BY_NETWORK = {
+const DEFAULT_GRPC_BY_NETWORK = {
   devnet: 'https://fullnode.devnet.sui.io:443',
   testnet: 'https://fullnode.testnet.sui.io:443',
   mainnet: 'https://fullnode.mainnet.sui.io:443',
   localnet: 'http://127.0.0.1:9000',
 };
-const networkFallbackRpc = DEFAULT_RPC_BY_NETWORK[SUI_NETWORK] || DEFAULT_RPC_BY_NETWORK.testnet;
-const SUI_RPC = process.env.SUI_RPC || (typeof getFullnodeUrl === 'function' ? getFullnodeUrl(SUI_NETWORK) : networkFallbackRpc);
+const networkFallbackGrpc = DEFAULT_GRPC_BY_NETWORK[SUI_NETWORK] || DEFAULT_GRPC_BY_NETWORK.testnet;
+const SUI_GRPC = process.env.SUI_GRPC || process.env.SUI_RPC || (typeof getFullnodeUrl === 'function' ? getFullnodeUrl(SUI_NETWORK) : networkFallbackGrpc);
+const DEFAULT_GRAPHQL_BY_NETWORK = {
+  devnet: '',
+  testnet: '',
+  mainnet: '',
+  localnet: 'http://127.0.0.1:9125/graphql',
+};
+
+const parseEndpointList = (value) => {
+  if (!value || typeof value !== 'string') return [];
+  return value
+    .split(/[\n,\s]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+};
+
+const dedupeEndpointList = (entries) => {
+  const seen = new Set();
+  const result = [];
+  for (const entry of entries) {
+    if (!entry || seen.has(entry)) continue;
+    seen.add(entry);
+    result.push(entry);
+  }
+  return result;
+};
+
+const configuredGraphql = parseEndpointList(
+  process.env.SUI_GRAPHQL || process.env.SUI_GRAPHQL_RPC || process.env.SUI_GRAPHQL_LIST || ''
+);
+const networkDefaultGraphql = DEFAULT_GRAPHQL_BY_NETWORK[SUI_NETWORK] || '';
+const SUI_GRAPHQL_CANDIDATES = dedupeEndpointList([...configuredGraphql, networkDefaultGraphql]);
+const SUI_GRAPHQL = SUI_GRAPHQL_CANDIDATES[0] || '';
 const deriveWebsocketUrl = (rpcUrl) => {
   if (!rpcUrl) return null;
   if (/^wss?:\/\//i.test(rpcUrl)) return rpcUrl;
@@ -208,7 +272,7 @@ const deriveWebsocketUrl = (rpcUrl) => {
   }
   return null;
 };
-const SUI_RPC_WS = process.env.SUI_RPC_WS || deriveWebsocketUrl(SUI_RPC);
+const SUI_RPC_WS = process.env.SUI_RPC_WS || deriveWebsocketUrl(SUI_GRPC);
 const PACKAGE_ID = process.env.PACKAGE_ID;
 const ADMIN_CAP_ID = process.env.ADMIN_CAP_ID;
 const PROTOCOL_CONFIG_ID = process.env.PROTOCOL_CONFIG_ID;
@@ -273,10 +337,138 @@ if (BYPASS_FACE_MATCH) {
   console.warn('Face verification bypass mode enabled — similarity checks will be skipped.');
 }
 
-console.log(`Sui network configured: ${SUI_NETWORK} (rpc: ${SUI_RPC})`);
+console.log(`Sui network configured: ${SUI_NETWORK} (grpc: ${SUI_GRPC})`);
+console.log(`Sui GraphQL endpoints: ${SUI_GRAPHQL_CANDIDATES.length ? SUI_GRAPHQL_CANDIDATES.join(', ') : 'not configured'}`);
 
 let suiClient;
 let adminKeypair; // This is the SPONSOR/ADMIN keypair, NOT the enclave's keypair.
+let graphqlClient = null;
+let attestationIndexerCursor = null;
+let activeGraphqlIndex = 0;
+
+function buildNativeGrpcTransport(rpcUrl) {
+  if (!GrpcTransport || !ChannelCredentials || !rpcUrl) return null;
+  try {
+    const parsed = new URL(rpcUrl);
+    return new GrpcTransport({
+      host: parsed.host,
+      channelCredentials: parsed.protocol === 'https:' ? ChannelCredentials.createSsl() : ChannelCredentials.createInsecure(),
+    });
+  } catch (_err) {
+    return null;
+  }
+}
+
+function getCoreClient(client) {
+  if (!client) return null;
+  return client.core && typeof client.core === 'object' ? client.core : null;
+}
+
+async function queryGraphQL(query, variables = {}) {
+  if (!SUI_GRAPHQL_CANDIDATES.length) {
+    throw new Error('GraphQL endpoint is not configured. Set SUI_GRAPHQL or SUI_GRAPHQL_LIST in env.');
+  }
+
+  let lastError = null;
+  const total = SUI_GRAPHQL_CANDIDATES.length;
+  const axios = require('axios');
+
+  for (let offset = 0; offset < total; offset += 1) {
+    const idx = (activeGraphqlIndex + offset) % total;
+    const endpoint = SUI_GRAPHQL_CANDIDATES[idx];
+
+    try {
+      if (!graphqlClient && SuiGraphQLClient) {
+        graphqlClient = new SuiGraphQLClient({ url: endpoint, network: SUI_NETWORK });
+      }
+
+      let body;
+      if (graphqlClient && typeof graphqlClient.query === 'function') {
+        body = await graphqlClient.query({ query, variables });
+      } else {
+        const response = await axios.post(endpoint, { query, variables }, { headers: { 'Content-Type': 'application/json' } });
+        body = response && response.data ? response.data : null;
+      }
+
+      if (!body) {
+        throw new Error('Empty GraphQL response.');
+      }
+      if (body.errors && body.errors.length) {
+        throw new Error(body.errors.map((err) => err.message).join('; '));
+      }
+
+      if (idx !== activeGraphqlIndex) {
+        activeGraphqlIndex = idx;
+        graphqlClient = SuiGraphQLClient ? new SuiGraphQLClient({ url: endpoint, network: SUI_NETWORK }) : null;
+        console.warn(`Switched active GraphQL endpoint to ${endpoint}`);
+      }
+
+      return body;
+    } catch (err) {
+      lastError = err;
+      graphqlClient = null;
+    }
+  }
+
+  throw lastError || new Error('All configured GraphQL endpoints failed.');
+}
+
+const OBJECT_QUERY = `
+  query ObjectByAddress($id: SuiAddress!) {
+    object(address: $id) {
+      address
+      version
+      digest
+      asMoveObject {
+        contents {
+          json
+          bcs
+          type { repr }
+        }
+      }
+    }
+  }
+`;
+
+const EVENT_QUERY = `
+  query EventsByType($type: String, $first: Int, $after: String) {
+    events(first: $first, after: $after, filter: { type: $type }) {
+      pageInfo { hasNextPage endCursor }
+      nodes {
+        sequenceNumber
+        timestamp
+        sender { address }
+        transaction { digest }
+        contents { json bcs type { repr } }
+      }
+    }
+  }
+`;
+
+async function fetchGraphQLObject(objectId) {
+  if (!objectId) return null;
+  try {
+    const response = await queryGraphQL(OBJECT_QUERY, { id: objectId });
+    return response?.data?.object || null;
+  } catch (_err) {
+    return null;
+  }
+}
+
+function toLegacyObjectSummary(graphqlObject) {
+  if (!graphqlObject) return null;
+  const fields = graphqlObject?.asMoveObject?.contents?.json || null;
+  return {
+    data: {
+      objectId: graphqlObject.address || null,
+      content: { fields },
+    },
+  };
+}
+
+function getMoveObjectFields(objectNode) {
+  return objectNode?.asMoveObject?.contents?.json || null;
+}
 
 const buildWebsocketClient = () => {
   if (!WebsocketClient || typeof WebsocketClient !== 'function') return null;
@@ -292,15 +484,19 @@ const buildWebsocketClient = () => {
 
 // Instantiate Sui client when available; load admin signer only if provided.
 try {
-	if (typeof SuiClient === 'function') {
+  const ActiveSuiClientCtor = SuiGrpcClient || SuiClient;
+  if (typeof ActiveSuiClientCtor === 'function') {
 		try {
-      const clientOptions = { url: SUI_RPC };
+			const nativeTransport = SuiGrpcClient ? buildNativeGrpcTransport(SUI_GRPC) : null;
+			const clientOptions = SuiGrpcClient
+			  ? (nativeTransport ? { network: SUI_NETWORK, transport: nativeTransport } : { baseUrl: SUI_GRPC, network: SUI_NETWORK })
+			  : { url: SUI_GRPC };
       const websocketClientInstance = buildWebsocketClient();
       if (websocketClientInstance) {
         clientOptions.websocketClient = websocketClientInstance;
       }
-      suiClient = new SuiClient(clientOptions);
-      console.log(`Sui client instantiated (rpc=${SUI_RPC}${websocketClientInstance ? `, ws=${SUI_RPC_WS}` : ''}).`);
+      suiClient = new ActiveSuiClientCtor(clientOptions);
+      console.log(`Sui client instantiated (${SuiGrpcClient ? 'grpc' : 'rpc'}=${SUI_GRPC}${websocketClientInstance ? `, ws=${SUI_RPC_WS}` : ''}).`);
 		} catch (e) {
 			console.error('Failed to instantiate SuiClient:', e);
 			suiClient = null;
@@ -452,17 +648,16 @@ function summarizeStoredAttestation(walletAddress) {
   };
 }
 
-function extractAttestationFromChanges(objectChanges) {
+async function extractAttestationFromChanges(objectChanges) {
   if (!Array.isArray(objectChanges)) return null;
   for (const change of objectChanges) {
     if (!change || typeof change !== 'object') continue;
-    if (change.type !== 'created' && change.type !== 'mutated') continue;
-    const objectType = change.objectType || change.type_ || null;
+    const objectId = change.id || change.objectId || null;
+    if (!objectId) continue;
+    const graphqlObject = await fetchGraphQLObject(objectId);
+    const objectType = graphqlObject?.asMoveObject?.contents?.type?.repr || null;
     if (!objectType || objectType !== `${PACKAGE_ID}::protocol::Suirify_Attestation`) continue;
-    const fields = change.objectFields || change.fields || (change.content && change.content.fields) || null;
-    if (!fields) continue;
-    const objectId = change.objectId || (change.reference && change.reference.objectId) || null;
-    const summary = summarizeAttestationObject({ data: { objectId, content: { fields } } });
+    const summary = summarizeAttestationObject(toLegacyObjectSummary(graphqlObject));
     if (summary) {
       return summary;
     }
@@ -473,23 +668,44 @@ function extractAttestationFromChanges(objectChanges) {
 async function getExistingAttestation(walletAddress) {
   if (!suiClient || !PACKAGE_ID || !walletAddress) return null;
   try {
-    const ownedObjects = await suiClient.getOwnedObjects({
-      owner: walletAddress,
-      filter: { StructType: `${PACKAGE_ID}::protocol::Suirify_Attestation` },
-      options: { showContent: true },
+    const coreClient = getCoreClient(suiClient);
+    if (!coreClient || typeof coreClient.getOwnedObjects !== 'function') return null;
+    const ownedObjects = await coreClient.getOwnedObjects({
+      address: walletAddress,
+      type: `${PACKAGE_ID}::protocol::Suirify_Attestation`,
+      limit: 1,
     });
-    const attestationObject = ownedObjects?.data?.find((obj) => obj && !obj.error);
-    const summary = summarizeAttestationObject(attestationObject);
-    if (!summary) return null;
+    const firstObject = ownedObjects?.objects?.[0] || null;
+    if (!firstObject || !firstObject.id) return null;
+    const graphqlObject = await fetchGraphQLObject(firstObject.id);
+    const summary = summarizeAttestationObject(toLegacyObjectSummary(graphqlObject));
+    if (!summary) {
+      return {
+        objectId: firstObject.id,
+        jurisdictionCode: null,
+        verificationLevel: null,
+        issueDateMs: null,
+        expiryDateMs: null,
+        status: 'ACTIVE',
+        statusLabel: 'Active',
+        statusCode: STATUS_CODE_ACTIVE,
+        revoked: false,
+        isValid: true,
+        source: 'chain-minimal',
+      };
+    }
     return {
       objectId: summary.objectId,
       jurisdictionCode: summary.jurisdictionCode,
       verificationLevel: summary.verificationLevel,
       issueDateMs: summary.issueDateMs,
       expiryDateMs: summary.expiryDateMs,
-      status: summary.statusLabel,
-      statusCode: summary.status,
+      status: summary.status,
+      statusLabel: summary.statusLabel,
+      statusCode: summary.statusCode,
+      revoked: summary.revoked,
       isValid: summary.isValid,
+      source: 'chain',
     };
   } catch (err) {
     console.error('Failed to load existing attestation for wallet', walletAddress, err);
@@ -504,13 +720,15 @@ async function getLatestPendingMintRequest(walletAddress, limit = 20, preferredR
     if (!normalizedWallet) {
       return null;
     }
-    const filter = { MoveEventType: `${PACKAGE_ID}::protocol::MintRequestCreated` };
-
-    const response = await suiClient.queryEvents({ query: filter, limit });
-    const events = Array.isArray(response?.data) ? response.data.slice() : [];
+    const response = await queryGraphQL(EVENT_QUERY, {
+      type: `${PACKAGE_ID}::protocol::MintRequestCreated`,
+      first: Math.min(Math.max(limit, 1), 100),
+      after: null,
+    });
+    const events = Array.isArray(response?.data?.events?.nodes) ? response.data.events.nodes.slice() : [];
     events.sort((a, b) => {
-      const aTs = a?.timestampMs ? Number(a.timestampMs) : 0;
-      const bTs = b?.timestampMs ? Number(b.timestampMs) : 0;
+      const aTs = a?.timestamp ? new Date(a.timestamp).getTime() : 0;
+      const bTs = b?.timestamp ? new Date(b.timestamp).getTime() : 0;
       return bTs - aTs;
     });
 
@@ -518,21 +736,21 @@ async function getLatestPendingMintRequest(walletAddress, limit = 20, preferredR
   const preferLower = typeof preferredRequestId === 'string' ? preferredRequestId.toLowerCase() : null;
 
   for (const event of events) {
-      const parsed = event?.parsedJson || {};
+      const parsed = event?.contents?.json || {};
       const requestId = parsed.request_id || parsed.requestId || null;
-      const requester = parsed.requester || parsed.requester_address || null;
+      const requester = parsed.requester || parsed.requester_address || parsed.recipient || null;
       if (!requestId || typeof requestId !== 'string' || !requester) continue;
   if (requester.toLowerCase() !== normalizedWallet.toLowerCase()) continue;
       if (isRequestConsumed(requestId)) continue;
 
-      const digest = (event?.id && event.id.txDigest) || event?.txDigest || event?.transactionDigest || event?.digest || null;
-      const eventSeq = event?.id && event.id.eventSeq !== undefined ? event.id.eventSeq : null;
+      const digest = event?.transaction?.digest || event?.transactionDigest || event?.digest || null;
+      const eventSeq = event?.sequenceNumber !== undefined ? event.sequenceNumber : null;
 
       const record = {
         requestId,
         requestTxDigest: digest,
         eventSequence: eventSeq,
-        timestampMs: event?.timestampMs || null,
+        timestampMs: event?.timestamp || null,
         requester,
       };
 
@@ -797,72 +1015,64 @@ app.get('/attestation/:walletAddress', async (req, res) => {
   const { walletAddress } = req.params;
   
   try {
-    // Fetch from Blockchain (The Source of Truth)
-    const ownedObjects = await suiClient.getOwnedObjects({
-      owner: walletAddress,
-      filter: { StructType: `${PACKAGE_ID}::protocol::Suirify_Attestation` },
-      options: { showContent: true },
-    });
-    
-    // Extract valid object from chain response
-    const chainObject = ownedObjects.data.find((obj) => !obj.error);
-    const chainSummary = summarizeAttestationObject(chainObject);
+    const toIsoOrNull = (ms) => {
+      if (ms === null || ms === undefined) return null;
+      const date = new Date(ms);
+      return Number.isNaN(date.getTime()) ? null : date.toISOString();
+    };
 
-    // Fetch from Local DB
+    // Chain is the source of truth for attestation discovery.
+    // DB is only used for fallback/enrichment when chain metadata is partial.
+    const chainSummary = await getExistingAttestation(walletAddress);
     const dbSummary = summarizeStoredAttestation(walletAddress);
 
-    // Helper for ISO dates
-    const toIsoOrNull = (ms) => (ms ? new Date(ms).toISOString() : null);
-
-    // Found on Blockchain. 
-    // Return Chain data immediately (it supersedes DB).
-    if (chainSummary) {
-      const dashboardData = {
-        objectId: chainSummary.objectId,
-        jurisdictionCode: chainSummary.jurisdictionCode,
-        verificationLevel: chainSummary.verificationLevel,
-        issueDate: toIsoOrNull(chainSummary.issueDateMs),
-        expiryDate: toIsoOrNull(chainSummary.expiryDateMs),
-        status: chainSummary.statusLabel,
-        statusCode: chainSummary.status,
-        revoked: chainSummary.revoked,
+    if (chainSummary && chainSummary.objectId) {
+      const mergedSummary = {
+        ...chainSummary,
+        jurisdictionCode: chainSummary.jurisdictionCode ?? dbSummary?.jurisdictionCode ?? null,
+        verificationLevel: chainSummary.verificationLevel ?? dbSummary?.verificationLevel ?? null,
+        issueDateMs: chainSummary.issueDateMs ?? dbSummary?.issueDateMs ?? null,
+        expiryDateMs: chainSummary.expiryDateMs ?? dbSummary?.expiryDateMs ?? null,
       };
-      return res.json({ 
-        hasAttestation: true, 
-        isValid: chainSummary.isValid, 
-        data: dashboardData, 
-        source: 'chain' 
+
+      const dashboardData = {
+        objectId: mergedSummary.objectId,
+        jurisdictionCode: mergedSummary.jurisdictionCode,
+        verificationLevel: mergedSummary.verificationLevel,
+        issueDate: toIsoOrNull(mergedSummary.issueDateMs),
+        expiryDate: toIsoOrNull(mergedSummary.expiryDateMs),
+        status: mergedSummary.statusLabel || mergedSummary.status,
+        statusCode: mergedSummary.statusCode,
+        revoked: Boolean(mergedSummary.revoked),
+      };
+      return res.json({
+        hasAttestation: true,
+        isValid: Boolean(mergedSummary.isValid),
+        data: dashboardData,
+        source: mergedSummary.source || 'chain',
       });
     }
 
-    // Not on Blockchain, but DB says "Yes".
-    // We must verify: Does the user ACTUALLY own the Object ID stored in the DB?
     if (dbSummary && dbSummary.objectId) {
-      
-      // Check if the object ID from DB exists in the list of objects we just fetched from chain
-      const isDbIdActuallyOwned = ownedObjects.data.some(
-        (obj) => obj.data && obj.data.objectId === dbSummary.objectId
-      );
-
-      if (isDbIdActuallyOwned) {
-        // The user owns it, but maybe our chain summarizer missed it (edge case). 
-        // We trust the DB here because the Chain confirmed ownership of the ID.
-        return res.json({ 
-          hasAttestation: true, 
-          isValid: dbSummary.isValid, 
-          data: dbSummary, 
-          source: 'db' 
-        });
-      } else {
-        // The DB says "Minted (ID: X)", but the Chain says "User does not own ID X".
-        // This implies the previous transaction failed or was reverted.
-        // We treat this as NO ATTESTATION so the user can try again.
-        console.warn(`DB mismatch for ${walletAddress}: DB claims object ${dbSummary.objectId}, but Chain does not see it. Treating as empty.`);
-      }
+      const dashboardData = {
+        objectId: dbSummary.objectId,
+        jurisdictionCode: dbSummary.jurisdictionCode,
+        verificationLevel: dbSummary.verificationLevel,
+        issueDate: toIsoOrNull(dbSummary.issueDateMs),
+        expiryDate: toIsoOrNull(dbSummary.expiryDateMs),
+        status: dbSummary.statusLabel || dbSummary.status,
+        statusCode: dbSummary.statusCode,
+        revoked: Boolean(dbSummary.revoked),
+      };
+      return res.json({
+        hasAttestation: true,
+        isValid: Boolean(dbSummary.isValid),
+        data: dashboardData,
+        source: 'db-fallback',
+      });
     }
 
-    // Not on Chain, Not in DB (or DB was stale).
-    res.json({ hasAttestation: false, isValid: false, data: null });
+    return res.json({ hasAttestation: false, isValid: false, data: null, source: 'none' });
 
   } catch (error) {
     console.error(`Error fetching attestation for ${req.params.walletAddress}:`, error);
@@ -1010,8 +1220,8 @@ app.get('/mint-config', async (_req, res) => {
 
   if (PROTOCOL_CONFIG_ID) {
     try {
-      const configObject = await suiClient.getObject({ id: PROTOCOL_CONFIG_ID, options: { showContent: true } });
-      const fields = configObject?.data?.content?.fields;
+      const configObject = await fetchGraphQLObject(PROTOCOL_CONFIG_ID);
+      const fields = getMoveObjectFields(configObject);
       if (fields) {
         if (fields.mint_fee !== undefined && fields.mint_fee !== null) {
           chainMintFee = toBigIntOrNull(fields.mint_fee);
@@ -1134,17 +1344,21 @@ app.get('/admin/mint-requests', requireAdmin, async (req, res) => {
   }
 
   try {
-  const response = await suiClient.queryEvents({ query, limit, cursor: cursorParam });
-    const events = Array.isArray(response?.data) ? response.data : [];
+    const response = await queryGraphQL(EVENT_QUERY, {
+      type: `${PACKAGE_ID}::protocol::MintRequestCreated`,
+      first: limit,
+      after: typeof req.query.cursor === 'string' && req.query.cursor.length ? req.query.cursor : null,
+    });
+    const events = Array.isArray(response?.data?.events?.nodes) ? response.data.events.nodes : [];
     const items = [];
 
     for (const event of events) {
-      const parsed = event?.parsedJson || {};
+      const parsed = event?.contents?.json || {};
       const requestId = parsed.request_id || parsed.requestId || null;
       const requester = parsed.requester || parsed.requester_address || null;
-      const txDigest = (event?.id && event.id.txDigest) || event?.txDigest || event?.transactionDigest || event?.digest || null;
-      const eventSeq = event?.id && event.id.eventSeq !== undefined ? event.id.eventSeq : null;
-      const timestampMs = event?.timestampMs || null;
+      const txDigest = event?.transaction?.digest || event?.transactionDigest || event?.digest || null;
+      const eventSeq = event?.sequenceNumber !== undefined ? event.sequenceNumber : null;
+      const timestampMs = event?.timestamp || null;
       const consumed = requestId ? isRequestConsumed(requestId) : false;
 
       if (!includeConsumed && consumed) {
@@ -1169,7 +1383,7 @@ app.get('/admin/mint-requests', requireAdmin, async (req, res) => {
     res.json({
       success: true,
       items,
-      nextCursor: response?.nextCursor || null,
+      nextCursor: response?.data?.events?.pageInfo?.endCursor || null,
     });
   } catch (error) {
     console.error('Admin mint request listing failed:', error);
@@ -1321,15 +1535,21 @@ app.post('/finalize-mint', async (req, res) => {
 
     // 5. The parent application's admin/sponsor signs and executes the transaction block.
     // This pays the gas fees for the transaction.
-    const executionResult = await suiClient.signAndExecuteTransaction({
-      signer: adminKeypair,
-      transaction: txb,
-      options: { showEffects: true, showEvents: true, showObjectChanges: true },
-      requestType: 'WaitForLocalExecution',
+    const coreClient = getCoreClient(suiClient);
+    if (!coreClient || typeof coreClient.executeTransaction !== 'function') {
+      throw new Error('Sui gRPC core executeTransaction is unavailable.');
+    }
+
+    const txBytes = await txb.build({ client: coreClient });
+    const signature = await signTransactionWithKeypair(adminKeypair, txBytes);
+
+    const executionResult = await coreClient.executeTransaction({
+      transaction: txBytes,
+      signatures: [signature],
     });
 
-    const digest = executionResult?.digest;
-    const attestationSummary = extractAttestationFromChanges(executionResult?.objectChanges);
+    const digest = executionResult?.transaction?.digest || executionResult?.transaction?.effects?.transactionDigest || null;
+    const attestationSummary = await extractAttestationFromChanges(executionResult?.transaction?.effects?.changedObjects || []);
     const attestationObjectId = attestationSummary?.objectId || null;
 
     // CRITICAL FIX: Persist attestation immediately after on-chain execution.
@@ -1381,8 +1601,8 @@ app.post('/finalize-mint', async (req, res) => {
       digest,
       finalizeTxDigest: digest,
       attestationId: attestationObjectId,
-      effects: executionResult?.effects ?? null,
-      objectChanges: executionResult?.objectChanges ?? null,
+      effects: executionResult?.transaction?.effects ?? null,
+      objectChanges: executionResult?.transaction?.effects?.changedObjects ?? null,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -1399,58 +1619,78 @@ async function startIndexer() {
     console.warn('Cannot start indexer: Sui client not configured.');
     return;
   }
-  if (typeof suiClient.subscribeEvent !== 'function') {
-    console.warn('Cannot start indexer: Sui client missing subscribeEvent support.');
-    return;
-  }
-  if (typeof global.WebSocket !== 'function') {
-    console.warn('Cannot start indexer: WebSocket implementation unavailable. Install the "ws" package.');
+  if (!SUI_GRAPHQL_CANDIDATES.length) {
+    console.warn('Indexer disabled: GraphQL endpoint not configured.');
     return;
   }
   console.log('Starting event indexer...');
   try {
-    await suiClient.subscribeEvent({
-      filter: { MoveEventType: `${PACKAGE_ID}::protocol::AttestationMinted` },
-      onMessage: async (event) => {
-        const recipient = (event?.parsedJson?.recipient) || null;
-        const requestIdFromEvent = (event?.parsedJson?.request_id || event?.parsedJson?.requestId) || null;
-        const attestationObjectIdFromEvent = (event?.parsedJson?.objectId) || null;
+    try {
+      await queryGraphQL('{ chainIdentifier }', {});
+    } catch (warmupErr) {
+      console.warn('Indexer disabled: GraphQL is unreachable:', warmupErr && warmupErr.message ? warmupErr.message : warmupErr);
+      return;
+    }
 
-        if (requestIdFromEvent) {
-          markRequestConsumed(requestIdFromEvent, {
-            finalizedAt: new Date().toISOString(),
-            source: 'event-indexer',
-            attestationId: attestationObjectIdFromEvent,
-            walletAddress: recipient,
-          });
-        }
-        if (!recipient) return;
+    const pollIndexer = async () => {
+      try {
+        const response = await queryGraphQL(EVENT_QUERY, {
+          type: `${PACKAGE_ID}::protocol::AttestationMinted`,
+          first: 50,
+          after: attestationIndexerCursor,
+        });
 
-        const pendingMint = pendingMints.get(recipient);
-        if (pendingMint) {
-          try {
-            db.markUsedGovId(
-              pendingMint.country,
-              pendingMint.idNumber,
-              {
-                walletAddress: recipient,
-                eventType: 'indexer-attestation',
-                source: 'event-indexer',
-                indexedAt: new Date().toISOString(),
-                requestId: pendingMint.requestId,
-                attestationId: pendingMint.attestationId || attestationObjectIdFromEvent,
-                fullNameHash: pendingMint.fullNameHash || null
-              }
-            );
-            console.log(`✅ SUCCESS: Recorded attestation for wallet ${recipient}`);
-          } catch (e) {
-            console.error('Failed to mark gov id as used in persistent DB:', e);
+        const eventPage = response?.data?.events || null;
+        const events = Array.isArray(eventPage?.nodes) ? eventPage.nodes : [];
+        attestationIndexerCursor = eventPage?.pageInfo?.endCursor || attestationIndexerCursor;
+
+        for (const event of events) {
+          const payload = event?.contents?.json || {};
+          const recipient = payload.recipient || payload.walletAddress || null;
+          const requestIdFromEvent = payload.request_id || payload.requestId || null;
+          const attestationObjectIdFromEvent = payload.objectId || payload.attestationId || null;
+
+          if (requestIdFromEvent) {
+            markRequestConsumed(requestIdFromEvent, {
+              finalizedAt: new Date().toISOString(),
+              source: 'event-indexer',
+              attestationId: attestationObjectIdFromEvent,
+              walletAddress: recipient,
+            });
           }
-          pendingMints.delete(recipient);
+          if (!recipient) continue;
+
+          const pendingMint = pendingMints.get(recipient);
+          if (pendingMint) {
+            try {
+              db.markUsedGovId(
+                pendingMint.country,
+                pendingMint.idNumber,
+                {
+                  walletAddress: recipient,
+                  eventType: 'indexer-attestation',
+                  source: 'event-indexer',
+                  indexedAt: new Date().toISOString(),
+                  requestId: pendingMint.requestId,
+                  attestationId: pendingMint.attestationId || attestationObjectIdFromEvent,
+                  fullNameHash: pendingMint.fullNameHash || null
+                }
+              );
+              console.log(`✅ SUCCESS: Recorded attestation for wallet ${recipient}`);
+            } catch (e) {
+              console.error('Failed to mark gov id as used in persistent DB:', e);
+            }
+            pendingMints.delete(recipient);
+          }
         }
-      },
-    });
-    console.log('Indexer successfully subscribed to events.');
+      } catch (err) {
+        console.error('Indexer polling failed:', err && err.message ? err.message : err);
+      }
+    };
+
+    await pollIndexer();
+    setInterval(pollIndexer, 15000);
+    console.log('Indexer polling started using GraphQL events.');
   } catch (error) {
     console.error('Failed to start event indexer:', error);
   }

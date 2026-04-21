@@ -44,6 +44,8 @@ services:
       
       # Load other vars from your .env file
       - SUI_NETWORK=${SUI_NETWORK}
+      - SUI_GRPC=${SUI_GRPC}
+      - SUI_GRAPHQL=${SUI_GRAPHQL}
       - SUI_RPC=${SUI_RPC}
       - PACKAGE_ID=${PACKAGE_ID}
       - ADMIN_CAP_ID=${ADMIN_CAP_ID}
